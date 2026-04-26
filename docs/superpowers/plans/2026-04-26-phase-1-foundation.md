@@ -10,6 +10,17 @@
 
 ---
 
+## Phases
+
+| Phase | Tasks | Deliverable | Safe pause point |
+|-------|-------|-------------|-----------------|
+| **A — Backend Foundation** | 1–2 | FastAPI app running, DB connected | ✅ After Task 2 |
+| **B — Backend Data & Services** | 3–8 | All backend endpoints + CV parser working | ✅ After Task 8 |
+| **C — Backend Preferences & Readiness** | 9–10 | Full backend API complete, all tests passing | ✅ After Task 10 |
+| **D — Frontend** | 11–15 | Settings page fully functional end-to-end | ✅ After Task 15 |
+
+---
+
 ## File Map
 
 ```
