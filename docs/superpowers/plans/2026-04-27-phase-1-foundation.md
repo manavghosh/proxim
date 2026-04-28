@@ -943,7 +943,7 @@ git commit -m "feat: add CV service layer with hash-change detection (TDD)"
 - Create: `src/__tests__/lib/preferences-service.test.ts`
 - Create: `src/lib/preferences-service.ts`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `src/__tests__/lib/preferences-service.test.ts`:
 
@@ -987,7 +987,7 @@ describe('mergePreferences', () => {
 })
 ```
 
-- [ ] **Step 2: Run tests — verify they fail**
+- [x] **Step 2: Run tests — verify they fail**
 
 ```bash
 npm run test:run -- src/__tests__/lib/preferences-service.test.ts
@@ -995,7 +995,7 @@ npm run test:run -- src/__tests__/lib/preferences-service.test.ts
 
 Expected: `Cannot find module '@/lib/preferences-service'`
 
-- [ ] **Step 3: Create `src/lib/preferences-service.ts`**
+- [x] **Step 3: Create `src/lib/preferences-service.ts`**
 
 ```typescript
 import { eq } from 'drizzle-orm'
@@ -1042,7 +1042,7 @@ export async function updatePreferences(
 }
 ```
 
-- [ ] **Step 4: Run tests — verify they pass**
+- [x] **Step 4: Run tests — verify they pass**
 
 ```bash
 npm run test:run -- src/__tests__/lib/preferences-service.test.ts
@@ -1050,7 +1050,7 @@ npm run test:run -- src/__tests__/lib/preferences-service.test.ts
 
 Expected: `4 passed`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/preferences-service.ts src/__tests__/lib/preferences-service.test.ts
@@ -1065,7 +1065,7 @@ git commit -m "feat: add preferences service with partial-merge logic (TDD)"
 - Create: `src/__tests__/lib/readiness-service.test.ts`
 - Create: `src/lib/readiness-service.ts`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `src/__tests__/lib/readiness-service.test.ts`:
 
@@ -1138,7 +1138,7 @@ describe('computeReadiness', () => {
 })
 ```
 
-- [ ] **Step 2: Run tests — verify they fail**
+- [x] **Step 2: Run tests — verify they fail**
 
 ```bash
 npm run test:run -- src/__tests__/lib/readiness-service.test.ts
@@ -1146,7 +1146,7 @@ npm run test:run -- src/__tests__/lib/readiness-service.test.ts
 
 Expected: `Cannot find module '@/lib/readiness-service'`
 
-- [ ] **Step 3: Create `src/lib/readiness-service.ts`**
+- [x] **Step 3: Create `src/lib/readiness-service.ts`**
 
 ```typescript
 import type { Candidate } from '@/db/schema'
@@ -1186,7 +1186,7 @@ export async function getReadiness(): Promise<ReadinessResult> {
 }
 ```
 
-- [ ] **Step 4: Run tests — verify they pass**
+- [x] **Step 4: Run tests — verify they pass**
 
 ```bash
 npm run test:run -- src/__tests__/lib/readiness-service.test.ts
@@ -1194,7 +1194,7 @@ npm run test:run -- src/__tests__/lib/readiness-service.test.ts
 
 Expected: `6 passed`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/readiness-service.ts src/__tests__/lib/readiness-service.test.ts
@@ -1209,7 +1209,7 @@ git commit -m "feat: add pipeline readiness service as pure function (TDD)"
 - Create: `src/__tests__/lib/cv-parser.test.ts`
 - Create: `src/lib/cv-parser.ts`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `src/__tests__/lib/cv-parser.test.ts`:
 
@@ -1262,7 +1262,7 @@ describe('parseCV', () => {
 })
 ```
 
-- [ ] **Step 2: Run tests — verify they fail**
+- [x] **Step 2: Run tests — verify they fail**
 
 ```bash
 npm run test:run -- src/__tests__/lib/cv-parser.test.ts
@@ -1270,7 +1270,7 @@ npm run test:run -- src/__tests__/lib/cv-parser.test.ts
 
 Expected: `Cannot find module '@/lib/cv-parser'`
 
-- [ ] **Step 3: Create `src/lib/cv-parser.ts`**
+- [x] **Step 3: Create `src/lib/cv-parser.ts`**
 
 ```typescript
 import { generateObject } from 'ai'
@@ -1300,7 +1300,7 @@ export async function parseCV(markdown: string): Promise<ParsedProfile> {
 }
 ```
 
-- [ ] **Step 4: Run tests — verify they pass**
+- [x] **Step 4: Run tests — verify they pass**
 
 ```bash
 npm run test:run -- src/__tests__/lib/cv-parser.test.ts
@@ -1308,7 +1308,7 @@ npm run test:run -- src/__tests__/lib/cv-parser.test.ts
 
 Expected: `3 passed`
 
-- [ ] **Step 5: Run full test suite**
+- [x] **Step 5: Run full test suite**
 
 ```bash
 npm run test:run
@@ -1316,7 +1316,7 @@ npm run test:run
 
 Expected: All tests pass across hash, cv-converter, cv-service, preferences-service, readiness-service, cv-parser.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/lib/cv-parser.ts src/__tests__/lib/cv-parser.test.ts
