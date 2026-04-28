@@ -1500,7 +1500,7 @@ git commit -m "feat: add all Route Handlers — CV convert/save/get, preferences
 - Create: `src/types/candidate.ts`
 - Create: `src/lib/api.ts`
 
-- [ ] **Step 1: Create `src/types/candidate.ts`**
+- [x] **Step 1: Create `src/types/candidate.ts`**
 
 ```typescript
 export type ParseStatus = 'pending' | 'parsing' | 'ready' | 'failed'
@@ -1550,7 +1550,7 @@ export interface PipelineReadiness {
 }
 ```
 
-- [ ] **Step 2: Create `src/lib/api.ts`**
+- [x] **Step 2: Create `src/lib/api.ts`**
 
 ```typescript
 import type { CandidateState, Preferences, PipelineReadiness } from '@/types/candidate'
@@ -1603,7 +1603,7 @@ export async function getReadiness(): Promise<PipelineReadiness> {
 }
 ```
 
-- [ ] **Step 3: TypeScript check**
+- [x] **Step 3: TypeScript check**
 
 ```bash
 npx tsc --noEmit
@@ -1611,7 +1611,7 @@ npx tsc --noEmit
 
 Expected: No errors.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/types/candidate.ts src/lib/api.ts
@@ -1630,7 +1630,7 @@ git commit -m "feat: add TypeScript types and fetch-based API client"
 - Create: `src/components/cv/MarkdownEditor.tsx`
 - Create: `src/components/cv/ParseStatusBadge.tsx`
 
-- [ ] **Step 1: Create `src/components/cv/CVUploader.tsx`**
+- [x] **Step 1: Create `src/components/cv/CVUploader.tsx`**
 
 ```tsx
 'use client'
@@ -1700,7 +1700,7 @@ export function CVUploader({ onConverted }: CVUploaderProps) {
 }
 ```
 
-- [ ] **Step 2: Create `src/components/cv/MarkdownEditor.tsx`**
+- [x] **Step 2: Create `src/components/cv/MarkdownEditor.tsx`**
 
 ```tsx
 'use client'
@@ -1757,7 +1757,7 @@ export function MarkdownEditor({ initialMarkdown, onSaved }: MarkdownEditorProps
 }
 ```
 
-- [ ] **Step 3: Create `src/components/cv/ParseStatusBadge.tsx`**
+- [x] **Step 3: Create `src/components/cv/ParseStatusBadge.tsx`**
 
 ```tsx
 'use client'
@@ -1814,7 +1814,7 @@ export function ParseStatusBadge({ initialStatus }: ParseStatusBadgeProps) {
 }
 ```
 
-- [ ] **Step 4: TypeScript check**
+- [x] **Step 4: TypeScript check**
 
 ```bash
 npx tsc --noEmit
@@ -1822,7 +1822,7 @@ npx tsc --noEmit
 
 Expected: No errors.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/cv/
@@ -1839,7 +1839,7 @@ git commit -m "feat: add CVUploader, MarkdownEditor, ParseStatusBadge using shad
 **Files:**
 - Create: `src/components/preferences/PreferencesForm.tsx`
 
-- [ ] **Step 1: Create `src/components/preferences/PreferencesForm.tsx`**
+- [x] **Step 1: Create `src/components/preferences/PreferencesForm.tsx`**
 
 ```tsx
 'use client'
@@ -2022,7 +2022,7 @@ export function PreferencesForm({ initialPreferences, onSaved }: PreferencesForm
 }
 ```
 
-- [ ] **Step 2: TypeScript check**
+- [x] **Step 2: TypeScript check**
 
 ```bash
 npx tsc --noEmit
@@ -2030,7 +2030,7 @@ npx tsc --noEmit
 
 Expected: No errors.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/components/preferences/PreferencesForm.tsx
@@ -2047,7 +2047,7 @@ git commit -m "feat: add PreferencesForm with required field validation using sh
 - Create: `src/components/shared/PipelineReadinessIndicator.tsx`
 - Create: `src/app/settings/page.tsx`
 
-- [ ] **Step 1: Create `src/components/shared/PipelineReadinessIndicator.tsx`**
+- [x] **Step 1: Create `src/components/shared/PipelineReadinessIndicator.tsx`**
 
 ```tsx
 import type { PipelineReadiness } from '@/types/candidate'
@@ -2088,7 +2088,7 @@ export function PipelineReadinessIndicator({
 }
 ```
 
-- [ ] **Step 2: Create `src/app/settings/page.tsx`**
+- [x] **Step 2: Create `src/app/settings/page.tsx`**
 
 ```tsx
 'use client'
@@ -2183,7 +2183,7 @@ export default function SettingsPage() {
 }
 ```
 
-- [ ] **Step 3: TypeScript check**
+- [x] **Step 3: TypeScript check**
 
 ```bash
 npx tsc --noEmit
@@ -2191,7 +2191,7 @@ npx tsc --noEmit
 
 Expected: No errors.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/components/shared/PipelineReadinessIndicator.tsx src/app/settings/page.tsx
@@ -2204,7 +2204,7 @@ git commit -m "feat: add PipelineReadinessIndicator and Settings page"
 
 **Files:** None created.
 
-- [ ] **Step 1: Run full test suite**
+- [x] **Step 1: Run full test suite**
 
 ```bash
 npm run test:run
@@ -2212,7 +2212,7 @@ npm run test:run
 
 Expected: All tests pass.
 
-- [ ] **Step 2: TypeScript full check**
+- [x] **Step 2: TypeScript full check**
 
 ```bash
 npx tsc --noEmit
@@ -2220,22 +2220,22 @@ npx tsc --noEmit
 
 Expected: Zero errors.
 
-- [ ] **Step 3: Start backend + open settings page**
+- [x] **Step 3: Start backend + open settings page**
 
 ```bash
 npm run dev
 ```
 
 Open `http://localhost:3000/settings` in a browser. Verify:
-- [ ] Pipeline readiness indicator appears (amber — "not ready")
-- [ ] Upload CV button is visible
-- [ ] Preferences form renders with all option groups
-- [ ] Upload `src/__tests__/fixtures/sample.md` → Markdown editor appears with the content
-- [ ] Edit a line in the editor → click Save CV → badge changes to "Parsing CV…"
-- [ ] After 5–10 seconds, badge changes to "Profile ready" (or "Parse failed" if `ANTHROPIC_API_KEY` not set)
-- [ ] Select a seniority level and geographic preference → Save Preferences → pipeline indicator turns green
+- [x] Pipeline readiness indicator appears (amber — "not ready")
+- [x] Upload CV button is visible
+- [x] Preferences form renders with all option groups
+- [x] Upload `src/__tests__/fixtures/sample.md` → Markdown editor appears with the content
+- [x] Edit a line in the editor → click Save CV → badge changes to "Parsing CV…"
+- [x] After 5–10 seconds, badge changes to "Profile ready" (or "Parse failed" if `ANTHROPIC_API_KEY` not set)
+- [x] Select a seniority level and geographic preference → Save Preferences → pipeline indicator turns green
 
-- [ ] **Step 4: Final commit**
+- [x] **Step 4: Final commit**
 
 ```bash
 git add -A
