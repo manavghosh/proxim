@@ -5,11 +5,11 @@ const MAX_BYTES = 10 * 1024 * 1024 // 10 MB
 
 export async function POST(request: Request) {
   const formData = await request.formData()
-  const file = formData.get('file') as File | null
-
-  if (!file) {
+  const fileEntry = formData.get('file')
+  if (!(fileEntry instanceof File)) {
     return NextResponse.json({ error: 'No file provided' }, { status: 400 })
   }
+  const file = fileEntry
 
   if (file.size > MAX_BYTES) {
     return NextResponse.json({ error: 'File exceeds 10 MB limit' }, { status: 413 })

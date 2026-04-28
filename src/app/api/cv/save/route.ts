@@ -1,5 +1,4 @@
-import { NextResponse } from 'next/server'
-import { after } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { saveCVMarkdown, markParseReady, markParseFailed } from '@/lib/cv-service'
 import { parseCV } from '@/lib/cv-parser'
 
@@ -21,7 +20,11 @@ export async function POST(request: Request) {
         const profile = await parseCV(markdown)
         await markParseReady(candidateId, profile)
       } catch {
-        await markParseFailed(candidateId)
+        try {
+          await markParseFailed(candidateId)
+        } catch (dbError) {
+          console.error('[cv/save] markParseFailed failed', { candidateId, dbError })
+        }
       }
     })
   }
