@@ -1334,7 +1334,7 @@ git commit -m "feat: add CV parser using Vercel AI SDK generateObject (TDD)"
 - Create: `src/app/api/preferences/route.ts`
 - Create: `src/app/api/candidate/readiness/route.ts`
 
-- [ ] **Step 1: Create `src/app/api/cv/route.ts`** (GET — returns current CV state)
+- [x] **Step 1: Create `src/app/api/cv/route.ts`** (GET — returns current CV state)
 
 ```typescript
 import { NextResponse } from 'next/server'
@@ -1346,7 +1346,7 @@ export async function GET() {
 }
 ```
 
-- [ ] **Step 2: Create `src/app/api/cv/convert/route.ts`** (POST — file → Markdown)
+- [x] **Step 2: Create `src/app/api/cv/convert/route.ts`** (POST — file → Markdown)
 
 ```typescript
 import { NextResponse } from 'next/server'
@@ -1381,7 +1381,7 @@ export async function POST(request: Request) {
 }
 ```
 
-- [ ] **Step 3: Create `src/app/api/cv/save/route.ts`** (POST — save + background parse)
+- [x] **Step 3: Create `src/app/api/cv/save/route.ts`** (POST — save + background parse)
 
 ```typescript
 import { NextResponse } from 'next/server'
@@ -1416,7 +1416,7 @@ export async function POST(request: Request) {
 }
 ```
 
-- [ ] **Step 4: Create `src/app/api/preferences/route.ts`** (GET + PUT)
+- [x] **Step 4: Create `src/app/api/preferences/route.ts`** (GET + PUT)
 
 ```typescript
 import { NextResponse } from 'next/server'
@@ -1434,7 +1434,7 @@ export async function PUT(request: Request) {
 }
 ```
 
-- [ ] **Step 5: Create `src/app/api/candidate/readiness/route.ts`** (GET)
+- [x] **Step 5: Create `src/app/api/candidate/readiness/route.ts`** (GET)
 
 ```typescript
 import { NextResponse } from 'next/server'
@@ -1446,7 +1446,7 @@ export async function GET() {
 }
 ```
 
-- [ ] **Step 6: TypeScript check**
+- [x] **Step 6: TypeScript check**
 
 ```bash
 npx tsc --noEmit
@@ -1454,7 +1454,7 @@ npx tsc --noEmit
 
 Expected: No errors.
 
-- [ ] **Step 7: Manually verify all endpoints**
+- [x] **Step 7: Manually verify all endpoints**
 
 Start the dev server:
 ```bash
@@ -1485,7 +1485,7 @@ curl http://localhost:3000/api/candidate/readiness
 
 Expected for final readiness call: `{ "ready": false, "missing": ["Upload and save your CV"] }`
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/app/api/
