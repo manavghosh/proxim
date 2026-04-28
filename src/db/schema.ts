@@ -39,7 +39,7 @@ export const parseStatusEnum = pgEnum('parse_status', [
 
 export const candidates = pgTable('candidates', {
   id: uuid().defaultRandom().primaryKey(),
-  candidateId: uuid(),
+  candidateId: uuid(), // nullable FK — reserved for future auth integration
   baseCvMd: text(),
   baseCvHash: varchar({ length: 64 }),
   parsedProfile: jsonb().$type<ParsedProfile>(),
@@ -49,7 +49,7 @@ export const candidates = pgTable('candidates', {
   updatedAt: timestamp({ withTimezone: true })
     .defaultNow()
     .notNull()
-    .$onUpdateFn(() => new Date()),
+    .$onUpdateFn(() => new Date()), // application-layer only — no DB-level trigger
 })
 
 export type Candidate = typeof candidates.$inferSelect
