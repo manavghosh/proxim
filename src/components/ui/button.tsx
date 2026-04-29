@@ -53,7 +53,7 @@ function Button({
     asChild?: boolean
     isLoading?: boolean
   }) {
-  const Comp = asChild ? Slot.Root : "button"
+  const Comp = asChild && !isLoading ? Slot.Root : "button"
 
   return (
     <Comp
@@ -61,10 +61,11 @@ function Button({
       data-variant={variant}
       data-size={size}
       disabled={isLoading || disabled}
+      aria-busy={isLoading || undefined}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
     >
-      {isLoading && <Loader2 className="animate-spin" />}
+      {isLoading && <Loader2 className="animate-spin" aria-hidden="true" data-testid="loading-spinner" />}
       {children}
     </Comp>
   )
