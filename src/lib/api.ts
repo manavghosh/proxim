@@ -2,9 +2,13 @@ import type { CandidateState, Preferences, PipelineReadiness } from '@/types/can
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? ''
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, attempt = 1): Promise<T> {
   const res = await fetch(`${BASE}${path}`, init)
   if (!res.ok) {
+    if (res.status === 500 && attempt < 3) {
+      await new Promise((r) => setTimeout(r, 1500 * attempt))
+      return request<T>(path, init, attempt + 1)
+    }
     const text = await res.text()
     throw new Error(`${res.status}: ${text}`)
   }
