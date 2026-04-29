@@ -52,7 +52,7 @@ export default function SettingsPage() {
   }
 
   function handlePreferencesSaved(prefs: Preferences) {
-    if (candidate) setCandidate({ ...candidate, preferences: prefs })
+    setCandidate(prev => prev ? { ...prev, preferences: prefs } : prev)
     void refresh()
   }
 

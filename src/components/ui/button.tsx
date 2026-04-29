@@ -67,7 +67,9 @@ function Button({
     >
       {isLoading ? (
         <>
-          <Loader2 className="animate-spin" aria-hidden="true" data-testid="loading-spinner" />
+          <span className="animate-spin inline-flex" aria-hidden="true" data-testid="loading-spinner">
+            <Loader2 />
+          </span>
           {children}
         </>
       ) : (
