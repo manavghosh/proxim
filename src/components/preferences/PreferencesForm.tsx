@@ -19,6 +19,9 @@ interface PreferencesFormProps {
 
 export function PreferencesForm({ initialPreferences, onSaved }: PreferencesFormProps) {
   const [prefs, setPrefs] = useState<Preferences>(initialPreferences)
+  const [seniorityText, setSeniorityText] = useState(
+    (initialPreferences.seniority_levels ?? []).join('\n')
+  )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
@@ -31,9 +34,9 @@ export function PreferencesForm({ initialPreferences, onSaved }: PreferencesForm
     setPrefs((p) => ({ ...p, [key]: next }))
   }
 
-  function validate(): boolean {
+  function validate(parsed: string[]): boolean {
     const errors: Record<string, string> = {}
-    if (!prefs.seniority_levels?.length)
+    if (!parsed.length)
       errors.seniority_levels = 'Enter at least one target role or seniority level'
     if (!prefs.geographic_preference)
       errors.geographic_preference = 'Select a geographic preference'
@@ -42,11 +45,12 @@ export function PreferencesForm({ initialPreferences, onSaved }: PreferencesForm
   }
 
   async function handleSave() {
-    if (!validate()) return
+    const parsed = parseSeniorityText(seniorityText)
+    if (!validate(parsed)) return
     setError(null)
     setSaving(true)
     try {
-      const { preferences } = await updatePreferences(prefs)
+      const { preferences } = await updatePreferences({ ...prefs, seniority_levels: parsed })
       onSaved(preferences as Preferences)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed.')
@@ -67,13 +71,8 @@ export function PreferencesForm({ initialPreferences, onSaved }: PreferencesForm
         <Textarea
           rows={4}
           placeholder={'CAIO\nCTO\nVP of AI\nHead of AI\nDirector of ML'}
-          value={(prefs.seniority_levels ?? []).join('\n')}
-          onChange={(e) =>
-            setPrefs((p) => ({
-              ...p,
-              seniority_levels: parseSeniorityText(e.target.value),
-            }))
-          }
+          value={seniorityText}
+          onChange={(e) => setSeniorityText(e.target.value)}
         />
         {fieldErrors.seniority_levels && (
           <p className="text-xs text-destructive">{fieldErrors.seniority_levels}</p>
