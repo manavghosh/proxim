@@ -5,9 +5,9 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { updatePreferences } from '@/lib/api'
+import { parseSeniorityText } from '@/lib/preferences-helpers'
 import type { Preferences } from '@/types/candidate'
 
-const SENIORITY_OPTIONS = ['CAIO', 'CTO', 'VP AI', 'Head of AI', 'Distinguished Engineer', 'AI Practice Head']
 const LOCATION_OPTIONS = ['Remote', 'Hybrid', 'Bengaluru-based', 'Open to relocation']
 const STAGE_OPTIONS = ['Startup Series B–D', 'GCC', 'Indian Enterprise', 'Product Co', 'Consultancy']
 const DOMAIN_OPTIONS = ['BFSI', 'E-commerce', 'SaaS', 'Healthcare', 'Defence']
@@ -34,7 +34,7 @@ export function PreferencesForm({ initialPreferences, onSaved }: PreferencesForm
   function validate(): boolean {
     const errors: Record<string, string> = {}
     if (!prefs.seniority_levels?.length)
-      errors.seniority_levels = 'Select at least one seniority level'
+      errors.seniority_levels = 'Enter at least one target role or seniority level'
     if (!prefs.geographic_preference)
       errors.geographic_preference = 'Select a geographic preference'
     setFieldErrors(errors)
@@ -58,27 +58,27 @@ export function PreferencesForm({ initialPreferences, onSaved }: PreferencesForm
   return (
     <div className="space-y-6">
       {/* Seniority — REQUIRED */}
-      <fieldset className="space-y-2">
+      <div className="space-y-2">
         <Label>
-          Target Seniority <span className="text-destructive">*</span>
+          Target Seniority / Role Keywords{' '}
+          <span className="text-destructive">*</span>
+          <span className="text-muted-foreground font-normal ml-1">(one per line)</span>
         </Label>
-        <div className="flex flex-wrap gap-2">
-          {SENIORITY_OPTIONS.map((opt) => (
-            <Button
-              key={opt}
-              type="button"
-              size="sm"
-              variant={prefs.seniority_levels?.includes(opt) ? 'default' : 'outline'}
-              onClick={() => toggleMulti('seniority_levels', opt)}
-            >
-              {opt}
-            </Button>
-          ))}
-        </div>
+        <Textarea
+          rows={4}
+          placeholder={'CAIO\nCTO\nVP of AI\nHead of AI\nDirector of ML'}
+          value={(prefs.seniority_levels ?? []).join('\n')}
+          onChange={(e) =>
+            setPrefs((p) => ({
+              ...p,
+              seniority_levels: parseSeniorityText(e.target.value),
+            }))
+          }
+        />
         {fieldErrors.seniority_levels && (
           <p className="text-xs text-destructive">{fieldErrors.seniority_levels}</p>
         )}
-      </fieldset>
+      </div>
 
       {/* Geographic preference — REQUIRED */}
       <fieldset className="space-y-2">

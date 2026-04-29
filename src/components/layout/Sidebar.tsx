@@ -2,6 +2,7 @@
 
 import type { LucideIcon } from 'lucide-react'
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
@@ -9,9 +10,10 @@ import {
   Send,
   Settings,
 } from 'lucide-react'
+import { getPreferences } from '@/lib/api'
+import { sidebarRoleLabel } from '@/lib/preferences-helpers'
 
 const USER_NAME = 'Manav Ghosh'
-const USER_ROLE = 'CAIO candidate'
 
 const NAV_MAIN = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -56,6 +58,16 @@ function NavItem({
 
 export function Sidebar() {
   const pathname = usePathname()
+  const [roleLabel, setRoleLabel] = useState('Candidate')
+
+  useEffect(() => {
+    getPreferences()
+      .then(({ preferences }) => {
+        const levels = (preferences.seniority_levels ?? []) as string[]
+        setRoleLabel(sidebarRoleLabel(levels))
+      })
+      .catch(() => undefined)
+  }, [pathname])
 
   return (
     <aside className="w-[220px] bg-[#060d1f] border-r border-[#1e2d4a] flex flex-col flex-shrink-0 h-screen">
@@ -111,7 +123,7 @@ export function Sidebar() {
             <p className="text-[11px] font-semibold text-[#cbd5e1] truncate">
               {USER_NAME}
             </p>
-            <p className="text-[9px] text-[#475569]">{USER_ROLE}</p>
+            <p className="text-[9px] text-[#475569]">{roleLabel}</p>
           </div>
         </div>
       </div>
