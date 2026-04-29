@@ -1,5 +1,6 @@
 'use client'
 
+import type { LucideIcon } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -8,6 +9,9 @@ import {
   Send,
   Settings,
 } from 'lucide-react'
+
+const USER_NAME = 'Manav Ghosh'
+const USER_ROLE = 'CAIO candidate'
 
 const NAV_MAIN = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -28,7 +32,7 @@ function NavItem({
 }: {
   href: string
   label: string
-  icon: React.ElementType
+  icon: LucideIcon
   soon?: boolean
   active: boolean
 }) {
@@ -105,9 +109,9 @@ export function Sidebar() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-[11px] font-semibold text-[#cbd5e1] truncate">
-              Manav Ghosh
+              {USER_NAME}
             </p>
-            <p className="text-[9px] text-[#475569]">CAIO candidate</p>
+            <p className="text-[9px] text-[#475569]">{USER_ROLE}</p>
           </div>
         </div>
       </div>

@@ -1,6 +1,8 @@
+import type { ReactNode } from 'react'
+
 interface TopbarProps {
   title: string
-  actions?: React.ReactNode
+  actions?: ReactNode
 }
 
 export function Topbar({ title, actions }: TopbarProps) {
