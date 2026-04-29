@@ -19,6 +19,10 @@ export async function getCV(): Promise<CandidateState> {
   return request('/api/cv')
 }
 
+export async function reparseCV(): Promise<CandidateState> {
+  return request('/api/cv/reparse', { method: 'POST' })
+}
+
 export async function convertCV(file: File): Promise<{ markdown: string }> {
   const form = new FormData()
   form.append('file', file)

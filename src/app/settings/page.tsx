@@ -1,12 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getCV, getReadiness } from '@/lib/api'
+import { getCV, getReadiness, reparseCV } from '@/lib/api'
 import { Topbar } from '@/components/layout/Topbar'
 import { CVUploader } from '@/components/cv/CVUploader'
 import { MarkdownEditor } from '@/components/cv/MarkdownEditor'
 import { ParseStatusBadge } from '@/components/cv/ParseStatusBadge'
 import { PreferencesForm } from '@/components/preferences/PreferencesForm'
+import { Button } from '@/components/ui/button'
 import type { CandidateState, Preferences, PipelineReadiness } from '@/types/candidate'
 
 export default function SettingsPage() {
@@ -14,6 +15,7 @@ export default function SettingsPage() {
   const [readiness, setReadiness] = useState<PipelineReadiness | null>(null)
   const [convertedMarkdown, setConvertedMarkdown] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [reparsing, setReparsing] = useState(false)
 
   async function refresh() {
     const [cv, r] = await Promise.all([getCV(), getReadiness()])
@@ -33,6 +35,16 @@ export default function SettingsPage() {
     setCandidate(updated)
     setConvertedMarkdown(null)
     void refresh()
+  }
+
+  async function handleReparse() {
+    setReparsing(true)
+    try {
+      const updated = await reparseCV()
+      setCandidate(updated)
+    } finally {
+      setReparsing(false)
+    }
   }
 
   function handlePreferencesSaved(prefs: Preferences) {
@@ -68,6 +80,17 @@ export default function SettingsPage() {
               </p>
               {candidate && (
                 <ParseStatusBadge initialStatus={candidate.parseStatus} />
+              )}
+              {candidate?.baseCvMd && candidate.parseStatus !== 'parsing' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="ml-auto text-xs border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c]"
+                  onClick={handleReparse}
+                  disabled={reparsing}
+                >
+                  {reparsing ? 'Queuing…' : '↺ Re-parse'}
+                </Button>
               )}
             </div>
 

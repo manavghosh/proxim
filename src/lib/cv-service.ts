@@ -4,6 +4,10 @@ import { candidates } from '@/db/schema'
 import type { Candidate } from '@/db/schema'
 import { computeSHA256 } from '@/lib/hash'
 
+export function canReparse(candidate: Candidate | null): boolean {
+  return Boolean(candidate?.baseCvMd) && candidate?.parseStatus !== 'parsing'
+}
+
 export function shouldTriggerParse(
   existingHash: string | null | undefined,
   newHash: string
