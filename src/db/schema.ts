@@ -23,7 +23,7 @@ type ParsedProfile = {
 
 type Preferences = {
   seniority_levels?: string[]
-  geographic_preference?: string
+  geographic_preference?: string[]
   company_stages?: string[]
   compensation_band?: { min: number; max: number; currency: string }
   target_companies?: string[]

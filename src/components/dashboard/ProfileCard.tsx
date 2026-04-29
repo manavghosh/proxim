@@ -53,7 +53,7 @@ export function ProfileCard({ candidate }: ProfileCardProps) {
   const topRole = parsedProfile.roles?.[0]
   const topSkills = parsedProfile.skills?.slice(0, 6) ?? []
   const seniorityLevels = (preferences?.seniority_levels ?? []) as string[]
-  const geo = (preferences?.geographic_preference as string) ?? null
+  const geoPrefs = (preferences?.geographic_preference as string[] | undefined) ?? []
 
   return (
     <div className="bg-[#0d1f3c] border border-[#1e3a5f] rounded-xl p-5">
@@ -120,12 +120,18 @@ export function ProfileCard({ candidate }: ProfileCardProps) {
       )}
 
       {/* Geo */}
-      {geo && (
+      {geoPrefs.length > 0 && (
         <>
           <p className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase mb-1">
-            Preference
+            Location
           </p>
-          <p className="text-[12px] text-[#94a3b8]">{geo}</p>
+          <div className="flex flex-wrap gap-1">
+            {geoPrefs.map((g) => (
+              <span key={g} className="text-[10px] bg-[#0a1835] border border-[#1e3a5f] text-[#94a3b8] px-2 py-0.5 rounded">
+                {g}
+              </span>
+            ))}
+          </div>
         </>
       )}
     </div>

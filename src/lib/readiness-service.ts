@@ -13,7 +13,7 @@ export function computeReadiness(candidate: Candidate | null): ReadinessResult {
   const senioritySet =
     Array.isArray(prefs.seniority_levels) &&
     (prefs.seniority_levels as string[]).length > 0
-  const locationSet = Boolean(prefs.geographic_preference)
+  const locationSet = Array.isArray(prefs.geographic_preference) && (prefs.geographic_preference as string[]).length > 0
 
   const missing: string[] = []
   if (!cvSaved) missing.push('Upload and save your CV')

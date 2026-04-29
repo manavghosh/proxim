@@ -13,11 +13,11 @@ describe('mergePreferences', () => {
   it('merges new fields into existing preferences', () => {
     const result = mergePreferences(
       { seniority_levels: ['CAIO'] },
-      { geographic_preference: 'Remote' }
+      { geographic_preference: ['Remote'] }
     )
     expect(result).toEqual({
       seniority_levels: ['CAIO'],
-      geographic_preference: 'Remote',
+      geographic_preference: ['Remote'],
     })
   })
 
@@ -31,15 +31,15 @@ describe('mergePreferences', () => {
 
   it('does not clear fields that are not present in the update', () => {
     const result = mergePreferences(
-      { seniority_levels: ['CAIO'], geographic_preference: 'Remote' },
+      { seniority_levels: ['CAIO'], geographic_preference: ['Remote'] },
       { seniority_levels: ['VP AI'] }
     )
-    expect(result.geographic_preference).toBe('Remote')
+    expect(result.geographic_preference).toEqual(['Remote'])
   })
 
   it('returns a new object and does not mutate the original', () => {
     const existing = { seniority_levels: ['CAIO'] }
-    mergePreferences(existing, { geographic_preference: 'Remote' })
+    mergePreferences(existing, { geographic_preference: ['Remote'] })
     expect(existing).toEqual({ seniority_levels: ['CAIO'] })
   })
 })

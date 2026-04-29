@@ -37,13 +37,36 @@ describe('computeReadiness', () => {
     expect(result.missing.some((m) => /geographic/i.test(m))).toBe(true)
   })
 
-  it('returns ready: true when CV, seniority, and location are all set', () => {
+  it('returns ready: true when CV, seniority, and location array are all set', () => {
     const result = computeReadiness({
       ...base,
       baseCvMd: '# CV',
       preferences: {
         seniority_levels: ['CAIO'],
-        geographic_preference: 'Remote',
+        geographic_preference: ['Remote'],
+      },
+    })
+    expect(result.ready).toBe(true)
+    expect(result.missing).toHaveLength(0)
+  })
+
+  it('returns ready: false when geographic_preference is an empty array', () => {
+    const result = computeReadiness({
+      ...base,
+      baseCvMd: '# CV',
+      preferences: { seniority_levels: ['CAIO'], geographic_preference: [] },
+    })
+    expect(result.ready).toBe(false)
+    expect(result.missing.some((m) => /geographic/i.test(m))).toBe(true)
+  })
+
+  it('returns ready: true when geographic_preference has multiple values', () => {
+    const result = computeReadiness({
+      ...base,
+      baseCvMd: '# CV',
+      preferences: {
+        seniority_levels: ['CAIO'],
+        geographic_preference: ['Remote', 'Hybrid'],
       },
     })
     expect(result.ready).toBe(true)
@@ -54,7 +77,7 @@ describe('computeReadiness', () => {
     const result = computeReadiness({
       ...base,
       baseCvMd: '# CV',
-      preferences: { seniority_levels: [], geographic_preference: 'Remote' },
+      preferences: { seniority_levels: [], geographic_preference: ['Remote'] },
     })
     expect(result.ready).toBe(false)
   })

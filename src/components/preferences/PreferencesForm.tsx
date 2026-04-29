@@ -41,8 +41,8 @@ export function PreferencesForm({ initialPreferences, onSaved }: PreferencesForm
     const errors: Record<string, string> = {}
     if (!parsed.length)
       errors.seniority_levels = 'Enter at least one target role or seniority level'
-    if (!prefs.geographic_preference)
-      errors.geographic_preference = 'Select a geographic preference'
+    if (!prefs.geographic_preference?.length)
+      errors.geographic_preference = 'Select at least one geographic preference'
     setFieldErrors(errors)
     return Object.keys(errors).length === 0
   }
@@ -97,8 +97,8 @@ export function PreferencesForm({ initialPreferences, onSaved }: PreferencesForm
               key={opt}
               type="button"
               size="sm"
-              variant={prefs.geographic_preference === opt ? 'default' : 'outline'}
-              onClick={() => setPrefs((p) => ({ ...p, geographic_preference: opt }))}
+              variant={prefs.geographic_preference?.includes(opt) ? 'default' : 'outline'}
+              onClick={() => toggleMulti('geographic_preference', opt)}
             >
               {opt}
             </Button>
