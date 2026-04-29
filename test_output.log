@@ -1,0 +1,25 @@
+
+> proxim@0.1.0 test
+> vitest
+
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+[1m[7m[34m DEV [39m[27m[22m [34mv2.1.9 [39m[90mC:/Agentic-AI/Proxim[39m
+
+ [32m✓[39m src/__tests__/lib/hash.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 5[2mms[22m[39m
+ [32m✓[39m src/__tests__/lib/readiness-service.test.ts [2m([22m[2m6 tests[22m[2m)[22m[90m 6[2mms[22m[39m
+[90mstdout[2m | src/__tests__/lib/cv-converter.test.ts[2m > [22m[2mconvertToMarkdown — PDF with no extractable text[2m > [22m[2mthrows ConversionError for a minimal empty PDF
+[22m[39mWarning: Setting up fake worker.
+
+ [32m✓[39m src/__tests__/lib/cv-converter.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 51[2mms[22m[39m
+ [32m✓[39m src/__tests__/lib/cv-parser.test.ts [2m([22m[2m3 tests[22m[2m)[22m[90m 145[2mms[22m[39m
+ [32m✓[39m src/__tests__/lib/cv-service.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 3[2mms[22m[39m
+ [32m✓[39m src/__tests__/lib/preferences-service.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 3[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m6 passed[39m[22m[90m (6)[39m
+[2m      Tests [22m [1m[32m26 passed[39m[22m[90m (26)[39m
+[2m   Start at [22m 16:34:09
+[2m   Duration [22m 2.43s[2m (transform 310ms, setup 1.07s, collect 1.43s, tests 214ms, environment 5.75s, prepare 1.59s)[22m
+
+[1m[7m[32m PASS [39m[27m[22m [32mWaiting for file changes...[39m
+       [2mpress [22m[1mh[22m[2m to show help[22m[2m, [22m[2mpress [22m[1mq[22m[2m to quit[22m

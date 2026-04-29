@@ -1,0 +1,76 @@
+extensions:
+  - name: superpowers-bridge
+    description: >
+      Automatically triggers Superpowers skills at each SpecKit lifecycle phase,
+      enforcing brainstorming, planning discipline, TDD, code review, and
+      verification gates before and after each command.
+    version: 1.0.0
+
+hooks:
+  before_specify:
+    - extension: superpowers-bridge
+      command: superpowers.brainstorming
+      description: Explore intent and requirements before writing a feature spec
+      prompt: >
+        We are about to run /speckit-specify. Before writing the spec, use the
+        brainstorming skill to explore the feature intent, user requirements, and
+        design options. The PRD is at docs/proxim-prd-extended.md.
+      optional: false
+      enabled: true
+
+  before_plan:
+    - extension: superpowers-bridge
+      command: superpowers.writing-plans
+      description: Apply structured planning discipline before generating design artifacts
+      prompt: >
+        We are about to run /speckit-plan. Before generating design artifacts,
+        use the writing-plans skill to structure the implementation approach,
+        identify risks, and validate against the Proxim constitution at
+        .specify/memory/constitution.md.
+      optional: false
+      enabled: true
+
+  before_implement:
+    - extension: superpowers-bridge
+      command: superpowers.test-driven-development
+      description: Enforce TDD — tests written and failing before any implementation code
+      prompt: >
+        We are about to run /speckit-implement. Before writing implementation code,
+        use the test-driven-development skill. Tests must be written, reviewed, and
+        confirmed failing before the first line of implementation is written.
+      optional: false
+      enabled: true
+
+  after_implement:
+    - extension: superpowers-bridge
+      command: superpowers.requesting-code-review
+      description: Verify implementation meets requirements and constitution before merging
+      prompt: >
+        /speckit-implement has completed. Use the requesting-code-review skill to
+        verify the implementation against the feature spec, the plan, and the
+        Proxim constitution. Flag any factual integrity, HITL gate, or observability
+        violations before the branch is merged.
+      optional: false
+      enabled: true
+
+  before_complete:
+    - extension: superpowers-bridge
+      command: superpowers.verification-before-completion
+      description: Run verification checks before claiming any task or feature done
+      prompt: >
+        Before marking work as complete, use the verification-before-completion skill.
+        Run the relevant test suite, confirm outputs, and provide evidence before
+        making any success claims. No claiming done without confirmed passing evidence.
+      optional: false
+      enabled: true
+
+  on_bug:
+    - extension: superpowers-bridge
+      command: superpowers.systematic-debugging
+      description: Apply structured debugging before proposing any fix
+      prompt: >
+        A bug or unexpected behaviour has been encountered. Before proposing a fix,
+        use the systematic-debugging skill to diagnose the root cause. Do not patch
+        symptoms — identify and fix the underlying issue.
+      optional: true
+      enabled: true

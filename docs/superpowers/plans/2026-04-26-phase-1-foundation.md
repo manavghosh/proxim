@@ -1,5 +1,9 @@
 # Phase 1 Foundation Implementation Plan
 
+> ⚠️ **OBSOLETE — DO NOT EXECUTE.** This plan was written for FastAPI + SQLAlchemy + Python.
+> The stack has changed to **Next.js 15 + Drizzle ORM + Vercel AI SDK** (constitution v1.1.0).
+> Run `/speckit-plan` to regenerate this plan before implementation begins.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build the candidate profile foundation — CV upload with inline Markdown editing, async structured parsing via Claude, and a preferences form with a pipeline readiness gate.
