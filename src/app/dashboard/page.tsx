@@ -39,6 +39,7 @@ export default function DashboardPage() {
   const [candidate, setCandidate] = useState<CandidateState | null>(null)
   const [readiness, setReadiness] = useState<PipelineReadiness | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     Promise.all([getCV(), getReadiness()])
@@ -46,6 +47,7 @@ export default function DashboardPage() {
         setCandidate(cv)
         setReadiness(r)
       })
+      .catch(() => setError('Failed to load dashboard data. Please refresh.'))
       .finally(() => setLoading(false))
   }, [])
 
@@ -64,6 +66,11 @@ export default function DashboardPage() {
       />
 
       <main className="flex-1 overflow-y-auto p-6 bg-[#0d1829]">
+        {error && (
+          <div className="mx-6 mt-4 px-4 py-3 bg-[#450a0a] border border-[#7f1d1d] rounded-lg text-[12px] text-[#fca5a5]">
+            {error}
+          </div>
+        )}
         {loading ? (
           <div className="space-y-4">
             <div className="grid grid-cols-4 gap-4">
