@@ -166,8 +166,8 @@ export function PreferencesForm({ initialPreferences, onSaved }: PreferencesForm
       </fieldset>
 
       <div className="flex items-center gap-3">
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? 'Saving…' : 'Save Preferences'}
+        <Button onClick={handleSave} isLoading={saving}>
+          Save Preferences
         </Button>
         {error && <p className="text-sm text-destructive">{error}</p>}
       </div>
