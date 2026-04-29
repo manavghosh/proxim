@@ -44,7 +44,7 @@ export function CVUploader({ onConverted }: CVUploaderProps) {
     <div className="space-y-2">
       <Button
         variant="default"
-        onClick={() => inputRef.current?.click()}
+        onClick={() => { if (!loading) inputRef.current?.click() }}
         isLoading={loading}
       >
         Upload CV

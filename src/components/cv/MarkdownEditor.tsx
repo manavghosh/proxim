@@ -45,6 +45,7 @@ export function MarkdownEditor({ initialMarkdown, onSaved }: MarkdownEditorProps
         rows={24}
         className="font-mono text-sm"
         spellCheck={false}
+        readOnly={saving}
       />
       {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
