@@ -42,13 +42,25 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    Promise.all([getCV(), getReadiness()])
-      .then(([cv, r]) => {
-        setCandidate(cv)
-        setReadiness(r)
-      })
-      .catch(() => setError('Failed to load dashboard data. Please refresh.'))
-      .finally(() => setLoading(false))
+    async function load() {
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const [cv, r] = await Promise.all([getCV(), getReadiness()])
+          setCandidate(cv)
+          setReadiness(r)
+          setLoading(false)
+          return
+        } catch {
+          if (attempt < 3) {
+            await new Promise((res) => setTimeout(res, 1500 * attempt))
+          } else {
+            setError('Failed to load dashboard data. Please refresh.')
+            setLoading(false)
+          }
+        }
+      }
+    }
+    load()
   }, [])
 
   const cvMeta = parseStatusMeta(candidate)
