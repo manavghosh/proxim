@@ -87,9 +87,9 @@ export default function SettingsPage() {
                   size="sm"
                   className="ml-auto text-xs border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c]"
                   onClick={handleReparse}
-                  disabled={reparsing}
+                  isLoading={reparsing}
                 >
-                  {reparsing ? 'Queuing…' : '↺ Re-parse'}
+                  ↺ Re-parse
                 </Button>
               )}
             </div>
