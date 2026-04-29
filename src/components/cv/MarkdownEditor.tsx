@@ -35,8 +35,8 @@ export function MarkdownEditor({ initialMarkdown, onSaved }: MarkdownEditorProps
         <p className="text-sm text-muted-foreground">
           Review and correct the Markdown before saving.
         </p>
-        <Button variant="default" size="sm" onClick={handleSave} disabled={saving}>
-          {saving ? 'Saving…' : 'Save CV'}
+        <Button variant="default" size="sm" onClick={handleSave} isLoading={saving}>
+          Save CV
         </Button>
       </div>
       <Textarea
