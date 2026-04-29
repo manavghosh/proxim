@@ -77,11 +77,8 @@ export function Sidebar() {
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
             <span className="text-white text-xs font-bold">P</span>
           </div>
-          <div>
-            <div className="text-[13px] font-bold text-[#f1f5f9] tracking-widest">
-              PROXIM
-            </div>
-            <div className="text-[9px] text-[#334155]">v0.1 · MVP</div>
+          <div className="text-[13px] font-bold text-[#f1f5f9] tracking-widest">
+            PROXIM
           </div>
         </div>
       </div>
