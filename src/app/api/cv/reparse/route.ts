@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { after } from 'next/server'
 import { getOrCreateCandidate, canReparse, markParseReady, markParseFailed } from '@/lib/cv-service'
 import { eq } from 'drizzle-orm'
 import { db } from '@/db'
@@ -17,7 +16,7 @@ export async function POST() {
       )
     }
 
-    const [updated] = await db
+    const [parsing] = await db
       .update(candidates)
       .set({ parseStatus: 'parsing', parsedProfile: null })
       .where(eq(candidates.id, candidate.id))
@@ -26,17 +25,22 @@ export async function POST() {
     const candidateId = candidate.id
     const markdown = candidate.baseCvMd!
 
-    after(async () => {
+    try {
+      const profile = await parseCV(markdown)
+      await markParseReady(candidateId, profile)
+    } catch (e) {
+      console.error('[cv/reparse] parseCV failed:', e)
       try {
-        const profile = await parseCV(markdown)
-        await markParseReady(candidateId, profile)
-      } catch {
         await markParseFailed(candidateId)
+      } catch (dbError) {
+        console.error('[cv/reparse] markParseFailed failed:', dbError)
       }
-    })
+    }
 
+    const updated = await getOrCreateCandidate()
     return NextResponse.json(updated)
-  } catch {
+  } catch (e) {
+    console.error('[cv/reparse] unexpected error:', e)
     return NextResponse.json({ error: 'Failed to trigger re-parse' }, { status: 500 })
   }
 }
