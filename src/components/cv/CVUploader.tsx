@@ -45,9 +45,9 @@ export function CVUploader({ onConverted }: CVUploaderProps) {
       <Button
         variant="default"
         onClick={() => inputRef.current?.click()}
-        disabled={loading}
+        isLoading={loading}
       >
-        {loading ? 'Converting…' : 'Upload CV'}
+        Upload CV
       </Button>
       <input
         ref={inputRef}
