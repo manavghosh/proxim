@@ -22,6 +22,9 @@ export function PreferencesForm({ initialPreferences, onSaved }: PreferencesForm
   const [seniorityText, setSeniorityText] = useState(
     (initialPreferences.seniority_levels ?? []).join('\n')
   )
+  const [targetCompaniesText, setTargetCompaniesText] = useState(
+    (initialPreferences.target_companies ?? []).join('\n')
+  )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
@@ -49,8 +52,12 @@ export function PreferencesForm({ initialPreferences, onSaved }: PreferencesForm
     if (!validate(parsed)) return
     setError(null)
     setSaving(true)
+    const parsedCompanies = targetCompaniesText
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean)
     try {
-      const { preferences } = await updatePreferences({ ...prefs, seniority_levels: parsed })
+      const { preferences } = await updatePreferences({ ...prefs, seniority_levels: parsed, target_companies: parsedCompanies })
       onSaved(preferences as Preferences)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed.')
@@ -131,16 +138,8 @@ export function PreferencesForm({ initialPreferences, onSaved }: PreferencesForm
         <Textarea
           rows={4}
           placeholder={'JPMC India\nWalmart Global Tech\nFreshworks'}
-          value={(prefs.target_companies ?? []).join('\n')}
-          onChange={(e) =>
-            setPrefs((p) => ({
-              ...p,
-              target_companies: e.target.value
-                .split('\n')
-                .map((s) => s.trim())
-                .filter(Boolean),
-            }))
-          }
+          value={targetCompaniesText}
+          onChange={(e) => setTargetCompaniesText(e.target.value)}
         />
       </div>
 

@@ -16,6 +16,7 @@ export default function SettingsPage() {
   const [convertedMarkdown, setConvertedMarkdown] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [reparsing, setReparsing] = useState(false)
+  const [reparseError, setReparseError] = useState<string | null>(null)
 
   async function refresh() {
     const [cv, r] = await Promise.all([getCV(), getReadiness()])
@@ -38,10 +39,13 @@ export default function SettingsPage() {
   }
 
   async function handleReparse() {
+    setReparseError(null)
     setReparsing(true)
     try {
       const updated = await reparseCV()
       setCandidate(updated)
+    } catch (e) {
+      setReparseError(e instanceof Error ? e.message : 'Re-parse failed. Try again.')
     } finally {
       setReparsing(false)
     }
@@ -81,16 +85,22 @@ export default function SettingsPage() {
               {candidate && (
                 <ParseStatusBadge initialStatus={candidate.parseStatus} />
               )}
-              {candidate?.baseCvMd && candidate.parseStatus !== 'parsing' && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="ml-auto text-xs border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c]"
-                  onClick={handleReparse}
-                  isLoading={reparsing}
-                >
-                  ↺ Re-parse
-                </Button>
+              {candidate && candidate.parseStatus !== 'parsing' &&
+                (candidate.baseCvMd || candidate.parseStatus === 'failed') && (
+                <div className="ml-auto flex items-center gap-2">
+                  {reparseError && (
+                    <p className="text-[10px] text-destructive">{reparseError}</p>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c]"
+                    onClick={handleReparse}
+                    isLoading={reparsing}
+                  >
+                    ↺ Re-parse
+                  </Button>
+                </div>
               )}
             </div>
 
