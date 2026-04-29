@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { getCV, getReadiness } from '@/lib/api'
+import { Topbar } from '@/components/layout/Topbar'
 import { CVUploader } from '@/components/cv/CVUploader'
 import { MarkdownEditor } from '@/components/cv/MarkdownEditor'
 import { ParseStatusBadge } from '@/components/cv/ParseStatusBadge'
 import { PreferencesForm } from '@/components/preferences/PreferencesForm'
-import { PipelineReadinessIndicator } from '@/components/shared/PipelineReadinessIndicator'
 import type { CandidateState, Preferences, PipelineReadiness } from '@/types/candidate'
 
 export default function SettingsPage() {
@@ -41,50 +41,65 @@ export default function SettingsPage() {
   }
 
   if (loading) {
-    return <div className="p-8 text-gray-500 text-sm">Loading…</div>
+    return (
+      <div className="flex flex-col flex-1 overflow-hidden">
+        <Topbar title="Settings" />
+        <div className="flex-1 flex items-center justify-center bg-[#0d1829]">
+          <p className="text-[#475569] text-sm">Loading…</p>
+        </div>
+      </div>
+    )
   }
 
   const markdownToEdit = convertedMarkdown ?? candidate?.baseCvMd
 
   return (
-    <main className="max-w-3xl mx-auto p-8 space-y-10">
-      <h1 className="text-2xl font-semibold text-gray-900">Settings</h1>
+    <div className="flex flex-col flex-1 overflow-hidden">
+      <Topbar title="Settings" />
 
-      {readiness && <PipelineReadinessIndicator readiness={readiness} />}
+      <main className="flex-1 overflow-y-auto p-6 bg-[#0d1829]">
+        <div className="grid grid-cols-[2fr_1fr] gap-6 max-w-6xl">
 
-      {/* CV section */}
-      <section className="space-y-4">
-        <div className="flex items-center gap-3">
-          <h2 className="text-lg font-medium text-gray-800">CV</h2>
-          {candidate && (
-            <ParseStatusBadge initialStatus={candidate.parseStatus} />
-          )}
-        </div>
+          {/* CV section */}
+          <section className="bg-[#0d1f3c] border border-[#1e3a5f] rounded-xl p-5 space-y-4">
+            <div className="flex items-center gap-3">
+              <p className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase">
+                CV
+              </p>
+              {candidate && (
+                <ParseStatusBadge initialStatus={candidate.parseStatus} />
+              )}
+            </div>
 
-        <CVUploader onConverted={handleConverted} />
+            <CVUploader onConverted={handleConverted} />
 
-        {markdownToEdit ? (
-          <MarkdownEditor
-            initialMarkdown={markdownToEdit}
-            onSaved={handleCVSaved}
-          />
-        ) : (
-          candidate?.baseCvMd && (
-            <p className="text-sm text-gray-500">
-              CV saved. Upload a new file to replace it.
+            {markdownToEdit ? (
+              <MarkdownEditor
+                initialMarkdown={markdownToEdit}
+                onSaved={handleCVSaved}
+              />
+            ) : (
+              candidate?.baseCvMd && (
+                <p className="text-sm text-[#475569]">
+                  CV saved. Upload a new file to replace it.
+                </p>
+              )
+            )}
+          </section>
+
+          {/* Preferences section */}
+          <section className="bg-[#0d1f3c] border border-[#1e3a5f] rounded-xl p-5 space-y-4">
+            <p className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase">
+              Preferences
             </p>
-          )
-        )}
-      </section>
+            <PreferencesForm
+              initialPreferences={candidate?.preferences ?? {}}
+              onSaved={handlePreferencesSaved}
+            />
+          </section>
 
-      {/* Preferences section */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-medium text-gray-800">Preferences</h2>
-        <PreferencesForm
-          initialPreferences={candidate?.preferences ?? {}}
-          onSaved={handlePreferencesSaved}
-        />
-      </section>
-    </main>
+        </div>
+      </main>
+    </div>
   )
 }
