@@ -7,6 +7,7 @@ describe('Button isLoading', () => {
     const { getByTestId } = render(<Button isLoading>Save</Button>)
     const spinner = getByTestId('loading-spinner')
     expect(spinner).toBeInTheDocument()
+    expect(spinner).toHaveAttribute('role', 'status')
     expect(spinner.classList.toString()).toContain('animate-spin')
   })
 
