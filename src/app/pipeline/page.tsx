@@ -1,3 +1,5 @@
+'use client'
+
 import { Workflow } from 'lucide-react'
 import { PlaceholderPage } from '@/components/shared/PlaceholderPage'
 

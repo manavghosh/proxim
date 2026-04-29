@@ -1,3 +1,5 @@
+'use client'
+
 import { Send } from 'lucide-react'
 import { PlaceholderPage } from '@/components/shared/PlaceholderPage'
 

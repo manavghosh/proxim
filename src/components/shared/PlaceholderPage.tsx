@@ -1,3 +1,5 @@
+'use client'
+
 import Link from 'next/link'
 import { Topbar } from '@/components/layout/Topbar'
 import { Button } from '@/components/ui/button'
