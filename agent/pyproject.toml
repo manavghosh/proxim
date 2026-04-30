@@ -3,13 +3,12 @@ name = "proxim-agent"
 version = "0.1.0"
 description = "Proxim LangGraph job discovery agent"
 authors = ["Manav Ghosh"]
-python = ">=3.11"
 
 [tool.poetry.dependencies]
 python = ">=3.11,<4.0"
 langgraph = "^0.4"
 litellm = "^1.40"
-asyncpg = "^0.29"
+asyncpg = "^0.31"
 pydantic = "^2.7"
 pydantic-settings = "^2.2"
 playwright = "^1.44"
