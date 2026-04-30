@@ -1,0 +1,31 @@
+{
+  "noOfJobsDisplayed": 3,
+  "jobDetails": [
+    {
+      "jobId": "j001",
+      "title": "Chief AI Officer",
+      "companyName": "Acme Corp",
+      "placeholders": [{"label": "experience", "unit": "Yrs", "value": "15 - 20"}],
+      "jdURL": "https://www.naukri.com/job-listings/caio-acme-corp-bengaluru-15-to-20-years-010101000001",
+      "location": "Bengaluru",
+      "jobDescription": "We are looking for a Chief AI Officer to lead our AI strategy..."
+    },
+    {
+      "jobId": "j002",
+      "title": "VP of Artificial Intelligence",
+      "companyName": "TechCo India",
+      "placeholders": [],
+      "jdURL": "https://www.naukri.com/job-listings/vp-ai-techco-020202000002",
+      "location": "Mumbai",
+      "jobDescription": "Lead the AI division and build agentic systems at scale..."
+    },
+    {
+      "jobId": "j003",
+      "companyName": "BadData Inc",
+      "placeholders": [],
+      "jdURL": "https://www.naukri.com/job-listings/missing-title-030303000003",
+      "location": "Remote",
+      "jobDescription": "This record has no title field."
+    }
+  ]
+}

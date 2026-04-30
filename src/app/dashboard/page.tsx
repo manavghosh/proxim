@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getCV, getReadiness } from '@/lib/api'
+import { getCV, getReadiness, triggerPipeline, getPipelineStatus } from '@/lib/api'
 import { Topbar } from '@/components/layout/Topbar'
 import { StatCard } from '@/components/dashboard/StatCard'
 import { ReadinessRing } from '@/components/dashboard/ReadinessRing'
@@ -40,6 +40,9 @@ export default function DashboardPage() {
   const [readiness, setReadiness] = useState<PipelineReadiness | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [pipelineJobId, setPipelineJobId] = useState<string | null>(null)
+  const [pipelineStatus, setPipelineStatus] = useState<string | null>(null)
+  const [pipelineLoading, setPipelineLoading] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -63,6 +66,28 @@ export default function DashboardPage() {
     load()
   }, [])
 
+  async function handleRunPipeline() {
+    setPipelineLoading(true)
+    try {
+      const { jobId } = await triggerPipeline('discovery_only')
+      setPipelineJobId(jobId)
+      setPipelineStatus('queued')
+      // Poll for status
+      const poll = async () => {
+        const status = await getPipelineStatus(jobId)
+        setPipelineStatus(status.status)
+        if (status.status !== 'completed' && status.status !== 'failed') {
+          setTimeout(() => { void poll() }, 5000)
+        } else {
+          setPipelineLoading(false)
+        }
+      }
+      void poll()
+    } catch {
+      setPipelineLoading(false)
+    }
+  }
+
   const cvMeta = parseStatusMeta(candidate)
   const pMeta = pipelineMeta(readiness)
 
@@ -71,8 +96,8 @@ export default function DashboardPage() {
       <Topbar
         title="Dashboard"
         actions={
-          <Button size="sm" className="text-xs">
-            ▶ Run Pipeline
+          <Button size="sm" className="text-xs" onClick={handleRunPipeline} disabled={pipelineLoading}>
+            {pipelineStatus ? `Pipeline: ${pipelineStatus}` : '▶ Run Pipeline'}
           </Button>
         }
       />
