@@ -127,6 +127,30 @@ async def bulk_insert_scan_history(pool: asyncpg.Pool, entries: list[dict]) -> N
             """, entry['candidate_id'], entry['url'], entry.get('job_id'))
 
 
+async def insert_pipeline_log(
+    pool: asyncpg.Pool,
+    pipeline_job_id: str,
+    level: str,
+    step: str,
+    message: str,
+    data: dict | None = None,
+) -> None:
+    """Write one log entry to pipeline_logs for the given pipeline job."""
+    import json
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO pipeline_logs (pipeline_job_id, level, step, message, data)
+            VALUES ($1, $2, $3, $4, $5)
+            """,
+            pipeline_job_id,
+            level,
+            step,
+            message,
+            json.dumps(data) if data is not None else None,
+        )
+
+
 def _to_snake(name: str) -> str:
     import re
     s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)

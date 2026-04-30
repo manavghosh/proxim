@@ -9,10 +9,21 @@ from agent.models import DiscoveryState, NormalisedJob, RunSummary
 logger = structlog.get_logger()
 
 
+async def _log(pool, job_id: str, level: str, step: str, message: str, data: dict | None = None) -> None:
+    """Write a pipeline log entry. Never raises — log failures must not crash the pipeline."""
+    try:
+        from agent.db import insert_pipeline_log
+        await insert_pipeline_log(pool, job_id, level=level, step=step, message=message, data=data)
+    except Exception as e:
+        logger.warning("log_write_failed", error=str(e))
+
+
 # ── Node: build_queries ───────────────────────────────────────────────────────
 
-def build_queries(state: DiscoveryState) -> dict:
+async def build_queries(state: DiscoveryState) -> dict:
     """Generate 5-8 search queries per source from candidate preferences."""
+    from agent.config import settings
+    import asyncpg
     prefs = state.preferences
     seniority_levels: list[str] = prefs.get("seniority_levels", [])
     geo: list[str] = prefs.get("geographic_preference", [])
@@ -32,14 +43,28 @@ def build_queries(state: DiscoveryState) -> dict:
         "iimjobs": base_queries[:5],
     }
 
+    total = sum(len(v) for v in queries.values())
+
     logger.info(
         "pipeline_step",
         step="build_queries",
         status="complete",
         sources=list(queries.keys()),
-        total_queries=sum(len(v) for v in queries.values()),
+        total_queries=total,
         sample_queries=base_queries[:3],
     )
+
+    pool = await asyncpg.create_pool(settings.database_url, min_size=1, max_size=2)
+    try:
+        await _log(pool, state.pipeline_job_id, "info", "build_queries",
+                   "Starting pipeline — generating search queries",
+                   {"sources": list(queries.keys())})
+        await _log(pool, state.pipeline_job_id, "info", "build_queries",
+                   f"Generated {total} queries across {list(queries.keys())}",
+                   {"total_queries": total})
+    finally:
+        await pool.close()
+
     return {"queries": queries}
 
 
@@ -82,51 +107,101 @@ def fan_out(state: DiscoveryState) -> list[Send]:
 
 async def scrape_naukri(state: DiscoveryState) -> dict:
     from agent.scrapers.naukri import NaukriScraper
-    scraper = NaukriScraper()
-    queries = state.queries.get("naukri", [])
-    logger.info("pipeline_step", step="scrape_naukri", status="started", query_count=len(queries))
-    jobs = await scraper.safe_scrape(queries, state.preferences)
-    logger.info("pipeline_step", step="scrape_naukri", status="complete", jobs_found=len(jobs))
+    from agent.config import settings
+    import asyncpg
+    pool = await asyncpg.create_pool(settings.database_url, min_size=1, max_size=2)
+    try:
+        scraper = NaukriScraper()
+        queries = state.queries.get("naukri", [])
+        logger.info("pipeline_step", step="scrape_naukri", status="started", query_count=len(queries))
+        await _log(pool, state.pipeline_job_id, "info", "scrape_naukri",
+                   f"Scraping Naukri ({len(queries)} queries)…", {"query_count": len(queries)})
+        jobs = await scraper.safe_scrape(queries, state.preferences)
+        logger.info("pipeline_step", step="scrape_naukri", status="complete", jobs_found=len(jobs))
+        await _log(pool, state.pipeline_job_id, "info", "scrape_naukri",
+                   f"Naukri complete — {len(jobs)} jobs found", {"jobs_found": len(jobs)})
+    finally:
+        await pool.close()
     return {"raw_jobs": jobs}
 
 
 async def scrape_iimjobs(state: DiscoveryState) -> dict:
     from agent.scrapers.iimjobs import IimjobsScraper
-    scraper = IimjobsScraper()
-    queries = state.queries.get("iimjobs", [])
-    logger.info("pipeline_step", step="scrape_iimjobs", status="started", query_count=len(queries))
-    jobs = await scraper.safe_scrape(queries, state.preferences)
-    logger.info("pipeline_step", step="scrape_iimjobs", status="complete", jobs_found=len(jobs))
+    from agent.config import settings
+    import asyncpg
+    pool = await asyncpg.create_pool(settings.database_url, min_size=1, max_size=2)
+    try:
+        scraper = IimjobsScraper()
+        queries = state.queries.get("iimjobs", [])
+        logger.info("pipeline_step", step="scrape_iimjobs", status="started", query_count=len(queries))
+        await _log(pool, state.pipeline_job_id, "info", "scrape_iimjobs",
+                   f"Scraping IIMJobs ({len(queries)} queries)…", {"query_count": len(queries)})
+        jobs = await scraper.safe_scrape(queries, state.preferences)
+        logger.info("pipeline_step", step="scrape_iimjobs", status="complete", jobs_found=len(jobs))
+        await _log(pool, state.pipeline_job_id, "info", "scrape_iimjobs",
+                   f"IIMJobs complete — {len(jobs)} jobs found", {"jobs_found": len(jobs)})
+    finally:
+        await pool.close()
     return {"raw_jobs": jobs}
 
 
 async def scrape_linkedin(state: DiscoveryState) -> dict:
     from agent.scrapers.linkedin import LinkedInScraper
-    scraper = LinkedInScraper()
-    queries = state.queries.get("naukri", [])[:3]  # reuse top 3 queries
-    logger.info("pipeline_step", step="scrape_linkedin", status="started", query_count=len(queries))
-    jobs = await scraper.safe_scrape(queries, state.preferences)
-    logger.info("pipeline_step", step="scrape_linkedin", status="complete", jobs_found=len(jobs))
+    from agent.config import settings
+    import asyncpg
+    pool = await asyncpg.create_pool(settings.database_url, min_size=1, max_size=2)
+    try:
+        scraper = LinkedInScraper()
+        queries = state.queries.get("naukri", [])[:3]  # reuse top 3 queries
+        logger.info("pipeline_step", step="scrape_linkedin", status="started", query_count=len(queries))
+        await _log(pool, state.pipeline_job_id, "info", "scrape_linkedin",
+                   f"Scraping LinkedIn ({len(queries)} queries)…", {"query_count": len(queries)})
+        jobs = await scraper.safe_scrape(queries, state.preferences)
+        logger.info("pipeline_step", step="scrape_linkedin", status="complete", jobs_found=len(jobs))
+        await _log(pool, state.pipeline_job_id, "info", "scrape_linkedin",
+                   f"LinkedIn complete — {len(jobs)} jobs found", {"jobs_found": len(jobs)})
+    finally:
+        await pool.close()
     return {"raw_jobs": jobs}
 
 
 async def scrape_careers_page(state: DiscoveryState) -> dict:
     from agent.scrapers.careers_page import CareersPageScraper
-    scraper = CareersPageScraper()
-    custom_sites = state.preferences.get("custom_job_sites", [])
-    logger.info("pipeline_step", step="scrape_careers_page", status="started", sites_count=len(custom_sites))
-    jobs = await scraper.safe_scrape([], state.preferences)
-    logger.info("pipeline_step", step="scrape_careers_page", status="complete", jobs_found=len(jobs))
+    from agent.config import settings
+    import asyncpg
+    pool = await asyncpg.create_pool(settings.database_url, min_size=1, max_size=2)
+    try:
+        scraper = CareersPageScraper()
+        custom_sites = state.preferences.get("custom_job_sites", [])
+        logger.info("pipeline_step", step="scrape_careers_page", status="started", sites_count=len(custom_sites))
+        await _log(pool, state.pipeline_job_id, "info", "scrape_careers_page",
+                   f"Scraping careers pages ({len(custom_sites)} sites)…", {"sites_count": len(custom_sites)})
+        jobs = await scraper.safe_scrape([], state.preferences)
+        logger.info("pipeline_step", step="scrape_careers_page", status="complete", jobs_found=len(jobs))
+        await _log(pool, state.pipeline_job_id, "info", "scrape_careers_page",
+                   f"Careers pages complete — {len(jobs)} jobs found", {"jobs_found": len(jobs)})
+    finally:
+        await pool.close()
     return {"raw_jobs": jobs}
 
 
 async def scrape_monster(state: DiscoveryState) -> dict:
     from agent.scrapers.monster import MonsterScraper
-    scraper = MonsterScraper()
-    queries = state.queries.get("naukri", [])[:3]
-    logger.info("pipeline_step", step="scrape_monster", status="started", query_count=len(queries))
-    jobs = await scraper.safe_scrape(queries, state.preferences)
-    logger.info("pipeline_step", step="scrape_monster", status="complete", jobs_found=len(jobs))
+    from agent.config import settings
+    import asyncpg
+    pool = await asyncpg.create_pool(settings.database_url, min_size=1, max_size=2)
+    try:
+        scraper = MonsterScraper()
+        queries = state.queries.get("naukri", [])[:3]
+        logger.info("pipeline_step", step="scrape_monster", status="started", query_count=len(queries))
+        await _log(pool, state.pipeline_job_id, "info", "scrape_monster",
+                   f"Scraping Monster ({len(queries)} queries)…", {"query_count": len(queries)})
+        jobs = await scraper.safe_scrape(queries, state.preferences)
+        logger.info("pipeline_step", step="scrape_monster", status="complete", jobs_found=len(jobs))
+        await _log(pool, state.pipeline_job_id, "info", "scrape_monster",
+                   f"Monster complete — {len(jobs)} jobs found", {"jobs_found": len(jobs)})
+    finally:
+        await pool.close()
     return {"raw_jobs": jobs}
 
 
@@ -144,14 +219,23 @@ async def normalise_and_dedup(state: DiscoveryState) -> dict:
     pool = await asyncpg.create_pool(settings.database_url, min_size=1, max_size=3)
     try:
         seen_urls = await get_scan_history_urls(pool, state.candidate_id)
+
+        await _log(pool, state.pipeline_job_id, "info", "normalise_and_dedup",
+                   f"Deduplicating {len(state.raw_jobs)} raw jobs…",
+                   {"raw_jobs": len(state.raw_jobs)})
+
+        seen_keys: list[str] = []
+        deduplicated = deduplicate_batch(state.raw_jobs, seen_urls=seen_urls, seen_keys=seen_keys)
+
+        new_count = sum(1 for j in deduplicated if not j.is_duplicate)
+        dedup_count = sum(1 for j in deduplicated if j.is_duplicate)
+
+        await _log(pool, state.pipeline_job_id, "info", "normalise_and_dedup",
+                   f"{new_count} new jobs · {dedup_count} duplicates removed",
+                   {"new": new_count, "duplicates": dedup_count})
     finally:
         await pool.close()
 
-    seen_keys: list[str] = []
-    deduplicated = deduplicate_batch(state.raw_jobs, seen_urls=seen_urls, seen_keys=seen_keys)
-
-    new_count = sum(1 for j in deduplicated if not j.is_duplicate)
-    dedup_count = sum(1 for j in deduplicated if j.is_duplicate)
     logger.info("pipeline_step", step="normalise_and_dedup", status="complete", new=new_count, duplicates=dedup_count)
 
     return {"deduplicated_jobs": deduplicated}
@@ -170,6 +254,10 @@ async def persist_jobs(state: DiscoveryState) -> dict:
 
         new_jobs = [j for j in state.deduplicated_jobs if not j.is_duplicate]
         logger.info("pipeline_step", step="persist_jobs", status="started", jobs_to_save=len(new_jobs))
+
+        await _log(pool, state.pipeline_job_id, "info", "persist_jobs",
+                   f"Saving {len(new_jobs)} jobs to database…", {"jobs_to_save": len(new_jobs)})
+
         job_dicts = [
             {
                 "candidate_id": state.candidate_id,
@@ -204,6 +292,9 @@ async def persist_jobs(state: DiscoveryState) -> dict:
             jobsDiscovered=len(new_jobs),
             jobsDeduplicated=deduped_count,
         )
+
+        await _log(pool, state.pipeline_job_id, "info", "persist_jobs",
+                   f"Saved {len(new_jobs)} jobs successfully", {"saved": len(new_jobs)})
     finally:
         await pool.close()
 
@@ -242,6 +333,10 @@ async def write_run_summary(state: DiscoveryState) -> dict:
             summary=summary.model_dump(),
         )
         await update_pipeline_job_status(pool, state.pipeline_job_id, "completed")
+
+        await _log(pool, state.pipeline_job_id, "info", "write_run_summary",
+                   f"Pipeline complete — {new_count} jobs discovered",
+                   {"jobs_new": new_count, "jobs_deduped": dedup_count})
 
         logger.info(
             "discovery_run_complete",
