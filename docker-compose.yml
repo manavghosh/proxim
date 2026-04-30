@@ -1,0 +1,27 @@
+version: "3.9"
+
+services:
+  nextjs:
+    build:
+      context: .
+      dockerfile: Dockerfile.nextjs
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    env_file:
+      - .env.local
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+
+  agent:
+    build:
+      context: agent/
+      dockerfile: Dockerfile
+    env_file:
+      - agent/.env
+    depends_on:
+      - nextjs
+    restart: unless-stopped
