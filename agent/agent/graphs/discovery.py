@@ -68,12 +68,26 @@ async def scrape_iimjobs(state: DiscoveryState) -> dict:
 
 # ── Node: normalise_and_dedup (stub — replaced in Phase 4) ───────────────────
 
-def normalise_and_dedup(state: DiscoveryState) -> dict:
-    """Pass-through stub: marks all jobs as non-duplicate. Phase 4 adds real dedup."""
-    deduplicated = [
-        NormalisedJob(**job.model_dump(), jd_text=job.jd_raw.strip())
-        for job in state.raw_jobs
-    ]
+async def normalise_and_dedup(state: DiscoveryState) -> dict:
+    """Deduplicate raw_jobs against scan history and within-batch fuzzy matching."""
+    from agent.config import settings
+    import asyncpg
+    from agent.db import get_scan_history_urls
+    from agent.normalise import deduplicate_batch
+
+    pool = await asyncpg.create_pool(settings.database_url, min_size=1, max_size=3)
+    try:
+        seen_urls = await get_scan_history_urls(pool, state.candidate_id)
+    finally:
+        await pool.close()
+
+    seen_keys: list[str] = []
+    deduplicated = deduplicate_batch(state.raw_jobs, seen_urls=seen_urls, seen_keys=seen_keys)
+
+    new_count = sum(1 for j in deduplicated if not j.is_duplicate)
+    dedup_count = sum(1 for j in deduplicated if j.is_duplicate)
+    logger.info("dedup_complete", new=new_count, duplicates=dedup_count)
+
     return {"deduplicated_jobs": deduplicated}
 
 

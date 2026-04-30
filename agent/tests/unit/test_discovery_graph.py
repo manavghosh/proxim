@@ -1,5 +1,4 @@
 """Integration test for the discovery graph with mocked scrapers and DB."""
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from agent.models import DiscoveryState, RawJob
 
@@ -37,10 +36,10 @@ class TestDiscoveryGraph:
             patch("agent.scrapers.naukri.NaukriScraper.scrape", new_callable=AsyncMock) as mock_naukri,
             patch("agent.scrapers.iimjobs.IimjobsScraper.scrape", new_callable=AsyncMock) as mock_iimjobs,
             patch("asyncpg.create_pool", new_callable=AsyncMock, return_value=mock_pool),
-            patch("agent.db.bulk_insert_jobs", new_callable=AsyncMock, return_value=["id1", "id2"]) as mock_bulk,
-            patch("agent.db.bulk_insert_scan_history", new_callable=AsyncMock) as mock_scan,
-            patch("agent.db.update_pipeline_run", new_callable=AsyncMock) as mock_update_run,
-            patch("agent.db.update_pipeline_job_status", new_callable=AsyncMock) as mock_update_job,
+            patch("agent.db.bulk_insert_jobs", new_callable=AsyncMock, return_value=["id1", "id2"]),
+            patch("agent.db.bulk_insert_scan_history", new_callable=AsyncMock),
+            patch("agent.db.update_pipeline_run", new_callable=AsyncMock),
+            patch("agent.db.update_pipeline_job_status", new_callable=AsyncMock),
         ):
             mock_naukri.return_value = [
                 FIXTURE_JOB,
@@ -61,3 +60,38 @@ class TestDiscoveryGraph:
 
         # 3 jobs total (2 from naukri, 1 from iimjobs)
         assert len(result["deduplicated_jobs"]) == 3
+
+    async def test_dedup_filters_duplicate_url(self):
+        """When the same URL appears twice, only one job reaches deduplicated_jobs as non-duplicate."""
+        mock_pool = make_mock_pool()
+
+        with (
+            patch("agent.scrapers.naukri.NaukriScraper.scrape", new_callable=AsyncMock) as mock_naukri,
+            patch("agent.scrapers.iimjobs.IimjobsScraper.scrape", new_callable=AsyncMock) as mock_iimjobs,
+            patch("agent.graphs.discovery.persist_jobs", new_callable=AsyncMock) as mock_persist,
+            patch("agent.graphs.discovery.write_run_summary", new_callable=AsyncMock) as mock_summary,
+            patch("asyncpg.create_pool", new_callable=AsyncMock, return_value=mock_pool),
+        ):
+            # Same URL from both sources = duplicate
+            duplicate_job = FIXTURE_JOB.model_copy(update={"source": "naukri"})
+            same_url_from_iimjobs = FIXTURE_JOB.model_copy(update={"source": "iimjobs"})
+            mock_naukri.return_value = [duplicate_job]
+            mock_iimjobs.return_value = [same_url_from_iimjobs]
+            mock_persist.return_value = {}
+            mock_summary.return_value = {}
+
+            from agent.graphs.discovery import discovery_graph
+            state = DiscoveryState(
+                candidate_id="cand-1",
+                pipeline_job_id="job-1",
+                pipeline_run_id="run-1",
+                preferences={},
+            )
+            result = await discovery_graph.ainvoke(state)
+
+        # Both jobs have the same source_url → one new, one duplicate
+        deduped = result["deduplicated_jobs"]
+        new_jobs = [j for j in deduped if not j.is_duplicate]
+        dupe_jobs = [j for j in deduped if j.is_duplicate]
+        assert len(new_jobs) == 1
+        assert len(dupe_jobs) == 1
