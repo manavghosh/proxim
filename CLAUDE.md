@@ -10,6 +10,22 @@ specs/001-job-discovery-agent/plan.md
 
 ---
 
+## Pre-Commit / Pre-Push Gate
+
+**Invoke `superpowers:verification-before-completion` before every commit, push, or completion claim.**
+
+The skill requires running each verification command and reading its actual output — not assuming it passes. The mandatory checklist for this project is:
+
+```bash
+npm run test:run     # must show 0 failures
+npx tsc --noEmit     # must show no output (zero errors)
+npm run build        # must complete with exit 0 and no prerender errors
+```
+
+All three MUST pass with evidence before any `git push` or PR. A passing test suite does not imply a passing build — TypeScript and Next.js prerendering can fail independently.
+
+---
+
 ## Task Tracking Discipline
 
 When executing tasks from any `tasks.md` file in `specs/`:
@@ -118,7 +134,7 @@ If a skill applies, invoking it is mandatory — not optional.
 | Writing a multi-step implementation plan from a spec | `superpowers:writing-plans` |
 | Executing a written implementation plan | `superpowers:executing-plans` or `superpowers:subagent-driven-development` |
 | Implementing any feature or bugfix (before writing code) | `superpowers:test-driven-development` |
-| Before committing, opening a PR, or claiming work is done | `superpowers:verification-before-completion` |
+| Before committing, pushing, opening a PR, or claiming work is done | `superpowers:verification-before-completion` — must run `test:run` + `tsc --noEmit` + `build` and show passing output |
 | Encountering any bug, test failure, or unexpected behaviour | `superpowers:systematic-debugging` |
 | 2+ independent tasks that can run without shared state | `superpowers:dispatching-parallel-agents` |
 | Starting feature work that needs isolation from the workspace | `superpowers:using-git-worktrees` |
