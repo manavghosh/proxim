@@ -27,6 +27,8 @@ export interface Preferences {
   compensation_band?: { min: number; max: number; currency: string }
   target_companies?: string[]
   preferred_domains?: string[]
+  enabled_sources?: string[]
+  custom_job_sites?: string[]
 }
 
 export interface CandidateState {
