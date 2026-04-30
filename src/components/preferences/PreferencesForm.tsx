@@ -12,6 +12,13 @@ const LOCATION_OPTIONS = ['Remote', 'Hybrid', 'Bengaluru-based', 'Open to reloca
 const STAGE_OPTIONS = ['Startup Series B–D', 'GCC', 'Indian Enterprise', 'Product Co', 'Consultancy']
 const DOMAIN_OPTIONS = ['BFSI', 'E-commerce', 'SaaS', 'Healthcare', 'Defence']
 
+const SOURCE_OPTIONS = [
+  { label: 'Naukri', value: 'naukri' },
+  { label: 'iimjobs', value: 'iimjobs' },
+  { label: 'LinkedIn', value: 'linkedin' },
+  { label: 'Monster', value: 'monster' },
+]
+
 interface PreferencesFormProps {
   initialPreferences: Preferences
   onSaved: (prefs: Preferences) => void
@@ -33,6 +40,14 @@ export function PreferencesForm({ initialPreferences, onSaved }: PreferencesForm
   )
   const [targetCompaniesText, setTargetCompaniesText] = useState(
     (initialPreferences.target_companies ?? []).join('\n')
+  )
+  const [customJobSitesText, setCustomJobSitesText] = useState(
+    (initialPreferences.custom_job_sites ?? []).join('\n')
+  )
+  const [customDomainsText, setCustomDomainsText] = useState(
+    (initialPreferences.preferred_domains ?? [])
+      .filter((d) => !DOMAIN_OPTIONS.includes(d))
+      .join('\n')
   )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -65,8 +80,26 @@ export function PreferencesForm({ initialPreferences, onSaved }: PreferencesForm
       .split('\n')
       .map((s) => s.trim())
       .filter(Boolean)
+    const parsedCustomSites = customJobSitesText
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean)
+    const parsedCustomDomains = customDomainsText
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean)
+    const mergedDomains = [
+      ...(prefs.preferred_domains?.filter((d) => DOMAIN_OPTIONS.includes(d)) ?? []),
+      ...parsedCustomDomains,
+    ]
     try {
-      const { preferences } = await updatePreferences({ ...prefs, seniority_levels: parsed, target_companies: parsedCompanies })
+      const { preferences } = await updatePreferences({
+        ...prefs,
+        seniority_levels: parsed,
+        target_companies: parsedCompanies,
+        custom_job_sites: parsedCustomSites,
+        preferred_domains: mergedDomains,
+      })
       onSaved(preferences as Preferences)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed.')
@@ -152,6 +185,41 @@ export function PreferencesForm({ initialPreferences, onSaved }: PreferencesForm
         />
       </div>
 
+      {/* Job Sources — optional */}
+      <fieldset className="space-y-2">
+        <Label>
+          Job Sources{' '}
+          <span className="text-muted-foreground font-normal">(optional — all run if none selected)</span>
+        </Label>
+        <div className="flex flex-wrap gap-2">
+          {SOURCE_OPTIONS.map((opt) => (
+            <Button
+              key={opt.value}
+              type="button"
+              size="sm"
+              variant={prefs.enabled_sources?.includes(opt.value) ? 'default' : 'outline'}
+              onClick={() => toggleMulti('enabled_sources', opt.value)}
+            >
+              {opt.label}
+            </Button>
+          ))}
+        </div>
+      </fieldset>
+
+      {/* Custom job sites — optional */}
+      <div className="space-y-2">
+        <Label>
+          Additional Job Sites{' '}
+          <span className="text-muted-foreground font-normal">(optional — one URL per line)</span>
+        </Label>
+        <Textarea
+          rows={3}
+          placeholder={'https://jobs.acmecorp.com/careers\nhttps://careers.example.in'}
+          value={customJobSitesText}
+          onChange={(e) => setCustomJobSitesText(e.target.value)}
+        />
+      </div>
+
       {/* Preferred domains — optional */}
       <fieldset className="space-y-2">
         <Label>
@@ -171,6 +239,12 @@ export function PreferencesForm({ initialPreferences, onSaved }: PreferencesForm
             </Button>
           ))}
         </div>
+        <Textarea
+          rows={3}
+          placeholder={'FinTech\nClimate Tech\nAI Research'}
+          value={customDomainsText}
+          onChange={(e) => setCustomDomainsText(e.target.value)}
+        />
       </fieldset>
 
       <div className="flex items-center gap-3">
