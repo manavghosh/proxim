@@ -53,7 +53,12 @@ export function ProfileCard({ candidate }: ProfileCardProps) {
   const topRole = parsedProfile.roles?.[0]
   const topSkills = parsedProfile.skills?.slice(0, 6) ?? []
   const seniorityLevels = (preferences?.seniority_levels ?? []) as string[]
-  const geoPrefs = (preferences?.geographic_preference as string[] | undefined) ?? []
+  const rawGeo = preferences?.geographic_preference
+  const geoPrefs: string[] = Array.isArray(rawGeo)
+    ? rawGeo
+    : typeof rawGeo === 'string' && rawGeo
+      ? [rawGeo]
+      : []
 
   return (
     <div className="bg-[#0d1f3c] border border-[#1e3a5f] rounded-xl p-5">

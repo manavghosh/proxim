@@ -18,7 +18,16 @@ interface PreferencesFormProps {
 }
 
 export function PreferencesForm({ initialPreferences, onSaved }: PreferencesFormProps) {
-  const [prefs, setPrefs] = useState<Preferences>(initialPreferences)
+  // Normalise geographic_preference: old DB rows may store a plain string
+  const normalisedInitial: Preferences = {
+    ...initialPreferences,
+    geographic_preference: Array.isArray(initialPreferences.geographic_preference)
+      ? initialPreferences.geographic_preference
+      : typeof initialPreferences.geographic_preference === 'string' && initialPreferences.geographic_preference
+        ? [initialPreferences.geographic_preference]
+        : [],
+  }
+  const [prefs, setPrefs] = useState<Preferences>(normalisedInitial)
   const [seniorityText, setSeniorityText] = useState(
     (initialPreferences.seniority_levels ?? []).join('\n')
   )
