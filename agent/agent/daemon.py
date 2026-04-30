@@ -44,7 +44,7 @@ async def main() -> None:
     signal.signal(signal.SIGTERM, _handle_sigterm)
     signal.signal(signal.SIGINT, _handle_sigterm)
 
-    logger.info("daemon_starting", polling_interval=settings.polling_interval_seconds)
+    logger.info("daemon_starting", polling_interval_seconds=settings.polling_interval_seconds)
     pool = await create_pool(settings.database_url)
 
     try:
