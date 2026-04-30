@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan at:
-docs/superpowers/plans/2026-04-27-phase-1-foundation.md
+specs/001-job-discovery-agent/plan.md
 <!-- SPECKIT END -->
 
 ---
