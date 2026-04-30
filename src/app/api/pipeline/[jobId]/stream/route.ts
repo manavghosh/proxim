@@ -54,6 +54,7 @@ export async function GET(
             .select()
             .from(pipelineRuns)
             .where(eq(pipelineRuns.pipelineJobId, jobId))
+            .orderBy(pipelineRuns.startedAt)
             .limit(1)
 
           if (currentJob.status !== lastStatus) {
