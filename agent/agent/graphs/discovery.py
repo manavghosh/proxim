@@ -1,10 +1,10 @@
 """LangGraph discovery graph — fan-out scraping across job sources."""
 from __future__ import annotations
-import asyncio
+from datetime import datetime, timezone
 import structlog
 from langgraph.graph import StateGraph, END
 from langgraph.types import Send
-from agent.models import DiscoveryState, NormalisedJob, RunSummary, RawJob
+from agent.models import DiscoveryState, NormalisedJob, RunSummary
 
 logger = structlog.get_logger()
 
@@ -147,6 +147,7 @@ async def persist_jobs(state: DiscoveryState) -> dict:
 
 async def write_run_summary(state: DiscoveryState) -> dict:
     """Mark the pipeline job and run as completed, write summary."""
+    from datetime import datetime, timezone
     from agent.config import settings
     import asyncpg
     pool = await asyncpg.create_pool(settings.database_url, min_size=1, max_size=3)
@@ -164,10 +165,11 @@ async def write_run_summary(state: DiscoveryState) -> dict:
             total_failed_sources=error_sources,
         )
 
+        now = datetime.now(timezone.utc)
         await update_pipeline_run(
             pool, state.pipeline_run_id,
             status="completed",
-            completedAt="NOW()",
+            completedAt=now,
             summary=summary.model_dump(),
         )
         await update_pipeline_job_status(pool, state.pipeline_job_id, "completed")
