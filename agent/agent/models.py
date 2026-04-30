@@ -11,7 +11,7 @@ class RawJob(BaseModel):
     company: str
     location: Optional[str] = None
     jd_raw: str
-    source: Literal["linkedin", "naukri", "iimjobs", "careers_page"]
+    source: Literal["linkedin", "naukri", "iimjobs", "careers_page", "monster"]
     source_url: str
     application_url: Optional[str] = None
     posted_at: Optional[datetime] = None

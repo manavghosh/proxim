@@ -32,21 +32,49 @@ def build_queries(state: DiscoveryState) -> dict:
         "iimjobs": base_queries[:5],
     }
 
+    logger.info(
+        "pipeline_step",
+        step="build_queries",
+        status="complete",
+        sources=list(queries.keys()),
+        total_queries=sum(len(v) for v in queries.values()),
+        sample_queries=base_queries[:3],
+    )
     return {"queries": queries}
 
 
 # ── Node: fan_out ─────────────────────────────────────────────────────────────
 
 def fan_out(state: DiscoveryState) -> list[Send]:
-    """Return Send objects to run all scraper nodes in parallel."""
-    sends = [
-        Send("scrape_naukri", state),
-        Send("scrape_iimjobs", state),
-        Send("scrape_linkedin", state),
-    ]
-    # Only scrape target company careers pages if URLs are configured
-    if state.preferences.get("target_companies_with_urls"):
+    """Dispatch scraper nodes based on enabled_sources preference.
+
+    If enabled_sources is empty or not set, all standard sources run.
+    Monster is only dispatched if explicitly enabled (stub returns []).
+    Custom job site URLs are routed to the careers_page scraper.
+    """
+    enabled: list[str] = state.preferences.get("enabled_sources", [])
+    standard_sources = ["naukri", "iimjobs", "linkedin"]
+    active = enabled if enabled else standard_sources
+
+    sends: list[Send] = []
+
+    for source in active:
+        if source in standard_sources:
+            sends.append(Send(f"scrape_{source}", state))
+        elif source == "monster":
+            sends.append(Send("scrape_monster", state))
+
+    # Custom job site URLs → careers_page scraper
+    custom_sites: list[str] = state.preferences.get("custom_job_sites", [])
+    if custom_sites:
         sends.append(Send("scrape_careers_page", state))
+
+    logger.info(
+        "pipeline_fan_out",
+        active_sources=[s for s in active if s in standard_sources + ["monster"]],
+        custom_sites_count=len(custom_sites),
+        total_nodes=len(sends),
+    )
     return sends
 
 
@@ -56,8 +84,9 @@ async def scrape_naukri(state: DiscoveryState) -> dict:
     from agent.scrapers.naukri import NaukriScraper
     scraper = NaukriScraper()
     queries = state.queries.get("naukri", [])
+    logger.info("pipeline_step", step="scrape_naukri", status="started", query_count=len(queries))
     jobs = await scraper.safe_scrape(queries, state.preferences)
-    logger.info("scrape_complete", source="naukri", jobs_found=len(jobs))
+    logger.info("pipeline_step", step="scrape_naukri", status="complete", jobs_found=len(jobs))
     return {"raw_jobs": jobs}
 
 
@@ -65,8 +94,9 @@ async def scrape_iimjobs(state: DiscoveryState) -> dict:
     from agent.scrapers.iimjobs import IimjobsScraper
     scraper = IimjobsScraper()
     queries = state.queries.get("iimjobs", [])
+    logger.info("pipeline_step", step="scrape_iimjobs", status="started", query_count=len(queries))
     jobs = await scraper.safe_scrape(queries, state.preferences)
-    logger.info("scrape_complete", source="iimjobs", jobs_found=len(jobs))
+    logger.info("pipeline_step", step="scrape_iimjobs", status="complete", jobs_found=len(jobs))
     return {"raw_jobs": jobs}
 
 
@@ -74,16 +104,29 @@ async def scrape_linkedin(state: DiscoveryState) -> dict:
     from agent.scrapers.linkedin import LinkedInScraper
     scraper = LinkedInScraper()
     queries = state.queries.get("naukri", [])[:3]  # reuse top 3 queries
+    logger.info("pipeline_step", step="scrape_linkedin", status="started", query_count=len(queries))
     jobs = await scraper.safe_scrape(queries, state.preferences)
-    logger.info("scrape_complete", source="linkedin", jobs_found=len(jobs))
+    logger.info("pipeline_step", step="scrape_linkedin", status="complete", jobs_found=len(jobs))
     return {"raw_jobs": jobs}
 
 
 async def scrape_careers_page(state: DiscoveryState) -> dict:
     from agent.scrapers.careers_page import CareersPageScraper
     scraper = CareersPageScraper()
+    custom_sites = state.preferences.get("custom_job_sites", [])
+    logger.info("pipeline_step", step="scrape_careers_page", status="started", sites_count=len(custom_sites))
     jobs = await scraper.safe_scrape([], state.preferences)
-    logger.info("scrape_complete", source="careers_page", jobs_found=len(jobs))
+    logger.info("pipeline_step", step="scrape_careers_page", status="complete", jobs_found=len(jobs))
+    return {"raw_jobs": jobs}
+
+
+async def scrape_monster(state: DiscoveryState) -> dict:
+    from agent.scrapers.monster import MonsterScraper
+    scraper = MonsterScraper()
+    queries = state.queries.get("naukri", [])[:3]
+    logger.info("pipeline_step", step="scrape_monster", status="started", query_count=len(queries))
+    jobs = await scraper.safe_scrape(queries, state.preferences)
+    logger.info("pipeline_step", step="scrape_monster", status="complete", jobs_found=len(jobs))
     return {"raw_jobs": jobs}
 
 
@@ -96,6 +139,8 @@ async def normalise_and_dedup(state: DiscoveryState) -> dict:
     from agent.db import get_scan_history_urls
     from agent.normalise import deduplicate_batch
 
+    logger.info("pipeline_step", step="normalise_and_dedup", status="started", raw_jobs=len(state.raw_jobs))
+
     pool = await asyncpg.create_pool(settings.database_url, min_size=1, max_size=3)
     try:
         seen_urls = await get_scan_history_urls(pool, state.candidate_id)
@@ -107,7 +152,7 @@ async def normalise_and_dedup(state: DiscoveryState) -> dict:
 
     new_count = sum(1 for j in deduplicated if not j.is_duplicate)
     dedup_count = sum(1 for j in deduplicated if j.is_duplicate)
-    logger.info("dedup_complete", new=new_count, duplicates=dedup_count)
+    logger.info("pipeline_step", step="normalise_and_dedup", status="complete", new=new_count, duplicates=dedup_count)
 
     return {"deduplicated_jobs": deduplicated}
 
@@ -124,6 +169,7 @@ async def persist_jobs(state: DiscoveryState) -> dict:
         from agent.db import bulk_insert_jobs, bulk_insert_scan_history, update_pipeline_run
 
         new_jobs = [j for j in state.deduplicated_jobs if not j.is_duplicate]
+        logger.info("pipeline_step", step="persist_jobs", status="started", jobs_to_save=len(new_jobs))
         job_dicts = [
             {
                 "candidate_id": state.candidate_id,
@@ -161,6 +207,7 @@ async def persist_jobs(state: DiscoveryState) -> dict:
     finally:
         await pool.close()
 
+    logger.info("pipeline_step", step="persist_jobs", status="complete", saved=len(new_jobs))
     return {}
 
 
@@ -168,6 +215,7 @@ async def persist_jobs(state: DiscoveryState) -> dict:
 
 async def write_run_summary(state: DiscoveryState) -> dict:
     """Mark the pipeline job and run as completed, write summary."""
+    logger.info("pipeline_step", step="write_run_summary", status="started")
     from datetime import datetime, timezone
     from agent.config import settings
     import asyncpg
@@ -217,6 +265,7 @@ def build_discovery_graph():
     graph.add_node("scrape_iimjobs", scrape_iimjobs)
     graph.add_node("scrape_linkedin", scrape_linkedin)
     graph.add_node("scrape_careers_page", scrape_careers_page)
+    graph.add_node("scrape_monster", scrape_monster)
     graph.add_node("normalise_and_dedup", normalise_and_dedup)
     graph.add_node("persist_jobs", persist_jobs)
     graph.add_node("write_run_summary", write_run_summary)
@@ -227,6 +276,7 @@ def build_discovery_graph():
     graph.add_edge("scrape_iimjobs", "normalise_and_dedup")
     graph.add_edge("scrape_linkedin", "normalise_and_dedup")
     graph.add_edge("scrape_careers_page", "normalise_and_dedup")
+    graph.add_edge("scrape_monster", "normalise_and_dedup")
     graph.add_edge("normalise_and_dedup", "persist_jobs")
     graph.add_edge("persist_jobs", "write_run_summary")
     graph.add_edge("write_run_summary", END)
