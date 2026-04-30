@@ -55,15 +55,15 @@ class CareersPageScraper(AbstractScraper):
             if not title:
                 continue
 
+            from bs4 import Tag as BS4Tag
+            from urllib.parse import urljoin
             link_tag = item.find("a", href=True)
             job_url = url
-            if link_tag and link_tag.get("href"):
-                href = link_tag["href"]
-                if href.startswith("http"):
-                    job_url = href
-                else:
-                    from urllib.parse import urljoin
-                    job_url = urljoin(url, href)
+            if link_tag and isinstance(link_tag, BS4Tag):
+                raw_href = link_tag.get("href", "")
+                href = raw_href[0] if isinstance(raw_href, list) else (raw_href or "")
+                if href:
+                    job_url = href if href.startswith("http") else urljoin(url, href)
 
             location_tag = item.select_one(".location, [class*='location']")
             location = location_tag.get_text(strip=True) if location_tag else None
