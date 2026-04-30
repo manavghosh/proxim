@@ -42,7 +42,11 @@ def fan_out(state: DiscoveryState) -> list[Send]:
     sends = [
         Send("scrape_naukri", state),
         Send("scrape_iimjobs", state),
+        Send("scrape_linkedin", state),
     ]
+    # Only scrape target company careers pages if URLs are configured
+    if state.preferences.get("target_companies_with_urls"):
+        sends.append(Send("scrape_careers_page", state))
     return sends
 
 
@@ -63,6 +67,23 @@ async def scrape_iimjobs(state: DiscoveryState) -> dict:
     queries = state.queries.get("iimjobs", [])
     jobs = await scraper.safe_scrape(queries, state.preferences)
     logger.info("scrape_complete", source="iimjobs", jobs_found=len(jobs))
+    return {"raw_jobs": jobs}
+
+
+async def scrape_linkedin(state: DiscoveryState) -> dict:
+    from agent.scrapers.linkedin import LinkedInScraper
+    scraper = LinkedInScraper()
+    queries = state.queries.get("naukri", [])[:3]  # reuse top 3 queries
+    jobs = await scraper.safe_scrape(queries, state.preferences)
+    logger.info("scrape_complete", source="linkedin", jobs_found=len(jobs))
+    return {"raw_jobs": jobs}
+
+
+async def scrape_careers_page(state: DiscoveryState) -> dict:
+    from agent.scrapers.careers_page import CareersPageScraper
+    scraper = CareersPageScraper()
+    jobs = await scraper.safe_scrape([], state.preferences)
+    logger.info("scrape_complete", source="careers_page", jobs_found=len(jobs))
     return {"raw_jobs": jobs}
 
 
@@ -194,16 +215,18 @@ def build_discovery_graph():
     graph.add_node("build_queries", build_queries)
     graph.add_node("scrape_naukri", scrape_naukri)
     graph.add_node("scrape_iimjobs", scrape_iimjobs)
+    graph.add_node("scrape_linkedin", scrape_linkedin)
+    graph.add_node("scrape_careers_page", scrape_careers_page)
     graph.add_node("normalise_and_dedup", normalise_and_dedup)
     graph.add_node("persist_jobs", persist_jobs)
     graph.add_node("write_run_summary", write_run_summary)
 
     graph.set_entry_point("build_queries")
-    # Fan-out: use conditional_edges with fan_out function returning Send objects
     graph.add_conditional_edges("build_queries", fan_out)
-    # After both scraper nodes, collect into normalise
     graph.add_edge("scrape_naukri", "normalise_and_dedup")
     graph.add_edge("scrape_iimjobs", "normalise_and_dedup")
+    graph.add_edge("scrape_linkedin", "normalise_and_dedup")
+    graph.add_edge("scrape_careers_page", "normalise_and_dedup")
     graph.add_edge("normalise_and_dedup", "persist_jobs")
     graph.add_edge("persist_jobs", "write_run_summary")
     graph.add_edge("write_run_summary", END)
