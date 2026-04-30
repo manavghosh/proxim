@@ -156,7 +156,7 @@ Reply detected → Pipeline paused → Interview tracked
 - Converts to structured Markdown on upload (preserving headings, bullets, tables)
 - Computes SHA256 hash of resulting Markdown — stored as `base_cv_hash`
 - Stores Markdown in Neon under `candidates.base_cv_md`
-- Rejects files > 5MB with clear error message
+- Rejects files > 10 MB with clear error message
 - Displays upload confirmation with extracted section count
 
 **Tech Stack:** FastAPI multipart upload → python-docx / pypdf for extraction → Neon storage
