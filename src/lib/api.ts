@@ -54,3 +54,19 @@ export async function updatePreferences(
 export async function getReadiness(): Promise<PipelineReadiness> {
   return request('/api/candidate/readiness')
 }
+
+export async function triggerPipeline(jobType: 'full_pipeline' | 'discovery_only'): Promise<{ jobId: string; status: string }> {
+  return request('/api/pipeline/trigger', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jobType }),
+  })
+}
+
+export async function getPipelineStatus(jobId: string): Promise<{
+  jobId: string
+  status: string
+  pipelineRun: { jobsDiscovered: number; jobsDeduplicated: number } | null
+}> {
+  return request(`/api/pipeline/${jobId}/status`)
+}
