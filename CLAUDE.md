@@ -10,6 +10,17 @@ specs/001-job-discovery-agent/plan.md
 
 ---
 
+## Task Tracking Discipline
+
+When executing tasks from any `tasks.md` file in `specs/`:
+
+- Mark each task `[x]` in the file **immediately** after it is completed — not in a batch at the end.
+- Use the pattern: change `- [ ] TXXX` → `- [x] TXXX` in the file as soon as the task's work is committed.
+- Commit the `tasks.md` update together with the task's code, or at minimum before starting the next task.
+- This applies to every `speckit-implement` run and any manual task execution.
+
+---
+
 ## Commands
 
 ```bash
