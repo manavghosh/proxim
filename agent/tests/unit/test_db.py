@@ -1,7 +1,5 @@
 """Tests for agent/db.py — written before implementation (TDD)."""
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, call
-from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock
 
 
 class TestClaimPipelineJob:

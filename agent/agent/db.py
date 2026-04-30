@@ -1,7 +1,6 @@
 """Database query functions for the Proxim agent service."""
 import asyncpg
 from typing import Optional
-from datetime import datetime, timezone
 
 
 async def create_pool(database_url: str) -> asyncpg.Pool:

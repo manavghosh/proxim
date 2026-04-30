@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    database_url: str
+    database_url: str = ""  # Required at runtime; populated from DATABASE_URL env var
     llm_provider: str = "anthropic"
     llm_model: str = "claude-sonnet-4-6"
     langchain_tracing_v2: bool = False
@@ -12,9 +12,7 @@ class Settings(BaseSettings):
     polling_interval_seconds: int = 3
     agent_port: int = 8001
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 
-settings = Settings()
+settings = Settings()  # pyright: ignore[reportCallIssue]
