@@ -15,6 +15,13 @@
       "when": 1777518151365,
       "tag": "0001_sad_polaris",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777551793948,
+      "tag": "0002_sloppy_fabian_cortez",
+      "breakpoints": true
     }
   ]
 }

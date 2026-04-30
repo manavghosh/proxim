@@ -127,3 +127,17 @@ export const scanHistory = pgTable('scan_history', {
 }, (table) => [
   uniqueIndex('scan_history_candidate_url_idx').on(table.candidateId, table.url),
 ])
+
+export const pipelineLogs = pgTable('pipeline_logs', {
+  id: uuid().defaultRandom().primaryKey(),
+  pipelineJobId: uuid().references(() => pipelineJobs.id).notNull(),
+  level: text().notNull(),
+  step: text().notNull(),
+  message: text().notNull(),
+  data: jsonb().$type<Record<string, unknown>>(),
+  createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index('pipeline_logs_job_created_idx').on(table.pipelineJobId, table.createdAt),
+])
+
+export type PipelineLog = typeof pipelineLogs.$inferSelect
