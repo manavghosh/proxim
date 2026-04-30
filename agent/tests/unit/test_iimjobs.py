@@ -25,12 +25,9 @@ class TestIimjobsScraper:
         assert "iimjobs.com" in results[0].source_url
 
     async def test_pagination_marker_detected(self):
-        """Scraper detects the next-page marker in fixture."""
-        from agent.scrapers.iimjobs import IimjobsScraper
-        scraper = IimjobsScraper()
-
+        """Fixture contains next-page marker confirming pagination is detectable."""
         html = FIXTURE_PATH.read_text()
-        assert 'data-page="2"' in html  # sanity check fixture has pagination marker
+        assert 'data-page="2"' in html
 
     async def test_empty_page_returns_empty_list(self):
         """Returns [] when page has no job cards."""

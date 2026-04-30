@@ -1,8 +1,7 @@
 """TDD tests for NaukriScraper — written before implementation."""
 import json
-import pytest
 from pathlib import Path
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import patch, MagicMock
 
 
 FIXTURE_PATH = Path(__file__).parent.parent / "fixtures" / "naukri_response.json"

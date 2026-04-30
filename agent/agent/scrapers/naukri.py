@@ -18,7 +18,7 @@ HEADERS = {
 class NaukriScraper(AbstractScraper):
     source_name = "naukri"
 
-    async def scrape(self, queries: list[str], preferences: dict) -> list[RawJob]:
+    async def scrape(self, queries: list[str], preferences: dict) -> list[RawJob]:  # noqa: ARG002
         jobs: list[RawJob] = []
         seen_urls: set[str] = set()
 

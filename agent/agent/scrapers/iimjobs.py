@@ -18,7 +18,7 @@ HEADERS = {
 class IimjobsScraper(AbstractScraper):
     source_name = "iimjobs"
 
-    async def scrape(self, queries: list[str], preferences: dict) -> list[RawJob]:
+    async def scrape(self, queries: list[str], preferences: dict) -> list[RawJob]:  # noqa: ARG002
         jobs: list[RawJob] = []
         seen_urls: set[str] = set()
 
@@ -42,7 +42,8 @@ class IimjobsScraper(AbstractScraper):
                         if not link:
                             continue
                         title = link.get_text(strip=True)
-                        href = link.get("href", "")
+                        raw_href = link.get("href", "")
+                        href = raw_href[0] if isinstance(raw_href, list) else (raw_href or "")
                         job_url = href if href.startswith("http") else f"{BASE_URL}{href}"
 
                         if job_url in seen_urls:
