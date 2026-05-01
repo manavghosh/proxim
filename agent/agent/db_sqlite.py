@@ -116,11 +116,17 @@ async def update_pipeline_run(
 ) -> None:
     if not kwargs:
         return
+    from datetime import datetime as _dt
     cols: list[str] = []
     values: list[object] = []
     for key, val in kwargs.items():
         cols.append(f'{_to_snake(key)} = ?')
-        values.append(json.dumps(val) if isinstance(val, (dict, list)) else val)
+        if isinstance(val, (dict, list)):
+            values.append(json.dumps(val))
+        elif isinstance(val, _dt):
+            values.append(val.isoformat())
+        else:
+            values.append(val)
     values.append(run_id)
     await pool.execute(
         f"UPDATE pipeline_runs SET {', '.join(cols)} WHERE id = ?",

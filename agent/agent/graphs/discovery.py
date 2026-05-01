@@ -18,12 +18,22 @@ async def _log(pool, job_id: str, level: str, step: str, message: str, data: dic
         logger.warning("log_write_failed", error=str(e))
 
 
+async def _make_pool():
+    """Create a DB connection/pool via the dispatcher (SQLite or PG)."""
+    from agent.config import settings
+    from agent.db import create_pool
+    return await create_pool(settings.database_url)
+
+
+async def _close_pool(pool) -> None:
+    from agent.db import close_pool
+    await close_pool(pool)
+
+
 # ── Node: build_queries ───────────────────────────────────────────────────────
 
 async def build_queries(state: DiscoveryState) -> dict:
     """Generate 5-8 search queries per source from candidate preferences."""
-    from agent.config import settings
-    import asyncpg
     prefs = state.preferences
     seniority_levels: list[str] = prefs.get("seniority_levels", [])
     geo: list[str] = prefs.get("geographic_preference", [])
@@ -33,7 +43,6 @@ async def build_queries(state: DiscoveryState) -> dict:
         "Director AI", "AI Practice Head", "LangGraph engineer",
     ]
 
-    # Add a location suffix to the first query if geo is available
     if geo and base_queries:
         location_hint = geo[0] if isinstance(geo, list) else geo
         base_queries = [f"{base_queries[0]} {location_hint}"] + base_queries[1:]
@@ -54,7 +63,7 @@ async def build_queries(state: DiscoveryState) -> dict:
         sample_queries=base_queries[:3],
     )
 
-    pool = await asyncpg.create_pool(settings.database_url, min_size=1, max_size=2)
+    pool = await _make_pool()
     try:
         await _log(pool, state.pipeline_job_id, "info", "build_queries",
                    "Starting pipeline — generating search queries",
@@ -63,7 +72,7 @@ async def build_queries(state: DiscoveryState) -> dict:
                    f"Generated {total} queries across {list(queries.keys())}",
                    {"total_queries": total})
     finally:
-        await pool.close()
+        await _close_pool(pool)
 
     return {"queries": queries}
 
@@ -71,12 +80,7 @@ async def build_queries(state: DiscoveryState) -> dict:
 # ── Node: fan_out ─────────────────────────────────────────────────────────────
 
 def fan_out(state: DiscoveryState) -> list[Send]:
-    """Dispatch scraper nodes based on enabled_sources preference.
-
-    If enabled_sources is empty or not set, all standard sources run.
-    Monster is only dispatched if explicitly enabled (stub returns []).
-    Custom job site URLs are routed to the careers_page scraper.
-    """
+    """Dispatch scraper nodes based on enabled_sources preference."""
     enabled: list[str] = state.preferences.get("enabled_sources", [])
     standard_sources = ["naukri", "iimjobs", "linkedin"]
     active = enabled if enabled else standard_sources
@@ -89,7 +93,6 @@ def fan_out(state: DiscoveryState) -> list[Send]:
         elif source == "monster":
             sends.append(Send("scrape_monster", state))
 
-    # Custom job site URLs → careers_page scraper
     custom_sites: list[str] = state.preferences.get("custom_job_sites", [])
     if custom_sites:
         sends.append(Send("scrape_careers_page", state))
@@ -107,9 +110,7 @@ def fan_out(state: DiscoveryState) -> list[Send]:
 
 async def scrape_naukri(state: DiscoveryState) -> dict:
     from agent.scrapers.naukri import NaukriScraper
-    from agent.config import settings
-    import asyncpg
-    pool = await asyncpg.create_pool(settings.database_url, min_size=1, max_size=2)
+    pool = await _make_pool()
     try:
         scraper = NaukriScraper()
         queries = state.queries.get("naukri", [])
@@ -121,15 +122,13 @@ async def scrape_naukri(state: DiscoveryState) -> dict:
         await _log(pool, state.pipeline_job_id, "info", "scrape_naukri",
                    f"Naukri complete — {len(jobs)} jobs found", {"jobs_found": len(jobs)})
     finally:
-        await pool.close()
+        await _close_pool(pool)
     return {"raw_jobs": jobs}
 
 
 async def scrape_iimjobs(state: DiscoveryState) -> dict:
     from agent.scrapers.iimjobs import IimjobsScraper
-    from agent.config import settings
-    import asyncpg
-    pool = await asyncpg.create_pool(settings.database_url, min_size=1, max_size=2)
+    pool = await _make_pool()
     try:
         scraper = IimjobsScraper()
         queries = state.queries.get("iimjobs", [])
@@ -141,18 +140,16 @@ async def scrape_iimjobs(state: DiscoveryState) -> dict:
         await _log(pool, state.pipeline_job_id, "info", "scrape_iimjobs",
                    f"IIMJobs complete — {len(jobs)} jobs found", {"jobs_found": len(jobs)})
     finally:
-        await pool.close()
+        await _close_pool(pool)
     return {"raw_jobs": jobs}
 
 
 async def scrape_linkedin(state: DiscoveryState) -> dict:
     from agent.scrapers.linkedin import LinkedInScraper
-    from agent.config import settings
-    import asyncpg
-    pool = await asyncpg.create_pool(settings.database_url, min_size=1, max_size=2)
+    pool = await _make_pool()
     try:
         scraper = LinkedInScraper()
-        queries = state.queries.get("naukri", [])[:3]  # reuse top 3 queries
+        queries = state.queries.get("naukri", [])[:3]
         logger.info("pipeline_step", step="scrape_linkedin", status="started", query_count=len(queries))
         await _log(pool, state.pipeline_job_id, "info", "scrape_linkedin",
                    f"Scraping LinkedIn ({len(queries)} queries)…", {"query_count": len(queries)})
@@ -161,15 +158,13 @@ async def scrape_linkedin(state: DiscoveryState) -> dict:
         await _log(pool, state.pipeline_job_id, "info", "scrape_linkedin",
                    f"LinkedIn complete — {len(jobs)} jobs found", {"jobs_found": len(jobs)})
     finally:
-        await pool.close()
+        await _close_pool(pool)
     return {"raw_jobs": jobs}
 
 
 async def scrape_careers_page(state: DiscoveryState) -> dict:
     from agent.scrapers.careers_page import CareersPageScraper
-    from agent.config import settings
-    import asyncpg
-    pool = await asyncpg.create_pool(settings.database_url, min_size=1, max_size=2)
+    pool = await _make_pool()
     try:
         scraper = CareersPageScraper()
         custom_sites = state.preferences.get("custom_job_sites", [])
@@ -181,15 +176,13 @@ async def scrape_careers_page(state: DiscoveryState) -> dict:
         await _log(pool, state.pipeline_job_id, "info", "scrape_careers_page",
                    f"Careers pages complete — {len(jobs)} jobs found", {"jobs_found": len(jobs)})
     finally:
-        await pool.close()
+        await _close_pool(pool)
     return {"raw_jobs": jobs}
 
 
 async def scrape_monster(state: DiscoveryState) -> dict:
     from agent.scrapers.monster import MonsterScraper
-    from agent.config import settings
-    import asyncpg
-    pool = await asyncpg.create_pool(settings.database_url, min_size=1, max_size=2)
+    pool = await _make_pool()
     try:
         scraper = MonsterScraper()
         queries = state.queries.get("naukri", [])[:3]
@@ -201,22 +194,20 @@ async def scrape_monster(state: DiscoveryState) -> dict:
         await _log(pool, state.pipeline_job_id, "info", "scrape_monster",
                    f"Monster complete — {len(jobs)} jobs found", {"jobs_found": len(jobs)})
     finally:
-        await pool.close()
+        await _close_pool(pool)
     return {"raw_jobs": jobs}
 
 
-# ── Node: normalise_and_dedup (stub — replaced in Phase 4) ───────────────────
+# ── Node: normalise_and_dedup ─────────────────────────────────────────────────
 
 async def normalise_and_dedup(state: DiscoveryState) -> dict:
     """Deduplicate raw_jobs against scan history and within-batch fuzzy matching."""
-    from agent.config import settings
-    import asyncpg
     from agent.db import get_scan_history_urls
     from agent.normalise import deduplicate_batch
 
     logger.info("pipeline_step", step="normalise_and_dedup", status="started", raw_jobs=len(state.raw_jobs))
 
-    pool = await asyncpg.create_pool(settings.database_url, min_size=1, max_size=3)
+    pool = await _make_pool()
     try:
         seen_urls = await get_scan_history_urls(pool, state.candidate_id)
 
@@ -234,7 +225,7 @@ async def normalise_and_dedup(state: DiscoveryState) -> dict:
                    f"{new_count} new jobs · {dedup_count} duplicates removed",
                    {"new": new_count, "duplicates": dedup_count})
     finally:
-        await pool.close()
+        await _close_pool(pool)
 
     logger.info("pipeline_step", step="normalise_and_dedup", status="complete", new=new_count, duplicates=dedup_count)
 
@@ -245,9 +236,7 @@ async def normalise_and_dedup(state: DiscoveryState) -> dict:
 
 async def persist_jobs(state: DiscoveryState) -> dict:
     """Persist new jobs to the database."""
-    from agent.config import settings
-    import asyncpg
-    pool = await asyncpg.create_pool(settings.database_url, min_size=1, max_size=3)
+    pool = await _make_pool()
 
     try:
         from agent.db import bulk_insert_jobs, bulk_insert_scan_history, update_pipeline_run
@@ -296,7 +285,7 @@ async def persist_jobs(state: DiscoveryState) -> dict:
         await _log(pool, state.pipeline_job_id, "info", "persist_jobs",
                    f"Saved {len(new_jobs)} jobs successfully", {"saved": len(new_jobs)})
     finally:
-        await pool.close()
+        await _close_pool(pool)
 
     logger.info("pipeline_step", step="persist_jobs", status="complete", saved=len(new_jobs))
     return {}
@@ -307,10 +296,7 @@ async def persist_jobs(state: DiscoveryState) -> dict:
 async def write_run_summary(state: DiscoveryState) -> dict:
     """Mark the pipeline job and run as completed, write summary."""
     logger.info("pipeline_step", step="write_run_summary", status="started")
-    from datetime import datetime, timezone
-    from agent.config import settings
-    import asyncpg
-    pool = await asyncpg.create_pool(settings.database_url, min_size=1, max_size=3)
+    pool = await _make_pool()
 
     try:
         from agent.db import update_pipeline_run, update_pipeline_job_status
@@ -325,7 +311,7 @@ async def write_run_summary(state: DiscoveryState) -> dict:
             total_failed_sources=error_sources,
         )
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(timezone.utc).isoformat()
 
         try:
             await update_pipeline_run(
@@ -336,7 +322,6 @@ async def write_run_summary(state: DiscoveryState) -> dict:
             )
         except Exception as e:
             logger.error("write_run_summary_update_failed", error=str(e))
-            # Still mark the job completed even if summary update fails
             await update_pipeline_run(pool, state.pipeline_run_id, status="completed", completedAt=now)
 
         await update_pipeline_job_status(pool, state.pipeline_job_id, "completed")
@@ -353,13 +338,12 @@ async def write_run_summary(state: DiscoveryState) -> dict:
         )
     except Exception as e:
         logger.error("write_run_summary_failed", error=str(e))
-        # Last resort — mark job failed so it doesn't stay stuck as 'running'
         try:
             await update_pipeline_job_status(pool, state.pipeline_job_id, "failed", error=str(e))
         except Exception:
             pass
     finally:
-        await pool.close()
+        await _close_pool(pool)
 
     return {"run_summary": summary}
 
