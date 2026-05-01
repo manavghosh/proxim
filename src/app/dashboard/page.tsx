@@ -9,6 +9,7 @@ import { ActivityFeed } from '@/components/dashboard/ActivityFeed'
 import { ProfileCard } from '@/components/dashboard/ProfileCard'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
+import { PipelineLogPane } from '@/components/dashboard/PipelineLogPane'
 import type { CandidateState, PipelineReadiness } from '@/types/candidate'
 
 function parseStatusMeta(candidate: CandidateState | null): {
@@ -153,6 +154,7 @@ export default function DashboardPage() {
               </div>
               <ProfileCard candidate={candidate} />
             </div>
+            <PipelineLogPane jobId={pipelineJobId} />
           </>
         )}
       </main>
