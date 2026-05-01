@@ -67,7 +67,7 @@ export function Sidebar() {
         setRoleLabel(sidebarRoleLabel(levels))
       })
       .catch(() => undefined)
-  }, [pathname])
+  }, []) // fetch once on mount — role label updates after Save Preferences via page reload
 
   return (
     <aside className="w-[220px] bg-[#060d1f] border-r border-[#1e2d4a] flex flex-col flex-shrink-0 h-screen">

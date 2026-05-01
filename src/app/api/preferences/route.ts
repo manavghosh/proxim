@@ -4,7 +4,9 @@ import { getPreferences, updatePreferences } from '@/lib/preferences-service'
 export async function GET() {
   try {
     const preferences = await getPreferences()
-    return NextResponse.json({ preferences })
+    return NextResponse.json({ preferences }, {
+      headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' },
+    })
   } catch {
     return NextResponse.json({ error: 'Failed to load preferences' }, { status: 500 })
   }

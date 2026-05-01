@@ -6,7 +6,7 @@ async function request<T>(path: string, init?: RequestInit, attempt = 1): Promis
   const res = await fetch(`${BASE}${path}`, init)
   if (!res.ok) {
     if (res.status === 500 && attempt < 3) {
-      await new Promise((r) => setTimeout(r, 1500 * attempt))
+      await new Promise((r) => setTimeout(r, 500 * attempt))
       return request<T>(path, init, attempt + 1)
     }
     const text = await res.text()
