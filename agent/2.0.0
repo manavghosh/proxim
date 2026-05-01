@@ -1,0 +1,5 @@
+Requirement already satisfied: playwright-stealth in c:\users\manav\appdata\local\pypoetry\cache\virtualenvs\proxim-agent-iklez7ga-py3.14\lib\site-packages (1.0.6)
+Requirement already satisfied: playwright in c:\users\manav\appdata\local\pypoetry\cache\virtualenvs\proxim-agent-iklez7ga-py3.14\lib\site-packages (from playwright-stealth) (1.59.0)
+Requirement already satisfied: pyee<14,>=13 in c:\users\manav\appdata\local\pypoetry\cache\virtualenvs\proxim-agent-iklez7ga-py3.14\lib\site-packages (from playwright->playwright-stealth) (13.0.1)
+Requirement already satisfied: greenlet<4.0.0,>=3.1.1 in c:\users\manav\appdata\local\pypoetry\cache\virtualenvs\proxim-agent-iklez7ga-py3.14\lib\site-packages (from playwright->playwright-stealth) (3.5.0)
+Requirement already satisfied: typing-extensions in c:\users\manav\appdata\local\pypoetry\cache\virtualenvs\proxim-agent-iklez7ga-py3.14\lib\site-packages (from pyee<14,>=13->playwright->playwright-stealth) (4.15.0)
