@@ -24,7 +24,7 @@ export async function GET(
 
     const logs = await (since
       ? db.select().from(pipelineLogs)
-          .where(and(eq(pipelineLogs.pipelineJobId, jobId), gt(pipelineLogs.createdAt, new Date(since))))
+          .where(and(eq(pipelineLogs.pipelineJobId, jobId), gt(pipelineLogs.createdAt, since as unknown as Date)))
           .orderBy(pipelineLogs.createdAt)
           .limit(100)
       : db.select().from(pipelineLogs)
