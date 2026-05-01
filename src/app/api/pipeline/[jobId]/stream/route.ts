@@ -1,6 +1,6 @@
-import { eq } from 'drizzle-orm'
+import { and, eq, gt } from 'drizzle-orm'
 import { db } from '@/db'
-import { pipelineJobs, pipelineRuns } from '@/db/schema'
+import { pipelineJobs, pipelineRuns, pipelineLogs } from '@/db/schema'
 
 const TERMINAL_STATUSES = new Set(['completed', 'failed'])
 const POLL_INTERVAL_MS = 2000
@@ -11,7 +11,6 @@ export async function GET(
 ) {
   const { jobId } = await params
 
-  // Verify job exists
   const [job] = await db
     .select({ id: pipelineJobs.id })
     .from(pipelineJobs)
@@ -28,6 +27,8 @@ export async function GET(
   const stream = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder()
+      let lastStatus = ''
+      let lastLogAt: Date | null = null
 
       const pushEvent = (event: string, data: unknown) => {
         controller.enqueue(
@@ -35,10 +36,32 @@ export async function GET(
         )
       }
 
-      let lastStatus = ''
-
       const poll = async () => {
         try {
+          // 1. Push any new log entries since last poll
+          const newLogs = await (lastLogAt
+            ? db.select().from(pipelineLogs)
+                .where(and(eq(pipelineLogs.pipelineJobId, jobId), gt(pipelineLogs.createdAt, lastLogAt)))
+                .orderBy(pipelineLogs.createdAt)
+                .limit(50)
+            : db.select().from(pipelineLogs)
+                .where(eq(pipelineLogs.pipelineJobId, jobId))
+                .orderBy(pipelineLogs.createdAt)
+                .limit(50))
+
+          for (const entry of newLogs) {
+            pushEvent('log_entry', {
+              id: entry.id,
+              level: entry.level,
+              step: entry.step,
+              message: entry.message,
+              data: entry.data,
+              createdAt: entry.createdAt,
+            })
+            lastLogAt = entry.createdAt
+          }
+
+          // 2. Check job status
           const [currentJob] = await db
             .select()
             .from(pipelineJobs)

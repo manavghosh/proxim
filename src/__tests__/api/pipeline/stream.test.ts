@@ -9,8 +9,8 @@ vi.mock('@/db', () => ({
 
 describe('GET /api/pipeline/[jobId]/stream', () => {
   it('returns 404 for unknown jobId', async () => {
-    // Mock db.select().from().where().limit() to return [] (job not found)
-    const chain = { from: vi.fn().mockReturnThis(), where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([]) }
+    // Mock db.select().from().where().orderBy().limit() to return [] (job not found)
+    const chain = { from: vi.fn().mockReturnThis(), where: vi.fn().mockReturnThis(), orderBy: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([]) }
     mockSelect.mockReturnValue(chain)
 
     const { GET } = await import('@/app/api/pipeline/[jobId]/stream/route')
