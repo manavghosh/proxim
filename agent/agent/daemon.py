@@ -20,30 +20,45 @@ def _handle_sigterm(*_):
 async def _dispatch_job(pool, job: dict) -> None:
     """Dispatch a pipeline job to the appropriate LangGraph graph."""
     from agent.db import insert_pipeline_run, get_candidate_preferences
-    from agent.graphs.discovery import discovery_graph
-    from agent.models import DiscoveryState
 
     run_id = await insert_pipeline_run(pool, job['id'], job['candidate_id'])
 
-    # Load the candidate's saved preferences (includes enabled_sources, custom_job_sites, etc.)
-    preferences = await get_candidate_preferences(pool, str(job['candidate_id']))
-    enabled = preferences.get('enabled_sources', [])
-    logger.info(
-        "job_dispatching",
-        job_id=job['id'],
-        enabled_sources=enabled if enabled else 'all (none selected)',
-    )
+    if job['job_type'] == 'fetch_jds':
+        from agent.graphs.fetch_jds import fetch_jds_graph
+        from agent.models import FetchJdsState
 
-    state = DiscoveryState(
-        candidate_id=str(job['candidate_id']),
-        pipeline_job_id=str(job['id']),
-        pipeline_run_id=run_id,
-        preferences=preferences,
-    )
+        logger.info("job_dispatching", job_id=job['id'], job_type='fetch_jds')
 
-    logger.info("graph_invoking", graph="discovery", job_id=job['id'])
-    await discovery_graph.ainvoke(state)
-    logger.info("graph_complete", graph="discovery", job_id=job['id'])
+        state = FetchJdsState(
+            candidate_id=str(job['candidate_id']),
+            pipeline_job_id=str(job['id']),
+            pipeline_run_id=run_id,
+        )
+        await fetch_jds_graph.ainvoke(state)
+
+    else:
+        from agent.graphs.discovery import discovery_graph
+        from agent.models import DiscoveryState
+
+        preferences = await get_candidate_preferences(pool, str(job['candidate_id']))
+        enabled = preferences.get('enabled_sources', [])
+        logger.info(
+            "job_dispatching",
+            job_id=job['id'],
+            job_type=job['job_type'],
+            enabled_sources=enabled if enabled else 'all (none selected)',
+        )
+
+        state = DiscoveryState(
+            candidate_id=str(job['candidate_id']),
+            pipeline_job_id=str(job['id']),
+            pipeline_run_id=run_id,
+            preferences=preferences,
+        )
+
+        logger.info("graph_invoking", graph="discovery", job_id=job['id'])
+        await discovery_graph.ainvoke(state)
+        logger.info("graph_complete", graph="discovery", job_id=job['id'])
 
 
 async def main() -> None:
