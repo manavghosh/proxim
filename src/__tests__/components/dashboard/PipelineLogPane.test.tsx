@@ -1,8 +1,21 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { PipelineLogPane } from '@/components/dashboard/PipelineLogPane'
 
 describe('PipelineLogPane', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ logs: [], jobStatus: 'running', jobError: null }),
+    })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
   it('shows idle hint when jobId is null', () => {
     render(<PipelineLogPane jobId={null} />)
     expect(screen.getByText(/Pipeline Log/i)).toBeInTheDocument()
@@ -10,26 +23,40 @@ describe('PipelineLogPane', () => {
   })
 
   it('shows waiting message when jobId is set', () => {
-    const mockES = { addEventListener: vi.fn(), close: vi.fn() }
-    vi.stubGlobal('EventSource', vi.fn(() => mockES))
-
     render(<PipelineLogPane jobId="job-1" />)
-
     expect(screen.getByText(/Pipeline Log/i)).toBeInTheDocument()
     expect(screen.getByText(/Waiting for pipeline/i)).toBeInTheDocument()
-
-    vi.unstubAllGlobals()
   })
 
-  it('opens EventSource for the correct jobId URL', () => {
-    const mockES = { addEventListener: vi.fn(), close: vi.fn() }
-    const MockEventSource = vi.fn(() => mockES)
-    vi.stubGlobal('EventSource', MockEventSource)
+  it('polls the logs endpoint when jobId is set', () => {
+    render(<PipelineLogPane jobId="job-1" />)
+    expect(global.fetch).toHaveBeenCalledWith('/api/pipeline/job-1/logs')
+  })
 
-    render(<PipelineLogPane jobId="job-abc" />)
+  it('uses since param on subsequent polls after receiving logs', async () => {
+    const timestamp = '2026-05-01T09:00:00.000Z'
+    vi.mocked(global.fetch)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          logs: [{ id: 'l1', level: 'info', step: 'build_queries', message: 'Starting…', createdAt: timestamp }],
+          jobStatus: 'running',
+          jobError: null,
+        }),
+      } as never)
+      .mockResolvedValue({
+        ok: true,
+        json: async () => ({ logs: [], jobStatus: 'completed', jobError: null }),
+      } as never)
 
-    expect(MockEventSource).toHaveBeenCalledWith('/api/pipeline/job-abc/stream')
+    render(<PipelineLogPane jobId="job-1" />)
+    // Let initial fetch complete
+    await vi.advanceTimersByTimeAsync(100)
+    // Advance one interval tick
+    await vi.advanceTimersByTimeAsync(2000)
 
-    vi.unstubAllGlobals()
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining(`since=${encodeURIComponent(timestamp)}`)
+    )
   })
 })

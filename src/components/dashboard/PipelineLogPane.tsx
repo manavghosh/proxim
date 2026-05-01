@@ -33,47 +33,76 @@ interface Props {
   jobId: string | null
 }
 
+const POLL_INTERVAL_MS = 2000
+const TERMINAL_STATUSES = new Set(['completed', 'failed'])
+
 export function PipelineLogPane({ jobId }: Props) {
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [running, setRunning] = useState(false)
+  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'polling' | 'error'>('idle')
   const bottomRef = useRef<HTMLDivElement>(null)
+  const lastLogAtRef = useRef<string | null>(null)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     if (!jobId) return
 
+    // Reset state for new job
     setLogs([])
     setRunning(true)
+    setConnectionStatus('polling')
+    lastLogAtRef.current = null
 
-    const es = new EventSource(`/api/pipeline/${jobId}/stream`)
-
-    es.addEventListener('log_entry', (e: MessageEvent) => {
-      const entry = JSON.parse(e.data) as LogEntry
-      setLogs((prev) => [...prev, entry])
-    })
-
-    es.addEventListener('completed', () => {
-      setRunning(false)
-      es.close()
-    })
-
-    es.addEventListener('failed', (e: MessageEvent) => {
+    const fetchLogs = async () => {
       try {
-        const payload = JSON.parse(e.data) as { error?: string }
-        if (payload.error) {
-          setLogs((prev) => [...prev, {
-            id: crypto.randomUUID(),
-            level: 'error',
-            step: 'failed',
-            message: `Pipeline failed: ${payload.error}`,
-            createdAt: new Date().toISOString(),
-          }])
-        }
-      } catch { /* ignore parse errors */ }
-      setRunning(false)
-      es.close()
-    })
+        const since = lastLogAtRef.current
+        const url = since
+          ? `/api/pipeline/${jobId}/logs?since=${encodeURIComponent(since)}`
+          : `/api/pipeline/${jobId}/logs`
 
-    return () => es.close()
+        const res = await fetch(url)
+        if (!res.ok) return // silent retry on non-200
+
+        const data = await res.json() as {
+          logs: LogEntry[]
+          jobStatus: string
+          jobError: string | null
+        }
+
+        if (data.logs.length > 0) {
+          setLogs((prev) => [...prev, ...data.logs])
+          lastLogAtRef.current = data.logs[data.logs.length - 1].createdAt
+          setConnectionStatus('polling')
+        }
+
+        // Stop polling when terminal status reached
+        if (TERMINAL_STATUSES.has(data.jobStatus)) {
+          if (data.jobStatus === 'failed' && data.jobError) {
+            setLogs((prev) => [...prev, {
+              id: `err-${Date.now()}`,
+              level: 'error',
+              step: 'failed',
+              message: `Pipeline failed: ${data.jobError}`,
+              createdAt: new Date().toISOString(),
+            }])
+          }
+          setRunning(false)
+          setConnectionStatus('idle')
+          if (intervalRef.current) clearInterval(intervalRef.current)
+        }
+      } catch {
+        setConnectionStatus('error')
+        // Keep polling — transient error, will recover next tick
+      }
+    }
+
+    // Poll immediately then on interval
+    void fetchLogs()
+    intervalRef.current = setInterval(() => { void fetchLogs() }, POLL_INTERVAL_MS)
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+    }
   }, [jobId])
 
   useEffect(() => {
@@ -88,12 +117,19 @@ export function PipelineLogPane({ jobId }: Props) {
         <div className="flex items-center gap-2">
           <span
             className={`w-2 h-2 rounded-full flex-shrink-0 ${
-              running ? 'bg-green-500 animate-pulse' : 'bg-[#334155]'
+              running
+                ? 'bg-green-500 animate-pulse'
+                : connectionStatus === 'error'
+                  ? 'bg-amber-500'
+                  : 'bg-[#334155]'
             }`}
           />
           <span className="text-[11px] font-semibold text-[#94a3b8] tracking-widest uppercase">
             Pipeline Log
           </span>
+          {connectionStatus === 'error' && (
+            <span className="text-[9px] text-amber-500">retrying…</span>
+          )}
         </div>
         {!running && logs.length > 0 && (
           <button
