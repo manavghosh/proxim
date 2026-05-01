@@ -2,10 +2,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { eq, or } from 'drizzle-orm'
 
 // Mock the DB module so module-level neon() call doesn't require DATABASE_URL
+const mockUpdateChain = {
+  set: vi.fn().mockReturnThis(),
+  where: vi.fn().mockResolvedValue([]),
+}
 vi.mock('@/db', () => ({
   db: {
     select: vi.fn(),
     insert: vi.fn(),
+    update: vi.fn(() => mockUpdateChain),
   },
 }))
 vi.mock('@/lib/cv-service', () => ({
