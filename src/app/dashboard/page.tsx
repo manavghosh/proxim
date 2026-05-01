@@ -73,14 +73,19 @@ export default function DashboardPage() {
       const { jobId } = await triggerPipeline('discovery_only')
       setPipelineJobId(jobId)
       setPipelineStatus('queued')
-      // Poll for status
+      // Poll for status — retries silently on 500 (Neon cold start)
       const poll = async () => {
-        const status = await getPipelineStatus(jobId)
-        setPipelineStatus(status.status)
-        if (status.status !== 'completed' && status.status !== 'failed') {
+        try {
+          const status = await getPipelineStatus(jobId)
+          setPipelineStatus(status.status)
+          if (status.status !== 'completed' && status.status !== 'failed') {
+            setTimeout(() => { void poll() }, 5000)
+          } else {
+            setPipelineLoading(false)
+          }
+        } catch {
+          // Status fetch failed — retry in 5s without crashing the UI
           setTimeout(() => { void poll() }, 5000)
-        } else {
-          setPipelineLoading(false)
         }
       }
       void poll()
