@@ -307,9 +307,10 @@ async def write_run_summary(state: DiscoveryState) -> dict:
     try:
         from agent.db import update_pipeline_run, update_pipeline_job_status
 
-        new_count = sum(1 for j in state.deduplicated_jobs if not j.is_duplicate)
-        dedup_count = sum(1 for j in state.deduplicated_jobs if j.is_duplicate)
+        new_count     = sum(1 for j in state.deduplicated_jobs if not j.is_duplicate)
+        dedup_count   = sum(1 for j in state.deduplicated_jobs if j.is_duplicate)
         error_sources = len(state.errors)
+        unfetched     = 0
 
         summary = RunSummary(
             total_new=new_count,
@@ -332,15 +333,27 @@ async def write_run_summary(state: DiscoveryState) -> dict:
 
         await update_pipeline_job_status(pool, state.pipeline_job_id, "completed")
 
-        await _log(pool, state.pipeline_job_id, "info", "write_run_summary",
-                   f"Pipeline complete — {new_count} jobs discovered",
-                   {"jobs_new": new_count, "jobs_deduped": dedup_count})
+        # Auto-queue a fetch_jds job if any discovered jobs still have empty jd_raw
+        from agent.db import count_jobs_with_empty_jd, queue_pipeline_job
+        unfetched = await count_jobs_with_empty_jd(pool, state.candidate_id)
+        if unfetched > 0:
+            await queue_pipeline_job(pool, state.candidate_id, "fetch_jds")
+            await _log(pool, state.pipeline_job_id, "info", "write_run_summary",
+                       f"Pipeline complete — {new_count} jobs discovered. "
+                       f"Queuing JD fetch for {unfetched} jobs…",
+                       {"jobs_new": new_count, "jobs_deduped": dedup_count,
+                        "pending_jd_fetch": unfetched})
+        else:
+            await _log(pool, state.pipeline_job_id, "info", "write_run_summary",
+                       f"Pipeline complete — {new_count} jobs discovered",
+                       {"jobs_new": new_count, "jobs_deduped": dedup_count})
 
         logger.info(
             "discovery_run_complete",
             jobs_new=new_count,
             jobs_deduped=dedup_count,
             sources_failed=error_sources,
+            pending_jd_fetch=unfetched,
         )
     except Exception as e:
         logger.error("write_run_summary_failed", error=str(e))
