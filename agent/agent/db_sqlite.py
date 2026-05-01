@@ -234,3 +234,58 @@ async def get_candidate_preferences(
         return {}
     prefs = row[0]
     return json.loads(prefs) if isinstance(prefs, str) else dict(prefs)
+
+
+async def get_jobs_with_empty_jd(
+    pool: aiosqlite.Connection,
+    candidate_id: str,
+    limit: int = 100,
+) -> list[dict]:
+    async with pool.execute(
+        "SELECT id, source_url FROM jobs "
+        "WHERE candidate_id = ? AND jd_raw = '' AND status = 'discovered' "
+        "ORDER BY created_at LIMIT ?",
+        (candidate_id, limit),
+    ) as cursor:
+        rows = await cursor.fetchall()
+    return [{"id": row[0], "source_url": row[1]} for row in rows]
+
+
+async def update_job_jd(
+    pool: aiosqlite.Connection,
+    job_id: str,
+    jd_raw: str,
+) -> None:
+    await pool.execute(
+        "UPDATE jobs SET jd_raw = ?, updated_at = ? WHERE id = ?",
+        (jd_raw, _now(), job_id),
+    )
+    await pool.commit()
+
+
+async def count_jobs_with_empty_jd(
+    pool: aiosqlite.Connection,
+    candidate_id: str,
+) -> int:
+    async with pool.execute(
+        "SELECT COUNT(*) FROM jobs "
+        "WHERE candidate_id = ? AND jd_raw = '' AND status = 'discovered'",
+        (candidate_id,),
+    ) as cursor:
+        row = await cursor.fetchone()
+    return row[0] if row else 0
+
+
+async def queue_pipeline_job(
+    pool: aiosqlite.Connection,
+    candidate_id: str,
+    job_type: str,
+) -> str:
+    job_id = _new_id()
+    await pool.execute(
+        "INSERT INTO pipeline_jobs (id, status, job_type, candidate_id, payload, created_at) "
+        "VALUES (?, 'queued', ?, ?, '{}', ?)",
+        (job_id, job_type, candidate_id, _now()),
+    )
+    await pool.commit()
+    return job_id

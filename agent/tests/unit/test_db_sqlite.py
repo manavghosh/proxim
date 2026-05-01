@@ -13,6 +13,10 @@ from agent.db_sqlite import (
     bulk_insert_scan_history,
     insert_pipeline_log,
     get_candidate_preferences,
+    get_jobs_with_empty_jd,
+    update_job_jd,
+    count_jobs_with_empty_jd,
+    queue_pipeline_job,
 )
 
 SCHEMA_SQL = """
@@ -231,3 +235,77 @@ async def test_get_candidate_preferences(conn):
 async def test_get_candidate_preferences_missing(conn):
     prefs = await get_candidate_preferences(conn, 'nonexistent-id')
     assert prefs == {}
+
+
+# ── New DB functions for JD fetch ─────────────────────────────────────────────
+
+_JOB_FIXTURE = {
+    'candidate_id': CANDIDATE_ID,
+    'pipeline_run_id': None,  # filled in per-test
+    'title': 'AI Director',
+    'company': 'Acme',
+    'location': 'Bengaluru',
+    'jd_raw': '',
+    'jd_text': '',
+    'source': 'linkedin',
+    'source_url': 'https://linkedin.com/jobs/view/123',
+    'application_url': None,
+    'posted_at': None,
+}
+
+
+async def test_count_jobs_with_empty_jd_returns_zero_when_no_jobs(conn):
+    count = await count_jobs_with_empty_jd(conn, CANDIDATE_ID)
+    assert count == 0
+
+
+async def test_get_jobs_with_empty_jd_returns_empty_when_no_jobs(conn):
+    result = await get_jobs_with_empty_jd(conn, CANDIDATE_ID)
+    assert result == []
+
+
+async def test_update_job_jd_updates_jd_raw(conn, job_id):
+    run_id = await insert_pipeline_run(conn, job_id, CANDIDATE_ID)
+    inserted_ids = await bulk_insert_jobs(conn, [{**_JOB_FIXTURE, 'pipeline_run_id': run_id}])
+    inserted_job_id = inserted_ids[0]
+    await update_job_jd(conn, inserted_job_id, 'We are hiring an AI Director…')
+    async with conn.execute('SELECT jd_raw FROM jobs WHERE id = ?', (inserted_job_id,)) as cur:
+        row = await cur.fetchone()
+    assert row[0] == 'We are hiring an AI Director…'
+
+
+async def test_count_jobs_with_empty_jd_counts_correctly(conn, job_id):
+    run_id = await insert_pipeline_run(conn, job_id, CANDIDATE_ID)
+    await bulk_insert_jobs(conn, [
+        {**_JOB_FIXTURE, 'pipeline_run_id': run_id, 'jd_raw': '',
+         'source_url': 'https://linkedin.com/jobs/1'},
+        {**_JOB_FIXTURE, 'pipeline_run_id': run_id, 'jd_raw': 'has jd',
+         'source_url': 'https://linkedin.com/jobs/2'},
+    ])
+    count = await count_jobs_with_empty_jd(conn, CANDIDATE_ID)
+    assert count == 1
+
+
+async def test_get_jobs_with_empty_jd_returns_only_empty_ones(conn, job_id):
+    run_id = await insert_pipeline_run(conn, job_id, CANDIDATE_ID)
+    await bulk_insert_jobs(conn, [
+        {**_JOB_FIXTURE, 'pipeline_run_id': run_id, 'jd_raw': '',
+         'source_url': 'https://linkedin.com/jobs/1'},
+        {**_JOB_FIXTURE, 'pipeline_run_id': run_id, 'jd_raw': 'has jd',
+         'source_url': 'https://linkedin.com/jobs/2'},
+    ])
+    jobs = await get_jobs_with_empty_jd(conn, CANDIDATE_ID)
+    assert len(jobs) == 1
+    assert jobs[0]['source_url'] == 'https://linkedin.com/jobs/1'
+    assert 'id' in jobs[0]
+
+
+async def test_queue_pipeline_job_inserts_queued_job(conn):
+    new_job_id = await queue_pipeline_job(conn, CANDIDATE_ID, 'fetch_jds')
+    assert new_job_id is not None
+    async with conn.execute(
+        'SELECT status, job_type FROM pipeline_jobs WHERE id = ?', (new_job_id,)
+    ) as cur:
+        row = await cur.fetchone()
+    assert row[0] == 'queued'
+    assert row[1] == 'fetch_jds'
