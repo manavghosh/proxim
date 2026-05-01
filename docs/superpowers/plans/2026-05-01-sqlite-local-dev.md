@@ -1,6 +1,6 @@
 # SQLite Local Dev Database Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Add a local SQLite database option so both Next.js and the Python daemon can run fully offline without Neon PostgreSQL.
 
@@ -16,7 +16,7 @@
 - Modify: `package.json`
 - Modify: `.gitignore`
 
-- [ ] **Step 1: Install better-sqlite3**
+- [x] **Step 1: Install better-sqlite3**
 
 ```bash
 npm install better-sqlite3
@@ -25,7 +25,7 @@ npm install --save-dev @types/better-sqlite3
 
 Expected: both appear in `package.json` dependencies/devDependencies.
 
-- [ ] **Step 2: Add proxim-dev.db to .gitignore**
+- [x] **Step 2: Add proxim-dev.db to .gitignore**
 
 Open `.gitignore` and add at the end:
 
@@ -34,7 +34,7 @@ Open `.gitignore` and add at the end:
 proxim-dev.db
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add package.json package-lock.json .gitignore
@@ -50,7 +50,7 @@ git commit -m "chore: add better-sqlite3 and gitignore dev db"
 
 All table names and column names (snake_case) are identical to the PG schema so both schemas produce the same DB structure. Types are mapped as: `uuid` → `text` with `$defaultFn(() => crypto.randomUUID())`, `jsonb` → `text({ mode: 'json' })`, `timestamp` → `text` with ISO-8601 strings, `pgEnum` → `text`.
 
-- [ ] **Step 1: Create `src/db/schema.sqlite.ts`**
+- [x] **Step 1: Create `src/db/schema.sqlite.ts`**
 
 ```typescript
 import {
@@ -180,7 +180,7 @@ export const pipelineLogs = sqliteTable('pipeline_logs', {
 export type PipelineLog = typeof pipelineLogs.$inferSelect
 ```
 
-- [ ] **Step 2: Type-check the new file**
+- [x] **Step 2: Type-check the new file**
 
 ```bash
 npx tsc --noEmit
@@ -188,7 +188,7 @@ npx tsc --noEmit
 
 Expected: no errors.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/db/schema.sqlite.ts
@@ -202,7 +202,7 @@ git commit -m "feat: add SQLite Drizzle schema"
 **Files:**
 - Create: `src/db/index.sqlite.ts`
 
-- [ ] **Step 1: Create `src/db/index.sqlite.ts`**
+- [x] **Step 1: Create `src/db/index.sqlite.ts`**
 
 ```typescript
 import Database from 'better-sqlite3'
@@ -219,7 +219,7 @@ client.pragma('foreign_keys = ON')
 export const db = drizzle(client, { schema, casing: 'snake_case' })
 ```
 
-- [ ] **Step 2: Type-check**
+- [x] **Step 2: Type-check**
 
 ```bash
 npx tsc --noEmit
@@ -227,7 +227,7 @@ npx tsc --noEmit
 
 Expected: no errors.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/db/index.sqlite.ts
@@ -242,7 +242,7 @@ git commit -m "feat: add SQLite Drizzle instance"
 - Create: `drizzle.sqlite.config.ts`
 - Modify: `package.json`
 
-- [ ] **Step 1: Create `drizzle.sqlite.config.ts`**
+- [x] **Step 1: Create `drizzle.sqlite.config.ts`**
 
 ```typescript
 import { defineConfig } from 'drizzle-kit'
@@ -258,7 +258,7 @@ export default defineConfig({
 })
 ```
 
-- [ ] **Step 2: Add scripts to `package.json`**
+- [x] **Step 2: Add scripts to `package.json`**
 
 In the `"scripts"` section, add these three entries alongside the existing `db:*` scripts:
 
@@ -268,7 +268,7 @@ In the `"scripts"` section, add these three entries alongside the existing `db:*
 "db:studio:sqlite":   "drizzle-kit studio   --config=drizzle.sqlite.config.ts"
 ```
 
-- [ ] **Step 3: Generate and apply SQLite migrations**
+- [x] **Step 3: Generate and apply SQLite migrations**
 
 ```bash
 DATABASE_URL=./proxim-dev.db npm run db:generate:sqlite
@@ -277,7 +277,7 @@ DATABASE_URL=./proxim-dev.db npm run db:migrate:sqlite
 
 Expected: `migrations/sqlite/` folder created with SQL files; `proxim-dev.db` file created at repo root.
 
-- [ ] **Step 4: Verify DB was created**
+- [x] **Step 4: Verify DB was created**
 
 ```bash
 npx better-sqlite3 ./proxim-dev.db ".tables"
@@ -285,7 +285,7 @@ npx better-sqlite3 ./proxim-dev.db ".tables"
 
 Expected output lists: `candidates  jobs  pipeline_jobs  pipeline_logs  pipeline_runs  scan_history`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add drizzle.sqlite.config.ts package.json migrations/sqlite/
@@ -301,7 +301,7 @@ git commit -m "feat: add SQLite drizzle-kit config and migration scripts"
 
 When `DATABASE_URL` does not start with `postgresql` or `postgres`, webpack resolves `@/db` and `@/db/schema` to the SQLite files instead of the default PG files. TypeScript continues to type-check against the PG schema (tsconfig paths stay unchanged) — this is intentional: the query API is identical and PG types are the production contract.
 
-- [ ] **Step 1: Replace `next.config.ts` with**
+- [x] **Step 1: Replace `next.config.ts` with**
 
 ```typescript
 import type { NextConfig } from 'next'
@@ -326,7 +326,7 @@ const config: NextConfig = {
 export default config
 ```
 
-- [ ] **Step 2: Type-check**
+- [x] **Step 2: Type-check**
 
 ```bash
 npx tsc --noEmit
@@ -334,7 +334,7 @@ npx tsc --noEmit
 
 Expected: no errors.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add next.config.ts
@@ -350,7 +350,7 @@ git commit -m "feat: swap @/db webpack alias to SQLite when DATABASE_URL is a fi
 
 The current auto-expire uses `INTERVAL '30 minutes'` which is PostgreSQL-only. Replace it with Drizzle query builder that works on both PG and SQLite.
 
-- [ ] **Step 1: Update imports in `src/app/api/pipeline/trigger/route.ts`**
+- [x] **Step 1: Update imports in `src/app/api/pipeline/trigger/route.ts`**
 
 Replace the existing import block at the top of the file with:
 
@@ -362,7 +362,7 @@ import { pipelineJobs } from '@/db/schema'
 import { getOrCreateCandidate } from '@/lib/cv-service'
 ```
 
-- [ ] **Step 2: Replace the raw `db.execute(sql\`...\`)` auto-expire block**
+- [x] **Step 2: Replace the raw `db.execute(sql\`...\`)` auto-expire block**
 
 Find this block (lines 29–35):
 
@@ -394,7 +394,7 @@ Replace it with:
 
 Also remove the unused `sql` import from `drizzle-orm` if it's only used here (check the top of the file).
 
-- [ ] **Step 3: Run the existing test suite**
+- [x] **Step 3: Run the existing test suite**
 
 ```bash
 npm run test:run
@@ -402,7 +402,7 @@ npm run test:run
 
 Expected: 0 failures.
 
-- [ ] **Step 4: Type-check**
+- [x] **Step 4: Type-check**
 
 ```bash
 npx tsc --noEmit
@@ -410,7 +410,7 @@ npx tsc --noEmit
 
 Expected: no errors.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/app/api/pipeline/trigger/route.ts
@@ -424,7 +424,7 @@ git commit -m "fix: replace PG-only INTERVAL raw SQL with dialect-agnostic Drizz
 **Files:**
 - Modify: `.env.local`
 
-- [ ] **Step 1: Edit `.env.local`** — comment out the Neon URL and add the SQLite path:
+- [x] **Step 1: Edit `.env.local`** — comment out the Neon URL and add the SQLite path:
 
 ```
 # Neon PostgreSQL (production) — uncomment to switch back
@@ -438,7 +438,7 @@ LLM_MODEL=claude-sonnet-4-6
 ANTHROPIC_API_KEY=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
 ```
 
-- [ ] **Step 2: Start the dev server**
+- [x] **Step 2: Start the dev server**
 
 ```bash
 npm run dev
@@ -446,7 +446,7 @@ npm run dev
 
 Expected: server starts without errors, no DB connection errors in console.
 
-- [ ] **Step 3: Smoke-test the CV endpoint**
+- [x] **Step 3: Smoke-test the CV endpoint**
 
 ```bash
 curl -s http://localhost:3000/api/cv
@@ -454,7 +454,7 @@ curl -s http://localhost:3000/api/cv
 
 Expected: `{"id":"...","parseStatus":"pending",...}` — a new candidate row auto-created in SQLite.
 
-- [ ] **Step 4: Smoke-test the pipeline trigger**
+- [x] **Step 4: Smoke-test the pipeline trigger**
 
 ```bash
 curl -s -X POST http://localhost:3000/api/pipeline/trigger \
@@ -464,7 +464,7 @@ curl -s -X POST http://localhost:3000/api/pipeline/trigger \
 
 Expected: `{"jobId":"...","status":"queued","createdAt":"..."}` with HTTP 201.
 
-- [ ] **Step 5: Verify DB row was written**
+- [x] **Step 5: Verify DB row was written**
 
 ```bash
 npx better-sqlite3 ./proxim-dev.db "SELECT id, status FROM pipeline_jobs;"
@@ -472,7 +472,7 @@ npx better-sqlite3 ./proxim-dev.db "SELECT id, status FROM pipeline_jobs;"
 
 Expected: one row with `status = queued`.
 
-- [ ] **Step 6: Run full test suite**
+- [x] **Step 6: Run full test suite**
 
 ```bash
 npm run test:run
@@ -480,7 +480,7 @@ npm run test:run
 
 Expected: 0 failures.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add .env.local
@@ -494,7 +494,7 @@ git commit -m "chore: switch local dev to SQLite DATABASE_URL"
 **Files:**
 - Modify: `agent/pyproject.toml`
 
-- [ ] **Step 1: Add aiosqlite dependency**
+- [x] **Step 1: Add aiosqlite dependency**
 
 In `agent/pyproject.toml`, add `aiosqlite` to `[tool.poetry.dependencies]`:
 
@@ -502,7 +502,7 @@ In `agent/pyproject.toml`, add `aiosqlite` to `[tool.poetry.dependencies]`:
 aiosqlite = "^0.20"
 ```
 
-- [ ] **Step 2: Install**
+- [x] **Step 2: Install**
 
 ```bash
 cd agent
@@ -511,7 +511,7 @@ poetry add aiosqlite
 
 Expected: `aiosqlite` appears in `poetry.lock`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add agent/pyproject.toml agent/poetry.lock
@@ -526,7 +526,7 @@ git commit -m "chore: add aiosqlite dependency to Python agent"
 - Create: `agent/agent/db_pg.py`
 - Modify: `agent/agent/db.py` (will become dispatcher in Task 11 — leave unchanged for now)
 
-- [ ] **Step 1: Create `agent/agent/db_pg.py`** — copy the full current content of `agent/agent/db.py` verbatim:
+- [x] **Step 1: Create `agent/agent/db_pg.py`** — copy the full current content of `agent/agent/db.py` verbatim:
 
 ```python
 """PostgreSQL database query functions for the Proxim agent (production)."""
@@ -699,7 +699,7 @@ def _to_snake(name: str) -> str:
     return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 ```
 
-- [ ] **Step 2: Run existing Python unit tests to confirm nothing broke**
+- [x] **Step 2: Run existing Python unit tests to confirm nothing broke**
 
 ```bash
 cd agent
@@ -708,7 +708,7 @@ poetry run pytest tests/unit/ -v
 
 Expected: all tests pass (db_pg.py not yet imported — db.py still intact).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add agent/agent/db_pg.py
@@ -732,7 +732,7 @@ Key differences from db_pg.py:
 - `::jsonb` casts removed
 - `pool.acquire()` context manager removed (connection used directly)
 
-- [ ] **Step 1: Create `agent/agent/db_sqlite.py`**
+- [x] **Step 1: Create `agent/agent/db_sqlite.py`**
 
 ```python
 """SQLite database query functions for the Proxim agent (local dev)."""
@@ -961,7 +961,7 @@ async def get_candidate_preferences(
     return json.loads(prefs) if isinstance(prefs, str) else dict(prefs)
 ```
 
-- [ ] **Step 2: Create `agent/tests/unit/test_db_sqlite.py`**
+- [x] **Step 2: Create `agent/tests/unit/test_db_sqlite.py`**
 
 ```python
 """Unit tests for db_sqlite.py using an in-memory SQLite database."""
@@ -1201,7 +1201,7 @@ async def test_get_candidate_preferences_missing(conn):
     assert prefs == {}
 ```
 
-- [ ] **Step 3: Run the new tests**
+- [x] **Step 3: Run the new tests**
 
 ```bash
 cd agent
@@ -1210,7 +1210,7 @@ poetry run pytest tests/unit/test_db_sqlite.py -v
 
 Expected: all tests pass.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add agent/agent/db_sqlite.py agent/tests/unit/test_db_sqlite.py
@@ -1226,7 +1226,7 @@ git commit -m "feat: add SQLite DB implementation and tests"
 
 The daemon imports `create_pool`, `close_pool`, `claim_pipeline_job`, etc. from `agent.db`. After this step, `db.py` detects the DB driver from `DATABASE_URL` and re-exports the right implementation. The daemon (`daemon.py`) is **not changed**.
 
-- [ ] **Step 1: Replace the full content of `agent/agent/db.py` with**
+- [x] **Step 1: Replace the full content of `agent/agent/db.py` with**
 
 ```python
 """
@@ -1249,7 +1249,7 @@ else:
     from agent.db_pg import *  # noqa: F401, F403
 ```
 
-- [ ] **Step 2: Run all Python unit tests**
+- [x] **Step 2: Run all Python unit tests**
 
 ```bash
 cd agent
@@ -1258,7 +1258,7 @@ poetry run pytest tests/unit/ -v
 
 Expected: all tests pass (existing tests mock `agent.db` — the dispatcher re-exports the same names).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add agent/agent/db.py
@@ -1272,7 +1272,7 @@ git commit -m "feat: rewrite db.py as SQLite/PG driver dispatcher"
 **Files:**
 - Modify: `agent/.env`
 
-- [ ] **Step 1: Edit `agent/.env`** — comment out Neon URL, add SQLite path (relative to `agent/` directory, so `../proxim-dev.db` reaches the repo root):
+- [x] **Step 1: Edit `agent/.env`** — comment out Neon URL, add SQLite path (relative to `agent/` directory, so `../proxim-dev.db` reaches the repo root):
 
 ```
 # Neon PostgreSQL (production) — uncomment to switch back
@@ -1291,14 +1291,14 @@ POLLING_INTERVAL_SECONDS=3
 AGENT_PORT=8001
 ```
 
-- [ ] **Step 2: Start Next.js (if not running)**
+- [x] **Step 2: Start Next.js (if not running)**
 
 ```bash
 # In repo root
 npm run dev
 ```
 
-- [ ] **Step 3: Trigger a pipeline job via the API**
+- [x] **Step 3: Trigger a pipeline job via the API**
 
 ```bash
 curl -s -X POST http://localhost:3000/api/pipeline/trigger \
@@ -1308,7 +1308,7 @@ curl -s -X POST http://localhost:3000/api/pipeline/trigger \
 
 Expected: `{"jobId":"...","status":"queued",...}`
 
-- [ ] **Step 4: Start the daemon and watch it pick up the job**
+- [x] **Step 4: Start the daemon and watch it pick up the job**
 
 ```bash
 cd agent
@@ -1321,7 +1321,7 @@ job_claimed   job_id=... job_type=discovery_only
 graph_invoking graph=discovery job_id=...
 ```
 
-- [ ] **Step 5: Verify pipeline_jobs row updated in SQLite**
+- [x] **Step 5: Verify pipeline_jobs row updated in SQLite**
 
 In a separate terminal:
 
@@ -1331,7 +1331,7 @@ npx better-sqlite3 ./proxim-dev.db "SELECT id, status, started_at FROM pipeline_
 
 Expected: status shows `running` or `completed`.
 
-- [ ] **Step 6: Run full Python test suite**
+- [x] **Step 6: Run full Python test suite**
 
 ```bash
 cd agent
@@ -1340,7 +1340,7 @@ poetry run pytest tests/unit/ -v
 
 Expected: all tests pass.
 
-- [ ] **Step 7: Run full Next.js test suite and type-check**
+- [x] **Step 7: Run full Next.js test suite and type-check**
 
 ```bash
 npm run test:run && npx tsc --noEmit
@@ -1348,7 +1348,7 @@ npm run test:run && npx tsc --noEmit
 
 Expected: 0 failures, no type errors.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add agent/.env

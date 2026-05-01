@@ -28,12 +28,13 @@ All three MUST pass with evidence before any `git push` or PR. A passing test su
 
 ## Task Tracking Discipline
 
-When executing tasks from any `tasks.md` file in `specs/`:
+When executing tasks from **any plan or task file** — including `tasks.md` files in `specs/` and implementation plans in `docs/superpowers/plans/`:
 
-- Mark each task `[x]` in the file **immediately** after it is completed — not in a batch at the end.
-- Use the pattern: change `- [ ] TXXX` → `- [x] TXXX` in the file as soon as the task's work is committed.
-- Commit the `tasks.md` update together with the task's code, or at minimum before starting the next task.
-- This applies to every `speckit-implement` run and any manual task execution.
+- Mark each step/task `[x]` in the file **immediately** after it is completed — not in a batch at the end.
+- Use the pattern: change `- [ ]` → `- [x]` in the file as soon as the task's work is committed.
+- Commit the plan/task file update together with the task's code, or at minimum before starting the next task.
+- This applies to every `speckit-implement` run, every `executing-plans` / `subagent-driven-development` run, and any manual task execution.
+- **Rule:** No task is considered done until its checkbox is marked `[x]` in the source file.
 
 ---
 
