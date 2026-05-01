@@ -97,7 +97,7 @@ export default function DashboardPage() {
       <Topbar
         title="Dashboard"
         actions={
-          <Button size="sm" className="text-xs" onClick={handleRunPipeline} disabled={pipelineLoading}>
+          <Button size="sm" className="text-xs" onClick={handleRunPipeline} isLoading={pipelineLoading}>
             {pipelineStatus ? `Pipeline: ${pipelineStatus}` : '▶ Run Pipeline'}
           </Button>
         }

@@ -3,12 +3,13 @@ import { render, screen } from '@testing-library/react'
 import { PipelineLogPane } from '@/components/dashboard/PipelineLogPane'
 
 describe('PipelineLogPane', () => {
-  it('renders nothing when jobId is null', () => {
-    const { container } = render(<PipelineLogPane jobId={null} />)
-    expect(container.firstChild).toBeNull()
+  it('shows idle hint when jobId is null', () => {
+    render(<PipelineLogPane jobId={null} />)
+    expect(screen.getByText(/Pipeline Log/i)).toBeInTheDocument()
+    expect(screen.getByText(/Run Pipeline/i)).toBeInTheDocument()
   })
 
-  it('shows Pipeline Log header and waiting message when jobId is set', () => {
+  it('shows waiting message when jobId is set', () => {
     const mockES = { addEventListener: vi.fn(), close: vi.fn() }
     vi.stubGlobal('EventSource', vi.fn(() => mockES))
 

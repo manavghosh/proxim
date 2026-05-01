@@ -82,8 +82,6 @@ export function PipelineLogPane({ jobId }: Props) {
     }
   }, [logs])
 
-  if (!jobId && logs.length === 0) return null
-
   return (
     <div className="bg-[#060d1f] border border-[#1e2d4a] rounded-xl overflow-hidden mt-4">
       <div className="flex items-center justify-between px-4 py-2 border-b border-[#1e2d4a]">
@@ -108,7 +106,9 @@ export function PipelineLogPane({ jobId }: Props) {
       </div>
       <div className="max-h-[320px] overflow-y-auto p-3 font-mono text-[11px] space-y-1">
         {logs.length === 0 ? (
-          <p className="text-[#334155]">Waiting for pipeline to start…</p>
+          <p className="text-[#334155]">
+            {jobId ? 'Waiting for pipeline to start…' : 'Click ▶ Run Pipeline to begin job discovery'}
+          </p>
         ) : (
           logs.map((entry) => (
             <div
