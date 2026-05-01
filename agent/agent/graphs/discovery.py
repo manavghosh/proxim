@@ -51,8 +51,9 @@ async def build_queries(state: DiscoveryState) -> dict:
     # If no sources are explicitly selected, all standard sources are active.
     enabled: list[str] = prefs.get("enabled_sources", [])
     all_queries = {
-        "naukri": base_queries,
-        "iimjobs": base_queries[:5],
+        "naukri":   base_queries,
+        "iimjobs":  base_queries[:5],
+        "linkedin": base_queries[:3],
     }
     queries = {k: v for k, v in all_queries.items() if k in enabled} if enabled else all_queries
 
@@ -69,12 +70,13 @@ async def build_queries(state: DiscoveryState) -> dict:
 
     pool = await _make_pool()
     try:
+        active_sources = list(queries.keys())
         await _log(pool, state.pipeline_job_id, "info", "build_queries",
-                   "Starting pipeline — generating search queries",
-                   {"sources": list(queries.keys())})
+                   f"Starting pipeline — sources: {active_sources or 'none selected'}",
+                   {"sources": active_sources})
         await _log(pool, state.pipeline_job_id, "info", "build_queries",
-                   f"Generated {total} queries across {list(queries.keys())}",
-                   {"total_queries": total})
+                   f"Generated {total} queries for {active_sources}",
+                   {"total_queries": total, "sources": active_sources})
     finally:
         await _close_pool(pool)
 
