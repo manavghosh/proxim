@@ -69,6 +69,8 @@ export default function DashboardPage() {
 
   async function handleRunPipeline() {
     setPipelineLoading(true)
+    setPipelineStatus(null)
+    setError(null)
     try {
       const { jobId } = await triggerPipeline('discovery_only')
       setPipelineJobId(jobId)
@@ -89,8 +91,9 @@ export default function DashboardPage() {
         }
       }
       void poll()
-    } catch {
+    } catch (e) {
       setPipelineLoading(false)
+      setError(e instanceof Error ? e.message : 'Failed to start pipeline. Check the daemon is running.')
     }
   }
 

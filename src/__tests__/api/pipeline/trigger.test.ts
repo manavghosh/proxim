@@ -11,6 +11,7 @@ vi.mock('@/db', () => ({
     select: vi.fn(),
     insert: vi.fn(),
     update: vi.fn(() => mockUpdateChain),
+    execute: vi.fn().mockResolvedValue([]),
   },
 }))
 vi.mock('@/lib/cv-service', () => ({

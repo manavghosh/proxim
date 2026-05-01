@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { and, eq, lt, or } from 'drizzle-orm'
-import { sql } from 'drizzle-orm'
+import { eq, or, sql } from 'drizzle-orm'
 import { db } from '@/db'
 import { pipelineJobs } from '@/db/schema'
 import { getOrCreateCandidate } from '@/lib/cv-service'
@@ -28,15 +27,12 @@ export async function POST(request: Request) {
     const candidate = await getOrCreateCandidate()
 
     // Auto-expire jobs stuck in running/queued for > 30 minutes (daemon was killed)
-    await db
-      .update(pipelineJobs)
-      .set({ status: 'failed', error: 'Expired — daemon did not complete this job' })
-      .where(
-        and(
-          or(eq(pipelineJobs.status, 'queued'), eq(pipelineJobs.status, 'running')),
-          lt(pipelineJobs.startedAt, sql`NOW() - INTERVAL '30 minutes'`)
-        )
-      )
+    await db.execute(sql`
+      UPDATE pipeline_jobs
+      SET status = 'failed', error = 'Expired — daemon did not complete this job'
+      WHERE (status = 'queued' OR status = 'running')
+        AND (started_at IS NULL OR started_at < NOW() - INTERVAL '30 minutes')
+    `)
 
     // Check for a genuinely active job (started < 30 min ago)
     const existing = await db
