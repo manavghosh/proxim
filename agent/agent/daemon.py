@@ -1,4 +1,9 @@
-"""Proxim agent polling daemon — polls Neon every 3s for queued pipeline jobs."""
+"""Proxim agent polling daemon — polls DB every 3s for queued pipeline jobs."""
+import warnings
+# langchain_core uses pydantic.v1 compat layer which emits a UserWarning on Python 3.14+.
+# The daemon functions correctly — suppress the noise.
+warnings.filterwarnings("ignore", message="Core Pydantic V1 functionality", category=UserWarning)
+
 import asyncio
 import signal
 import structlog
