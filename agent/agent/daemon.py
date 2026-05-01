@@ -14,22 +14,26 @@ def _handle_sigterm(*_):
 
 async def _dispatch_job(pool, job: dict) -> None:
     """Dispatch a pipeline job to the appropriate LangGraph graph."""
-    from agent.db import insert_pipeline_run
+    from agent.db import insert_pipeline_run, get_candidate_preferences
     from agent.graphs.discovery import discovery_graph
     from agent.models import DiscoveryState
 
     run_id = await insert_pipeline_run(pool, job['id'], job['candidate_id'])
 
-    import json
-    payload = job.get('payload') or {}
-    if isinstance(payload, str):
-        payload = json.loads(payload)
+    # Load the candidate's saved preferences (includes enabled_sources, custom_job_sites, etc.)
+    preferences = await get_candidate_preferences(pool, str(job['candidate_id']))
+    enabled = preferences.get('enabled_sources', [])
+    logger.info(
+        "job_dispatching",
+        job_id=job['id'],
+        enabled_sources=enabled if enabled else 'all (none selected)',
+    )
 
     state = DiscoveryState(
         candidate_id=str(job['candidate_id']),
         pipeline_job_id=str(job['id']),
         pipeline_run_id=run_id,
-        preferences=payload.get('preferences', {}),
+        preferences=preferences,
     )
 
     logger.info("graph_invoking", graph="discovery", job_id=job['id'])

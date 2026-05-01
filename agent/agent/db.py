@@ -157,6 +157,22 @@ async def insert_pipeline_log(
         )
 
 
+async def get_candidate_preferences(pool: asyncpg.Pool, candidate_id: str) -> dict:
+    """Load the candidate's saved preferences from the candidates table."""
+    import json
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT preferences FROM candidates WHERE id = $1",
+            candidate_id,
+        )
+        if not row or not row['preferences']:
+            return {}
+        prefs = row['preferences']
+        if isinstance(prefs, str):
+            return json.loads(prefs)
+        return dict(prefs)
+
+
 def _to_snake(name: str) -> str:
     import re
     s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
