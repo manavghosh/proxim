@@ -46,3 +46,12 @@ class DiscoveryState(BaseModel):
     deduplicated_jobs: list[NormalisedJob] = []
     run_summary: Optional[RunSummary] = None
     errors: Annotated[list[SourceError], operator.add] = []
+
+
+class FetchJdsState(BaseModel):
+    candidate_id: str
+    pipeline_job_id: str
+    pipeline_run_id: str = ""
+    jobs_to_fetch: list[dict] = []
+    fetched_count: int = 0
+    failed_count: int = 0
