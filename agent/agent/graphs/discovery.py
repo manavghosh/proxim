@@ -326,12 +326,19 @@ async def write_run_summary(state: DiscoveryState) -> dict:
         )
 
         now = datetime.now(timezone.utc)
-        await update_pipeline_run(
-            pool, state.pipeline_run_id,
-            status="completed",
-            completedAt=now,
-            summary=summary.model_dump(),
-        )
+
+        try:
+            await update_pipeline_run(
+                pool, state.pipeline_run_id,
+                status="completed",
+                completedAt=now,
+                summary=summary.model_dump(),
+            )
+        except Exception as e:
+            logger.error("write_run_summary_update_failed", error=str(e))
+            # Still mark the job completed even if summary update fails
+            await update_pipeline_run(pool, state.pipeline_run_id, status="completed", completedAt=now)
+
         await update_pipeline_job_status(pool, state.pipeline_job_id, "completed")
 
         await _log(pool, state.pipeline_job_id, "info", "write_run_summary",
@@ -344,6 +351,13 @@ async def write_run_summary(state: DiscoveryState) -> dict:
             jobs_deduped=dedup_count,
             sources_failed=error_sources,
         )
+    except Exception as e:
+        logger.error("write_run_summary_failed", error=str(e))
+        # Last resort — mark job failed so it doesn't stay stuck as 'running'
+        try:
+            await update_pipeline_job_status(pool, state.pipeline_job_id, "failed", error=str(e))
+        except Exception:
+            pass
     finally:
         await pool.close()
 

@@ -73,12 +73,18 @@ async def insert_pipeline_run(
 async def update_pipeline_run(pool: asyncpg.Pool, run_id: str, **kwargs) -> None:
     if not kwargs:
         return
+    import json
     set_clauses = []
     values = []
     for i, (key, value) in enumerate(kwargs.items(), start=1):
         col = _to_snake(key)
-        set_clauses.append(f"{col} = ${i}")
-        values.append(value)
+        # asyncpg requires dicts/lists to be JSON strings for JSONB columns
+        if isinstance(value, (dict, list)):
+            set_clauses.append(f"{col} = ${i}::jsonb")
+            values.append(json.dumps(value))
+        else:
+            set_clauses.append(f"{col} = ${i}")
+            values.append(value)
     values.append(run_id)
     query = f"UPDATE pipeline_runs SET {', '.join(set_clauses)} WHERE id = ${len(values)}"
     async with pool.acquire() as conn:
