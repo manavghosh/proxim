@@ -158,11 +158,13 @@ async def bulk_insert_jobs(
         job_id = _new_id()
         posted = job.get('posted_at')
         posted_str = posted.isoformat() if hasattr(posted, 'isoformat') else posted
+        now = _now()
         await pool.execute(
             'INSERT INTO jobs '
             '(id, candidate_id, pipeline_run_id, title, company, location, '
-            'jd_raw, jd_text, source, source_url, application_url, posted_at) '
-            'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'jd_raw, jd_text, source, source_url, application_url, posted_at, '
+            'created_at, updated_at) '
+            'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             (
                 job_id,
                 job['candidate_id'],
@@ -176,6 +178,8 @@ async def bulk_insert_jobs(
                 job['source_url'],
                 job.get('application_url'),
                 posted_str,
+                now,
+                now,
             ),
         )
         ids.append(job_id)
@@ -190,10 +194,12 @@ async def bulk_insert_scan_history(
     if not entries:
         return
     for entry in entries:
+        now = _now()
         await pool.execute(
-            'INSERT INTO scan_history (id, candidate_id, url, job_id) VALUES (?, ?, ?, ?) '
+            'INSERT INTO scan_history (id, candidate_id, url, job_id, first_seen_at, last_seen_at) '
+            'VALUES (?, ?, ?, ?, ?, ?) '
             'ON CONFLICT (candidate_id, url) DO UPDATE SET last_seen_at = ?',
-            (_new_id(), entry['candidate_id'], entry['url'], entry.get('job_id'), _now()),
+            (_new_id(), entry['candidate_id'], entry['url'], entry.get('job_id'), now, now, now),
         )
     await pool.commit()
 
@@ -207,10 +213,10 @@ async def insert_pipeline_log(
     data: dict | None = None,
 ) -> None:
     await pool.execute(
-        'INSERT INTO pipeline_logs (id, pipeline_job_id, level, step, message, data) '
-        'VALUES (?, ?, ?, ?, ?, ?)',
+        'INSERT INTO pipeline_logs (id, pipeline_job_id, level, step, message, data, created_at) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?)',
         (_new_id(), pipeline_job_id, level, step, message,
-         json.dumps(data) if data is not None else None),
+         json.dumps(data) if data is not None else None, _now()),
     )
     await pool.commit()
 
