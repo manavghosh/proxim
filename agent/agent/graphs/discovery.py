@@ -47,10 +47,14 @@ async def build_queries(state: DiscoveryState) -> dict:
         location_hint = geo[0] if isinstance(geo, list) else geo
         base_queries = [f"{base_queries[0]} {location_hint}"] + base_queries[1:]
 
-    queries = {
+    # Build query map for all supported sources, then filter to enabled_sources.
+    # If no sources are explicitly selected, all standard sources are active.
+    enabled: list[str] = prefs.get("enabled_sources", [])
+    all_queries = {
         "naukri": base_queries,
         "iimjobs": base_queries[:5],
     }
+    queries = {k: v for k, v in all_queries.items() if k in enabled} if enabled else all_queries
 
     total = sum(len(v) for v in queries.values())
 
