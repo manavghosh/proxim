@@ -177,3 +177,57 @@ def _to_snake(name: str) -> str:
     import re
     s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
     return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+
+
+async def get_jobs_with_empty_jd(
+    pool: asyncpg.Pool,
+    candidate_id: str,
+    limit: int = 100,
+) -> list[dict]:
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT id, source_url FROM jobs "
+            "WHERE candidate_id = $1 AND jd_raw = '' AND status = 'discovered' "
+            "ORDER BY created_at LIMIT $2",
+            candidate_id, limit,
+        )
+    return [{"id": str(row["id"]), "source_url": row["source_url"]} for row in rows]
+
+
+async def update_job_jd(
+    pool: asyncpg.Pool,
+    job_id: str,
+    jd_raw: str,
+) -> None:
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE jobs SET jd_raw = $1, updated_at = NOW() WHERE id = $2",
+            jd_raw, job_id,
+        )
+
+
+async def count_jobs_with_empty_jd(
+    pool: asyncpg.Pool,
+    candidate_id: str,
+) -> int:
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT COUNT(*) AS c FROM jobs "
+            "WHERE candidate_id = $1 AND jd_raw = '' AND status = 'discovered'",
+            candidate_id,
+        )
+    return row["c"] if row else 0
+
+
+async def queue_pipeline_job(
+    pool: asyncpg.Pool,
+    candidate_id: str,
+    job_type: str,
+) -> str:
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "INSERT INTO pipeline_jobs (job_type, candidate_id, payload) "
+            "VALUES ($1, $2, $3) RETURNING id",
+            job_type, candidate_id, {},
+        )
+    return str(row["id"])
