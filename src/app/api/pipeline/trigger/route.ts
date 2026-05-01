@@ -26,8 +26,9 @@ export async function POST(request: Request) {
   try {
     const candidate = await getOrCreateCandidate()
 
-    // Auto-expire jobs stuck in running/queued for > 30 minutes (daemon was killed)
-    const expiry = new Date(Date.now() - 30 * 60 * 1000)
+    // Auto-expire jobs stuck in running/queued for > 30 minutes (daemon was killed).
+    // Use ISO string so it binds correctly for both SQLite (text) and PG (timestamp).
+    const expiry = new Date(Date.now() - 30 * 60 * 1000).toISOString() as unknown as Date
     await db
       .update(pipelineJobs)
       .set({ status: 'failed', error: 'Expired — daemon did not complete this job' })
