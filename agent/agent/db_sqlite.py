@@ -289,3 +289,54 @@ async def queue_pipeline_job(
     )
     await pool.commit()
     return job_id
+
+
+# ── Scoring DB functions (F9) ─────────────────────────────────────────────────
+
+async def get_jobs_to_score(
+    pool: aiosqlite.Connection,
+    candidate_id: str,
+) -> list[dict]:
+    """Return discovered jobs with non-empty jd_raw that have not yet been scored."""
+    async with pool.execute(
+        "SELECT id, title, company, jd_raw, source FROM jobs "
+        "WHERE candidate_id = ? AND status = 'discovered' AND jd_raw != '' "
+        "ORDER BY created_at",
+        (candidate_id,),
+    ) as cursor:
+        rows = await cursor.fetchall()
+    return [
+        {"id": row[0], "title": row[1], "company": row[2],
+         "jd_raw": row[3], "source": row[4]}
+        for row in rows
+    ]
+
+
+async def update_job_score(
+    pool: aiosqlite.Connection,
+    job_id: str,
+    score_json: dict,
+    grade: str,
+    report_md: str,
+    archetype: str,
+    archetype_confidence: float,
+) -> None:
+    await pool.execute(
+        "UPDATE jobs SET status = 'scored', score10d = ?, grade = ?, "
+        "report_md = ?, archetype = ?, archetype_confidence = ?, updated_at = ? "
+        "WHERE id = ?",
+        (json.dumps(score_json), grade, report_md,
+         archetype, archetype_confidence, _now(), job_id),
+    )
+    await pool.commit()
+
+
+async def mark_job_score_failed(
+    pool: aiosqlite.Connection,
+    job_id: str,
+) -> None:
+    await pool.execute(
+        "UPDATE jobs SET status = 'score_failed', updated_at = ? WHERE id = ?",
+        (_now(), job_id),
+    )
+    await pool.commit()

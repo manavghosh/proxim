@@ -17,6 +17,9 @@ from agent.db_sqlite import (
     update_job_jd,
     count_jobs_with_empty_jd,
     queue_pipeline_job,
+    get_jobs_to_score,
+    update_job_score,
+    mark_job_score_failed,
 )
 
 SCHEMA_SQL = """
@@ -70,6 +73,11 @@ CREATE TABLE IF NOT EXISTS jobs (
     application_url TEXT,
     posted_at TEXT,
     status TEXT NOT NULL DEFAULT 'discovered',
+    score10d TEXT,
+    grade TEXT,
+    report_md TEXT,
+    archetype TEXT,
+    archetype_confidence REAL,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -309,3 +317,77 @@ async def test_queue_pipeline_job_inserts_queued_job(conn):
         row = await cur.fetchone()
     assert row[0] == 'queued'
     assert row[1] == 'fetch_jds'
+
+
+# ── Scoring DB functions (T010) ───────────────────────────────────────────────
+
+async def test_get_jobs_to_score_returns_discovered_with_jd(conn, job_id):
+    run_id = await insert_pipeline_run(conn, job_id, CANDIDATE_ID)
+    ids = await bulk_insert_jobs(conn, [{
+        **_JOB_FIXTURE,
+        'pipeline_run_id': run_id,
+        'jd_raw': 'We are hiring a Director of AI with LangGraph experience.',
+        'source_url': 'https://linkedin.com/jobs/score-1',
+    }])
+    result = await get_jobs_to_score(conn, CANDIDATE_ID)
+    assert len(result) == 1
+    assert result[0]['id'] == ids[0]
+    assert 'jd_raw' in result[0]
+    assert 'title' in result[0]
+
+
+async def test_get_jobs_to_score_skips_empty_jd(conn, job_id):
+    run_id = await insert_pipeline_run(conn, job_id, CANDIDATE_ID)
+    await bulk_insert_jobs(conn, [{
+        **_JOB_FIXTURE,
+        'pipeline_run_id': run_id,
+        'jd_raw': '',
+        'source_url': 'https://linkedin.com/jobs/score-2',
+    }])
+    result = await get_jobs_to_score(conn, CANDIDATE_ID)
+    assert result == []
+
+
+async def test_update_job_score_persists_all_fields(conn, job_id):
+    run_id = await insert_pipeline_run(conn, job_id, CANDIDATE_ID)
+    ids = await bulk_insert_jobs(conn, [{
+        **_JOB_FIXTURE,
+        'pipeline_run_id': run_id,
+        'jd_raw': 'JD text here',
+        'source_url': 'https://linkedin.com/jobs/score-3',
+    }])
+    j_id = ids[0]
+    score_json = {'gate': {'role_level_match': {'score': 4.0, 'reasoning': 'test'}}, 'weighted': {}}
+    await update_job_score(
+        conn, j_id,
+        score_json=score_json,
+        grade='B',
+        report_md='## Report\n\nContent here.',
+        archetype='GCC AI Practice Head',
+        archetype_confidence=0.82,
+    )
+    async with conn.execute(
+        'SELECT grade, report_md, archetype, archetype_confidence, status FROM jobs WHERE id = ?',
+        (j_id,)
+    ) as cur:
+        row = await cur.fetchone()
+    assert row[0] == 'B'
+    assert row[1] == '## Report\n\nContent here.'
+    assert row[2] == 'GCC AI Practice Head'
+    assert row[3] == pytest.approx(0.82, rel=1e-2)
+    assert row[4] == 'scored'
+
+
+async def test_mark_job_score_failed_sets_status(conn, job_id):
+    run_id = await insert_pipeline_run(conn, job_id, CANDIDATE_ID)
+    ids = await bulk_insert_jobs(conn, [{
+        **_JOB_FIXTURE,
+        'pipeline_run_id': run_id,
+        'jd_raw': 'JD',
+        'source_url': 'https://linkedin.com/jobs/score-4',
+    }])
+    j_id = ids[0]
+    await mark_job_score_failed(conn, j_id)
+    async with conn.execute('SELECT status FROM jobs WHERE id = ?', (j_id,)) as cur:
+        row = await cur.fetchone()
+    assert row[0] == 'score_failed'

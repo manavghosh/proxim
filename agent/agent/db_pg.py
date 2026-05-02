@@ -231,3 +231,55 @@ async def queue_pipeline_job(
             job_type, candidate_id, {},
         )
     return str(row["id"])
+
+
+# ── Scoring DB functions (F9) ─────────────────────────────────────────────────
+
+async def get_jobs_to_score(
+    pool: asyncpg.Pool,
+    candidate_id: str,
+) -> list[dict]:
+    """Return discovered jobs with non-empty jd_raw that have not yet been scored."""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT id, title, company, jd_raw, source FROM jobs "
+            "WHERE candidate_id = $1 AND status = 'discovered' AND jd_raw != '' "
+            "ORDER BY created_at",
+            candidate_id,
+        )
+    return [
+        {"id": str(row["id"]), "title": row["title"], "company": row["company"],
+         "jd_raw": row["jd_raw"], "source": row["source"]}
+        for row in rows
+    ]
+
+
+async def update_job_score(
+    pool: asyncpg.Pool,
+    job_id: str,
+    score_json: dict,
+    grade: str,
+    report_md: str,
+    archetype: str,
+    archetype_confidence: float,
+) -> None:
+    import json as _json
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE jobs SET status = 'scored', score10d = $1::jsonb, grade = $2, "
+            "report_md = $3, archetype = $4, archetype_confidence = $5, updated_at = NOW() "
+            "WHERE id = $6",
+            _json.dumps(score_json), grade, report_md,
+            archetype, archetype_confidence, job_id,
+        )
+
+
+async def mark_job_score_failed(
+    pool: asyncpg.Pool,
+    job_id: str,
+) -> None:
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE jobs SET status = 'score_failed', updated_at = NOW() WHERE id = $1",
+            job_id,
+        )
