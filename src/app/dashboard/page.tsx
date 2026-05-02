@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { getCV, getReadiness, triggerPipeline, getPipelineStatus } from '@/lib/api'
+import { getCV, getReadiness, triggerPipeline, getPipelineStatus, getJobStats, resetFailedJobs } from '@/lib/api'
 import type { PipelineJobType } from '@/lib/api'
 import { Topbar } from '@/components/layout/Topbar'
 import { StatCard } from '@/components/dashboard/StatCard'
@@ -54,14 +54,17 @@ export default function DashboardPage() {
   const [selectedPhase, setSelectedPhase] = useState<PipelineJobType>('discovery_only')
   const [showPhaseMenu, setShowPhaseMenu] = useState(false)
   const phaseMenuRef = useRef<HTMLDivElement>(null)
+  const [scoreFailed, setScoreFailed] = useState(0)
+  const [rescoreLoading, setRescoreLoading] = useState(false)
 
   useEffect(() => {
     async function load() {
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
-          const [cv, r] = await Promise.all([getCV(), getReadiness()])
+          const [cv, r, stats] = await Promise.all([getCV(), getReadiness(), getJobStats()])
           setCandidate(cv)
           setReadiness(r)
+          setScoreFailed(stats.scoreFailed)
           setLoading(false)
           return
         } catch {
@@ -115,6 +118,20 @@ export default function DashboardPage() {
     }
   }
 
+  async function handleRescore() {
+    setRescoreLoading(true)
+    try {
+      const { reset } = await resetFailedJobs()
+      setScoreFailed(0)
+      setError(null)
+      alert(`${reset} job${reset !== 1 ? 's' : ''} reset — trigger Score Jobs to rescore`)
+    } catch {
+      setError('Failed to reset failed jobs. Please try again.')
+    } finally {
+      setRescoreLoading(false)
+    }
+  }
+
   const cvMeta = parseStatusMeta(candidate)
   const pMeta = pipelineMeta(readiness)
 
@@ -123,6 +140,18 @@ export default function DashboardPage() {
       <Topbar
         title="Dashboard"
         actions={
+          <div className="flex items-center gap-2">
+          {scoreFailed > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-xs border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
+              onClick={handleRescore}
+              isLoading={rescoreLoading}
+            >
+              ⚠ Rescore Failed ({scoreFailed})
+            </Button>
+          )}
           <div className="relative flex items-center gap-0" ref={phaseMenuRef}>
             {/* Main run button */}
             <Button
@@ -162,6 +191,7 @@ export default function DashboardPage() {
                 ))}
               </div>
             )}
+          </div>
           </div>
         }
       />
