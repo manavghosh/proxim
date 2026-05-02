@@ -69,7 +69,16 @@ def _build_scoring_prompt(job: dict, parsed_profile: dict, preferences: dict) ->
     geo = preferences.get("geographic_preference", [])
     comp = preferences.get("compensation_band", {})
     stage = preferences.get("company_stages", [])
-    profile_str = json.dumps(parsed_profile, indent=2)
+    # Limit profile to key fields to keep prompt size manageable
+    compact_profile = {
+        "name":         parsed_profile.get("name", ""),
+        "summary":      parsed_profile.get("summary", "")[:500],
+        "roles":        parsed_profile.get("roles", [])[:5],
+        "skills":       parsed_profile.get("skills", [])[:20],
+        "patents":      parsed_profile.get("patents", [])[:5],
+        "projects":     parsed_profile.get("projects", [])[:3],
+    }
+    profile_str = json.dumps(compact_profile, indent=2)
     archetype_list = "\n".join(f"  - {a}" for a in ARCHETYPES)
 
     return f"""You are a senior career analyst scoring a job opportunity for a senior IT professional.
@@ -188,8 +197,18 @@ async def score_job(
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"},
                 temperature=0.1,
+                max_tokens=4096,
             )
             raw = response.choices[0].message.content
+
+            # Guard: empty/None content means the model didn't return JSON
+            if not raw or not raw.strip():
+                finish_reason = response.choices[0].finish_reason
+                raise ValueError(
+                    f"Empty response from LLM (finish_reason={finish_reason}). "
+                    "JD may be too long — will retry with truncated prompt."
+                )
+
             parsed = json.loads(raw)
 
             # Recompute grade + score deterministically — do not trust the LLM's values
@@ -206,7 +225,7 @@ async def score_job(
 
             return JobScoreOutput.model_validate(parsed)
 
-        except (ValidationError, json.JSONDecodeError, KeyError) as e:
+        except (ValidationError, json.JSONDecodeError, KeyError, ValueError) as e:
             last_error = e
             logger.warning("score_retry", job_id=job.get("id"), attempt=attempt, error=str(e))
 
