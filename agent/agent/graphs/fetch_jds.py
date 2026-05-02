@@ -123,13 +123,23 @@ async def write_fetch_summary(state: FetchJdsState) -> dict:
 
         await update_pipeline_job_status(pool, state.pipeline_job_id, "completed")
 
+        # Auto-queue score_jobs if there are discovered jobs with non-empty jd_raw
+        from agent.db import get_jobs_to_score, queue_pipeline_job
+        jobs_to_score = await get_jobs_to_score(pool, state.candidate_id)
+        scoring_queued = len(jobs_to_score) > 0
+        if scoring_queued:
+            await queue_pipeline_job(pool, state.candidate_id, "score_jobs")
+
         pending_msg = f", {state.failed_count} still pending" if state.failed_count else ""
+        scoring_msg = f" Queuing scoring for {len(jobs_to_score)} jobs…" if scoring_queued else ""
         await _log(pool, state.pipeline_job_id, "info", "write_fetch_summary",
-                   f"JD fetch complete — {state.fetched_count} updated{pending_msg}",
-                   {"fetched": state.fetched_count, "pending": state.failed_count})
+                   f"JD fetch complete — {state.fetched_count} updated{pending_msg}.{scoring_msg}",
+                   {"fetched": state.fetched_count, "pending": state.failed_count,
+                    "scoring_queued": len(jobs_to_score)})
 
         logger.info("fetch_jds_complete",
-                    fetched=state.fetched_count, failed=state.failed_count)
+                    fetched=state.fetched_count, failed=state.failed_count,
+                    scoring_queued=scoring_queued)
 
     except Exception as e:
         logger.error("write_fetch_summary_failed", error=str(e))

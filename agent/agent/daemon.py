@@ -36,6 +36,19 @@ async def _dispatch_job(pool, job: dict) -> None:
         )
         await fetch_jds_graph.ainvoke(state)
 
+    elif job['job_type'] == 'score_jobs':
+        from agent.graphs.scoring import scoring_graph
+        from agent.models import ScoringState
+
+        logger.info("job_dispatching", job_id=job['id'], job_type='score_jobs')
+
+        state = ScoringState(
+            candidate_id=str(job['candidate_id']),
+            pipeline_job_id=str(job['id']),
+            pipeline_run_id=run_id,
+        )
+        await scoring_graph.ainvoke(state)
+
     else:
         from agent.graphs.discovery import discovery_graph
         from agent.models import DiscoveryState

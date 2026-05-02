@@ -27,23 +27,33 @@ export async function GET(
       .orderBy(pipelineRuns.startedAt)
       .limit(1)
 
-    // When discovery_only completes, check if a fetch_jds job was auto-queued.
-    // Return its ID so the dashboard can seamlessly continue tracking it.
+    // When a job completes, chain to the next auto-queued follow-up job.
+    // discovery_only → fetch_jds → score_jobs
     let followUpJobId: string | null = null
-    if (job.status === 'completed' && job.jobType === 'discovery_only') {
-      const [fetchJob] = await db
-        .select({ id: pipelineJobs.id })
-        .from(pipelineJobs)
-        .where(
-          and(
-            eq(pipelineJobs.candidateId, job.candidateId),
-            eq(pipelineJobs.jobType, 'fetch_jds'),
-            or(eq(pipelineJobs.status, 'queued'), eq(pipelineJobs.status, 'running'))
+    if (job.status === 'completed') {
+      const nextTypes =
+        job.jobType === 'discovery_only' ? ['fetch_jds', 'score_jobs']
+        : job.jobType === 'fetch_jds'    ? ['score_jobs']
+        : []
+
+      for (const nextType of nextTypes) {
+        const [nextJob] = await db
+          .select({ id: pipelineJobs.id })
+          .from(pipelineJobs)
+          .where(
+            and(
+              eq(pipelineJobs.candidateId, job.candidateId),
+              eq(pipelineJobs.jobType, nextType),
+              or(eq(pipelineJobs.status, 'queued'), eq(pipelineJobs.status, 'running'))
+            )
           )
-        )
-        .orderBy(pipelineJobs.createdAt)
-        .limit(1)
-      followUpJobId = fetchJob?.id ?? null
+          .orderBy(pipelineJobs.createdAt)
+          .limit(1)
+        if (nextJob) {
+          followUpJobId = nextJob.id
+          break
+        }
+      }
     }
 
     return NextResponse.json({
