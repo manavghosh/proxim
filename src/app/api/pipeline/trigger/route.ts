@@ -4,7 +4,7 @@ import { db } from '@/db'
 import { pipelineJobs } from '@/db/schema'
 import { getOrCreateCandidate } from '@/lib/cv-service'
 
-const VALID_JOB_TYPES = ['full_pipeline', 'discovery_only'] as const
+const VALID_JOB_TYPES = ['full_pipeline', 'discovery_only', 'fetch_jds', 'score_jobs'] as const
 
 export async function POST(request: Request) {
   let body: unknown

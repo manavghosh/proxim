@@ -55,7 +55,9 @@ export async function getReadiness(): Promise<PipelineReadiness> {
   return request('/api/candidate/readiness')
 }
 
-export async function triggerPipeline(jobType: 'full_pipeline' | 'discovery_only'): Promise<{ jobId: string; status: string }> {
+export type PipelineJobType = 'full_pipeline' | 'discovery_only' | 'fetch_jds' | 'score_jobs'
+
+export async function triggerPipeline(jobType: PipelineJobType): Promise<{ jobId: string; status: string }> {
   return request('/api/pipeline/trigger', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

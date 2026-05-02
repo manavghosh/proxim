@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { getCV, getReadiness, triggerPipeline, getPipelineStatus } from '@/lib/api'
+import type { PipelineJobType } from '@/lib/api'
 import { Topbar } from '@/components/layout/Topbar'
 import { StatCard } from '@/components/dashboard/StatCard'
 import { ReadinessRing } from '@/components/dashboard/ReadinessRing'
@@ -11,6 +12,12 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { PipelineLogPane } from '@/components/dashboard/PipelineLogPane'
 import type { CandidateState, PipelineReadiness } from '@/types/candidate'
+
+const PHASE_OPTIONS: Array<{ value: PipelineJobType; label: string; description: string }> = [
+  { value: 'discovery_only', label: '▶ Full Pipeline',   description: 'Discover → Fetch JDs → Score' },
+  { value: 'fetch_jds',      label: '📄 Fetch JDs',      description: 'Fetch JD text for discovered jobs' },
+  { value: 'score_jobs',     label: '🏅 Score Jobs',     description: 'Score & grade all fetched JDs' },
+]
 
 function parseStatusMeta(candidate: CandidateState | null): {
   value: string
@@ -41,9 +48,12 @@ export default function DashboardPage() {
   const [readiness, setReadiness] = useState<PipelineReadiness | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [chainJobIds, setChainJobIds] = useState<string[]>([])
+  const [chainJobIds, setChainJobIds]     = useState<string[]>([])
   const [pipelineStatus, setPipelineStatus] = useState<string | null>(null)
   const [pipelineLoading, setPipelineLoading] = useState(false)
+  const [selectedPhase, setSelectedPhase] = useState<PipelineJobType>('discovery_only')
+  const [showPhaseMenu, setShowPhaseMenu] = useState(false)
+  const phaseMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     async function load() {
@@ -72,7 +82,7 @@ export default function DashboardPage() {
     setPipelineStatus(null)
     setError(null)
     try {
-      const { jobId } = await triggerPipeline('discovery_only')
+      const { jobId } = await triggerPipeline(selectedPhase)
       setChainJobIds([jobId])   // fresh chain — clears previous run's logs
       setPipelineStatus('queued')
 
@@ -113,9 +123,46 @@ export default function DashboardPage() {
       <Topbar
         title="Dashboard"
         actions={
-          <Button size="sm" className="text-xs" onClick={handleRunPipeline} isLoading={pipelineLoading}>
-            {pipelineStatus ? `Pipeline: ${pipelineStatus}` : '▶ Run Pipeline'}
-          </Button>
+          <div className="relative flex items-center gap-0" ref={phaseMenuRef}>
+            {/* Main run button */}
+            <Button
+              size="sm"
+              className="text-xs rounded-r-none border-r border-r-white/20"
+              onClick={handleRunPipeline}
+              isLoading={pipelineLoading}
+            >
+              {pipelineStatus
+                ? `Pipeline: ${pipelineStatus}`
+                : PHASE_OPTIONS.find(p => p.value === selectedPhase)?.label ?? '▶ Run Pipeline'}
+            </Button>
+            {/* Phase selector chevron */}
+            {!pipelineLoading && (
+              <button
+                onClick={() => setShowPhaseMenu(v => !v)}
+                className="h-8 px-2 bg-primary hover:bg-primary/90 text-primary-foreground text-xs rounded-l-none rounded-r-sm border-l border-l-white/20 transition-colors"
+                title="Select pipeline phase"
+              >
+                ▾
+              </button>
+            )}
+            {/* Dropdown menu */}
+            {showPhaseMenu && (
+              <div className="absolute top-full right-0 mt-1 w-64 bg-[#0d1f3c] border border-[#1e2d4a] rounded-lg shadow-xl z-50 overflow-hidden">
+                {PHASE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => { setSelectedPhase(opt.value); setShowPhaseMenu(false) }}
+                    className={`w-full text-left px-4 py-3 text-xs hover:bg-[#1e3a5f] transition-colors ${
+                      selectedPhase === opt.value ? 'bg-[#1e3a5f] text-[#e2e8f0]' : 'text-[#94a3b8]'
+                    }`}
+                  >
+                    <div className="font-medium">{opt.label}</div>
+                    <div className="text-[#475569] text-[10px] mt-0.5">{opt.description}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         }
       />
 
