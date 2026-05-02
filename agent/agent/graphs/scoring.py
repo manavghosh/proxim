@@ -155,9 +155,13 @@ async def score_and_report_batch(state: ScoringState) -> dict:
                 except Exception:
                     pass
                 is_rate_limit = "rate" in str(e).lower() or "429" in str(e)
-                reason = "rate limit — re-run score_jobs to retry" if is_rate_limit else "LLM error — marked score_failed"
+                short_error = str(e)[:120]
+                if is_rate_limit:
+                    log_msg = f"Skipped: {job.get('title')} @ {job.get('company')} — rate limit (re-run score_jobs to retry)"
+                else:
+                    log_msg = f"Skipped: {job.get('title')} @ {job.get('company')} — {short_error} (marked score_failed)"
                 await _log(pool, state.pipeline_job_id, "warning", "score_and_report_batch",
-                           f"Skipped: {job.get('title')} @ {job.get('company')} ({reason})",
+                           log_msg,
                            {"job_id": job.get("id"), "error": str(e)})
 
             # Polite delay between jobs to stay within Anthropic rate limits
