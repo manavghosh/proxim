@@ -16,20 +16,20 @@ describe('PipelineLogPane', () => {
     vi.restoreAllMocks()
   })
 
-  it('shows idle hint when jobId is null', () => {
-    render(<PipelineLogPane jobId={null} />)
+  it('shows idle hint when chainJobIds is empty', () => {
+    render(<PipelineLogPane chainJobIds={[]} />)
     expect(screen.getByText(/Pipeline Log/i)).toBeInTheDocument()
     expect(screen.getByText(/Run Pipeline/i)).toBeInTheDocument()
   })
 
-  it('shows waiting message when jobId is set', () => {
-    render(<PipelineLogPane jobId="job-1" />)
+  it('shows waiting message when chainJobIds has a job', () => {
+    render(<PipelineLogPane chainJobIds={['job-1']} />)
     expect(screen.getByText(/Pipeline Log/i)).toBeInTheDocument()
     expect(screen.getByText(/Waiting for pipeline/i)).toBeInTheDocument()
   })
 
-  it('polls the logs endpoint when jobId is set', () => {
-    render(<PipelineLogPane jobId="job-1" />)
+  it('polls the logs endpoint when chainJobIds is set', () => {
+    render(<PipelineLogPane chainJobIds={['job-1']} />)
     expect(global.fetch).toHaveBeenCalledWith('/api/pipeline/job-1/logs')
   })
 
@@ -49,10 +49,8 @@ describe('PipelineLogPane', () => {
         json: async () => ({ logs: [], jobStatus: 'completed', jobError: null }),
       } as never)
 
-    render(<PipelineLogPane jobId="job-1" />)
-    // Let initial fetch complete
+    render(<PipelineLogPane chainJobIds={['job-1']} />)
     await vi.advanceTimersByTimeAsync(100)
-    // Advance one interval tick
     await vi.advanceTimersByTimeAsync(2000)
 
     expect(global.fetch).toHaveBeenCalledWith(

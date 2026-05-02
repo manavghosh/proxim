@@ -41,7 +41,7 @@ export default function DashboardPage() {
   const [readiness, setReadiness] = useState<PipelineReadiness | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [pipelineJobId, setPipelineJobId] = useState<string | null>(null)
+  const [chainJobIds, setChainJobIds] = useState<string[]>([])
   const [pipelineStatus, setPipelineStatus] = useState<string | null>(null)
   const [pipelineLoading, setPipelineLoading] = useState(false)
 
@@ -73,19 +73,20 @@ export default function DashboardPage() {
     setError(null)
     try {
       const { jobId } = await triggerPipeline('discovery_only')
-      setPipelineJobId(jobId)
+      setChainJobIds([jobId])   // fresh chain — clears previous run's logs
       setPipelineStatus('queued')
 
-      // Poll for status, chaining to any auto-queued follow-up job (e.g. fetch_jds).
-      // currentJobId is passed explicitly so the closure stays in sync when we switch jobs.
+      // Poll for status, chaining to any auto-queued follow-up jobs.
+      // When a followUpJobId is detected, we APPEND it to the chain so the
+      // log pane accumulates logs across all phases without clearing.
       const poll = async (currentJobId: string) => {
         try {
           const status = await getPipelineStatus(currentJobId)
           setPipelineStatus(status.status)
 
           if (status.followUpJobId) {
-            // discovery_only completed and spawned a fetch_jds job — track it
-            setPipelineJobId(status.followUpJobId)
+            // Append follow-up job to the chain — log pane will NOT clear
+            setChainJobIds((prev) => [...prev, status.followUpJobId!])
             setPipelineStatus('running')
             setTimeout(() => { void poll(status.followUpJobId!) }, 3000)
           } else if (status.status !== 'completed' && status.status !== 'failed') {
@@ -94,7 +95,6 @@ export default function DashboardPage() {
             setPipelineLoading(false)
           }
         } catch {
-          // Status fetch failed — retry in 5s without crashing the UI
           setTimeout(() => { void poll(currentJobId) }, 5000)
         }
       }
@@ -170,7 +170,7 @@ export default function DashboardPage() {
               </div>
               <ProfileCard candidate={candidate} />
             </div>
-            <PipelineLogPane jobId={pipelineJobId} />
+            <PipelineLogPane chainJobIds={chainJobIds} />
           </>
         )}
       </main>
