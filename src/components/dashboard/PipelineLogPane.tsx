@@ -43,6 +43,7 @@ export function PipelineLogPane({ jobId }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const lastLogAtRef = useRef<string | null>(null)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const fetchingRef = useRef(false)
 
   useEffect(() => {
     if (!jobId) return
@@ -52,8 +53,12 @@ export function PipelineLogPane({ jobId }: Props) {
     setRunning(true)
     setConnectionStatus('polling')
     lastLogAtRef.current = null
+    fetchingRef.current = false
 
     const fetchLogs = async () => {
+      // Prevent concurrent fetches — interval may fire before previous fetch completes
+      if (fetchingRef.current) return
+      fetchingRef.current = true
       try {
         const since = lastLogAtRef.current
         const url = since
@@ -70,7 +75,11 @@ export function PipelineLogPane({ jobId }: Props) {
         }
 
         if (data.logs.length > 0) {
-          setLogs((prev) => [...prev, ...data.logs])
+          // Deduplicate by ID — guards against overlapping fetches returning the same entries
+          setLogs((prev) => {
+            const seen = new Set(prev.map((l) => l.id))
+            return [...prev, ...data.logs.filter((l) => !seen.has(l.id))]
+          })
           lastLogAtRef.current = data.logs[data.logs.length - 1].createdAt
           setConnectionStatus('polling')
         }
@@ -93,6 +102,8 @@ export function PipelineLogPane({ jobId }: Props) {
       } catch {
         setConnectionStatus('error')
         // Keep polling — transient error, will recover next tick
+      } finally {
+        fetchingRef.current = false
       }
     }
 
