@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan at:
-docs/superpowers/plans/2026-05-02-10d-scoring-engine.md
+specs/002-10d-scoring-engine/plan.md
 <!-- SPECKIT END -->
 
 ---
@@ -122,20 +122,62 @@ LLM_MODEL=claude-sonnet-4-6
 
 ---
 
-## Skill Triggers
+## Two Separate Workflows — Do Not Mix
 
-Invoke the listed skill BEFORE taking any action in the corresponding situation.
-If a skill applies, invoking it is mandatory — not optional.
+This project uses **two distinct planning and implementation workflows**. They must never be mixed.
 
-### Development lifecycle
+---
+
+### Workflow A — SpecKit (for named features in `specs/`)
+
+**Use this when**: working on a feature that has or will have a spec directory under `specs/###-feature-name/`.
+
+**SpecKit commands** produce a specific folder structure in `specs/###-feature-name/`:
+
+```
+specs/###-feature-name/
+├── spec.md          ← /speckit-specify
+├── research.md      ← /speckit-plan (Phase 0)
+├── data-model.md    ← /speckit-plan (Phase 1)
+├── quickstart.md    ← /speckit-plan (Phase 1)
+├── contracts/       ← /speckit-plan (Phase 1)
+│   └── api.md
+├── plan.md          ← /speckit-plan (filled template)
+└── tasks.md         ← /speckit-tasks
+```
+
+**Rules for SpecKit:**
+- `/speckit-plan` generates `research.md`, `data-model.md`, `contracts/`, `quickstart.md`, and fills `plan.md` — output lives in `specs/###-feature-name/`, **never** in `docs/superpowers/plans/`
+- `/speckit-tasks` generates `tasks.md` in `specs/###-feature-name/` — tasks follow the `T001 [P] [US?] Description — file path` format seen in `specs/001-job-discovery-agent/tasks.md`
+- `/speckit-implement` executes `tasks.md` tasks one at a time, marking `[x]` as each completes
+- **Do NOT invoke `superpowers:writing-plans` or `superpowers:executing-plans` for SpecKit features** — these produce output in the wrong location and wrong format
+- Superpowers skill gates (`superpowers:test-driven-development`, `superpowers:verification-before-completion`, etc.) ARE still invoked at the gates marked inside `tasks.md`
+
+| SpecKit command | When to use |
+|---|---|
+| `/speckit-specify` | Creating or updating a feature spec |
+| `/speckit-clarify` | Clarifying underspecified areas before planning |
+| `/speckit-plan` | Generating research + design artifacts from spec |
+| `/speckit-tasks` | Generating the task list from design artifacts |
+| `/speckit-implement` | Executing tasks defined in `tasks.md` |
+| `/speckit-analyze` | Cross-checking spec, plan, and tasks for consistency |
+| `/speckit-constitution` | Creating or amending the project constitution |
+
+---
+
+### Workflow B — Superpowers (for ad-hoc work outside `specs/`)
+
+**Use this when**: fixing bugs, building small features without a spec, exploring architecture, or for any work that doesn't have a `specs/###-feature-name/` directory.
+
+**Output location**: `docs/superpowers/plans/YYYY-MM-DD-<feature>.md`
 
 | Situation | Skill |
 |---|---|
-| Any new feature, component, or behaviour to design | `superpowers:brainstorming` |
-| Writing a multi-step implementation plan from a spec | `superpowers:writing-plans` |
+| Any new feature or behaviour to design | `superpowers:brainstorming` |
+| Writing an implementation plan from a spec | `superpowers:writing-plans` → saves to `docs/superpowers/plans/` |
 | Executing a written implementation plan | `superpowers:executing-plans` or `superpowers:subagent-driven-development` |
 | Implementing any feature or bugfix (before writing code) | `superpowers:test-driven-development` |
-| Before committing, pushing, opening a PR, or claiming work is done | `superpowers:verification-before-completion` — must run `test:run` + `tsc --noEmit` + `build` and show passing output |
+| Before committing, pushing, opening a PR, or claiming work is done | `superpowers:verification-before-completion` — must run `test:run` + `tsc --noEmit` + `build` |
 | Encountering any bug, test failure, or unexpected behaviour | `superpowers:systematic-debugging` |
 | 2+ independent tasks that can run without shared state | `superpowers:dispatching-parallel-agents` |
 | Starting feature work that needs isolation from the workspace | `superpowers:using-git-worktrees` |
@@ -143,22 +185,10 @@ If a skill applies, invoking it is mandatory — not optional.
 | Major feature step complete, pre-merge | `superpowers:requesting-code-review` |
 | Receiving code review feedback | `superpowers:receiving-code-review` |
 
-### Next.js / React code
+### Next.js / React code (applies to both workflows)
 
 | Situation | Skill |
 |---|---|
 | Writing or reviewing any React component, hook, or Next.js page | `vercel-react-best-practices` |
 | Building any new UI page, layout, or component | `frontend-design` |
 | Verifying frontend behaviour in the browser | `webapp-testing` |
-
-### SpecKit workflows
-
-| Situation | Skill |
-|---|---|
-| Creating or updating a feature specification | `speckit-specify` |
-| Clarifying an underspecified spec before planning | `speckit-clarify` |
-| Producing an implementation plan from design artifacts | `speckit-plan` |
-| Generating a task list from design artifacts | `speckit-tasks` |
-| Executing tasks defined in tasks.md | `speckit-implement` |
-| Cross-checking spec, plan, and tasks for consistency | `speckit-analyze` |
-| Creating or amending the project constitution | `speckit-constitution` |
