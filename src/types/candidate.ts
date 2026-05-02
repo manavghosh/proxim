@@ -29,6 +29,7 @@ export interface Preferences {
   preferred_domains?: string[]
   enabled_sources?: string[]
   custom_job_sites?: string[]
+  grade_filter?: 'A' | 'A+B' | 'all'
 }
 
 export interface CandidateState {
