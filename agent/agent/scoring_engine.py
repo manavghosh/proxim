@@ -211,6 +211,7 @@ async def score_job(
 
             parsed = json.loads(raw)
 
+
             # Recompute grade + score deterministically — do not trust the LLM's values
             gate_failed = (
                 parsed["gate"]["role_level_match"]["score"] < GATE_FAIL_THRESHOLD
@@ -225,9 +226,23 @@ async def score_job(
 
             return JobScoreOutput.model_validate(parsed)
 
-        except (ValidationError, json.JSONDecodeError, KeyError, ValueError) as e:
+        except Exception as e:
             last_error = e
-            logger.warning("score_retry", job_id=job.get("id"), attempt=attempt, error=str(e))
+            error_str = str(e)
+            is_rate_limit = "rate" in error_str.lower() or "429" in error_str or "RateLimitError" in type(e).__name__
+
+            if attempt < MAX_RETRIES:
+                # Back off longer on rate limits, shorter on parse errors
+                wait = 60 if is_rate_limit else 5
+                logger.warning("score_retry",
+                               job_id=job.get("id"), attempt=attempt,
+                               error=error_str, wait_seconds=wait,
+                               reason="rate_limit" if is_rate_limit else "parse_error")
+                import asyncio
+                await asyncio.sleep(wait)
+            else:
+                logger.warning("score_retry",
+                               job_id=job.get("id"), attempt=attempt, error=error_str)
 
     raise RuntimeError(
         f"Scoring failed after {MAX_RETRIES + 1} attempts for job {job.get('id')}: {last_error}"
