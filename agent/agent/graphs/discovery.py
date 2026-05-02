@@ -155,7 +155,7 @@ async def scrape_linkedin(state: DiscoveryState) -> dict:
     pool = await _make_pool()
     try:
         scraper = LinkedInScraper()
-        queries = state.queries.get("naukri", [])[:3]
+        queries = state.queries.get("linkedin", [])
         logger.info("pipeline_step", step="scrape_linkedin", status="started", query_count=len(queries))
         await _log(pool, state.pipeline_job_id, "info", "scrape_linkedin",
                    f"Scraping LinkedIn ({len(queries)} queries)…", {"query_count": len(queries)})
@@ -191,7 +191,11 @@ async def scrape_monster(state: DiscoveryState) -> dict:
     pool = await _make_pool()
     try:
         scraper = MonsterScraper()
-        queries = state.queries.get("naukri", [])[:3]
+        # Monster reuses the first available source's queries
+        queries = (state.queries.get("monster")
+                   or state.queries.get("linkedin")
+                   or state.queries.get("naukri")
+                   or [])[:3]
         logger.info("pipeline_step", step="scrape_monster", status="started", query_count=len(queries))
         await _log(pool, state.pipeline_job_id, "info", "scrape_monster",
                    f"Scraping Monster ({len(queries)} queries)…", {"query_count": len(queries)})
