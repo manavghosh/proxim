@@ -72,3 +72,42 @@ export async function getPipelineStatus(jobId: string): Promise<{
 }> {
   return request(`/api/pipeline/${jobId}/status`)
 }
+
+export interface ScoredJob {
+  id: string
+  title: string
+  company: string
+  location: string | null
+  source: string
+  sourceUrl: string
+  postedAt: string | null
+  status: string
+  grade: string | null
+  score10d: Record<string, unknown> | null
+  archetype: string | null
+  archetypeConfidence: string | null
+  createdAt: string
+}
+
+export async function getJobs(
+  gradeFilter: 'A' | 'A+B' | 'all' = 'all'
+): Promise<{ jobs: ScoredJob[] }> {
+  return request(`/api/jobs?grade=${encodeURIComponent(gradeFilter)}`)
+}
+
+export async function submitDecision(
+  jobId: string,
+  decision: 'approved' | 'rejected' | 'snoozed'
+): Promise<{ jobId: string; status: string }> {
+  return request(`/api/jobs/${jobId}/decision`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ decision }),
+  })
+}
+
+export async function getJobReport(
+  jobId: string
+): Promise<{ reportMd: string | null; grade: string | null }> {
+  return request(`/api/jobs/${jobId}/report`)
+}
