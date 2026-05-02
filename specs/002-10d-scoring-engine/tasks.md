@@ -238,13 +238,13 @@
 
 > 🔵 Invoke `superpowers:verification-before-completion` at T055 before final commit.
 
-- [ ] T050 [P] Verify daemon logs show per-job scoring progress: start daemon, trigger `score_jobs` manually via curl, watch terminal for `"Scored 1/N — B (4.2) — Director of AI @ Acme"` entries
-- [ ] T051 [P] Verify pipeline log pane shows all three phases in one continuous log stream: discovery logs + JD fetch logs + scoring logs (no clearing between phases)
-- [ ] T052 [P] Verify `/applications` grade filter persists: set to "A only", reload page, confirm filter still shows "A only"
-- [ ] T053 [P] Verify F-grade jobs never appear on `/applications`: check DB for any `grade='F'` jobs; confirm they are absent from the dashboard even when "All" filter is selected
-- [ ] T054 Run full Python test suite: `cd agent && poetry run pytest tests/unit/ -v --cov=agent --cov-report=term-missing` — all tests pass
-- [ ] T055 🔵 **Invoke `superpowers:verification-before-completion`** — run `npm run test:run` (0 failures) + `npx tsc --noEmit` (0 errors) + `npm run build` (exit 0, no prerender errors); show evidence before proceeding
-- [ ] T056 Final commit: `git add -A && git commit -m "feat: 10D scoring engine — F9 complete"`
+- [x] T050 [P] Verify daemon logs show per-job scoring progress: start daemon, trigger `score_jobs` manually via curl, watch terminal for `"Scored 1/N — B (4.2) — Director of AI @ Acme"` entries
+- [x] T051 [P] Verify pipeline log pane shows all three phases in one continuous log stream: discovery logs + JD fetch logs + scoring logs (no clearing between phases)
+- [x] T052 [P] Verify `/applications` grade filter persists: set to "A only", reload page, confirm filter still shows "A only"
+- [x] T053 [P] Verify F-grade jobs never appear on `/applications`: check DB for any `grade='F'` jobs; confirm they are absent from the dashboard even when "All" filter is selected
+- [x] T054 Run full Python test suite: `cd agent && poetry run pytest tests/unit/ -v --cov=agent --cov-report=term-missing` — all tests pass
+- [x] T055 🔵 **Invoke `superpowers:verification-before-completion`** — run `npm run test:run` (0 failures) + `npx tsc --noEmit` (0 errors) + `npm run build` (exit 0, no prerender errors); show evidence before proceeding
+- [x] T056 Final commit: `git add -A && git commit -m "feat: 10D scoring engine — F9 complete"`
 
 ---
 
