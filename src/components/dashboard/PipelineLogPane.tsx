@@ -67,9 +67,9 @@ export function PipelineLogPane({ chainJobIds }: Props) {
     setShowScrollBtn(false)
   }, [])
 
-  // Auto-scroll only when user is already at the bottom
+  // Auto-scroll only when there are logs AND the user is already at the bottom
   useEffect(() => {
-    if (isAtBottomRef.current && typeof bottomRef.current?.scrollIntoView === 'function') {
+    if (logs.length > 0 && isAtBottomRef.current && typeof bottomRef.current?.scrollIntoView === 'function') {
       bottomRef.current.scrollIntoView({ behavior: 'smooth' })
     }
   }, [logs])
