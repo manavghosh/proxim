@@ -23,13 +23,13 @@
 
 **Purpose**: Extend the `jobs` table with the 5 columns needed to store scoring results. Must complete before any Python or Next.js scoring work can be tested end-to-end.
 
-- [ ] T001 Add `Score10D` and `DimensionScore` TypeScript types to `src/db/schema.ts` (at the top, before table definitions) per data-model.md
-- [ ] T002 Add 5 new columns to the `jobs` pgTable in `src/db/schema.ts`: `score10d jsonb.$type<Score10D>()`, `grade varchar({length:1})`, `reportMd text()`, `archetype text()`, `archetypeConfidence numeric({precision:3,scale:2})`
-- [ ] T003 Add the same `Score10D`/`DimensionScore` types and 5 columns to the `jobs` sqliteTable in `src/db/schema.sqlite.ts` using SQLite-compatible types: `score10d text({mode:'json'}).$type<Score10D>()`, `grade text()`, `reportMd text()`, `archetype text()`, `archetypeConfidence real()`
-- [ ] T004 Run `npm run db:generate` — review generated migration for correctness (5 nullable columns on `jobs`)
-- [ ] T005 Run `npm run db:migrate` — confirm columns added to Neon
-- [ ] T006 Run `DATABASE_URL=./proxim-dev.db npm run db:generate:sqlite && DATABASE_URL=./proxim-dev.db npm run db:migrate:sqlite` — confirm columns added to `proxim-dev.db`
-- [ ] T007 Run `npx tsc --noEmit` — zero TypeScript errors after schema additions
+- [x] T001 Add `Score10D` and `DimensionScore` TypeScript types to `src/db/schema.ts` (at the top, before table definitions) per data-model.md
+- [x] T002 Add 5 new columns to the `jobs` pgTable in `src/db/schema.ts`: `score10d jsonb.$type<Score10D>()`, `grade varchar({length:1})`, `reportMd text()`, `archetype text()`, `archetypeConfidence numeric({precision:3,scale:2})`
+- [x] T003 Add the same `Score10D`/`DimensionScore` types and 5 columns to the `jobs` sqliteTable in `src/db/schema.sqlite.ts` using SQLite-compatible types: `score10d text({mode:'json'}).$type<Score10D>()`, `grade text()`, `reportMd text()`, `archetype text()`, `archetypeConfidence real()`
+- [x] T004 Run `npm run db:generate` — review generated migration for correctness (5 nullable columns on `jobs`)
+- [x] T005 Run `npm run db:migrate` — confirm columns added to Neon
+- [x] T006 Run `DATABASE_URL=./proxim-dev.db npm run db:generate:sqlite && DATABASE_URL=./proxim-dev.db npm run db:migrate:sqlite` — confirm columns added to `proxim-dev.db`
+- [x] T007 Run `npx tsc --noEmit` — zero TypeScript errors after schema additions
 
 **Checkpoint ✅**: `npm run db:studio:sqlite` shows `jobs` table has `grade`, `score_10d`, `report_md`, `archetype`, `archetype_confidence` columns. `npx tsc --noEmit` passes.
 
@@ -43,32 +43,32 @@
 
 ### 2A — Pydantic Models
 
-- [ ] T008 [P] Add `DimensionScore`, `GateScores`, `WeightedScores`, `JobScoreOutput`, `ScoreReport`, `ScoringState` Pydantic models to `agent/agent/models.py` per data-model.md
+- [x] T008 [P] Add `DimensionScore`, `GateScores`, `WeightedScores`, `JobScoreOutput`, `ScoreReport`, `ScoringState` Pydantic models to `agent/agent/models.py` per data-model.md
 
-- [ ] T009 [P] Run `cd agent && poetry run python -c "from agent.models import ScoringState, JobScoreOutput, ScoreReport; print('OK')"` — confirm `OK`
+- [x] T009 [P] Run `cd agent && poetry run python -c "from agent.models import ScoringState, JobScoreOutput, ScoreReport; print('OK')"` — confirm `OK`
 
 ### 2B — DB Functions (TDD)
 
 > 🔴→🟢 TDD gate: Write T010 first, confirm tests FAIL, then implement T011 and T012.
 
-- [ ] T010 Write failing tests in `agent/tests/unit/test_db_sqlite.py` — add 4 new test functions:
+- [x] T010 Write failing tests in `agent/tests/unit/test_db_sqlite.py` — add 4 new test functions:
   - `test_get_jobs_to_score_returns_discovered_with_jd` — insert a discovered job with `jd_raw='We are hiring...'`; call `get_jobs_to_score(conn, CANDIDATE_ID)`; assert 1 result with keys `id`, `title`, `company`, `jd_raw`
   - `test_get_jobs_to_score_skips_empty_jd` — insert job with `jd_raw=''`; call `get_jobs_to_score`; assert `result == []`
   - `test_update_job_score_persists_all_fields` — insert job; call `update_job_score(conn, job_id, score_json={}, grade='B', report_md='## Report', archetype='GCC AI Practice Head', archetype_confidence=0.82)`; query DB; assert `grade='B'`, `report_md='## Report'`, `archetype='GCC AI Practice Head'`
   - `test_mark_job_score_failed_sets_status` — insert job; call `mark_job_score_failed(conn, job_id)`; query DB; assert `status='score_failed'`
 
-- [ ] T011 Run `cd agent && poetry run pytest tests/unit/test_db_sqlite.py -k "score" -v` — confirm all 4 FAIL 🔴 with `ImportError`
+- [x] T011 Run `cd agent && poetry run pytest tests/unit/test_db_sqlite.py -k "score" -v` — confirm all 4 FAIL 🔴 with `ImportError`
 
-- [ ] T012 Add 3 new functions to `agent/agent/db_sqlite.py`:
+- [x] T012 Add 3 new functions to `agent/agent/db_sqlite.py`:
   - `get_jobs_to_score(pool, candidate_id) -> list[dict]` — `SELECT id, title, company, jd_raw, source FROM jobs WHERE candidate_id=? AND status='discovered' AND jd_raw!='' ORDER BY created_at`
   - `update_job_score(pool, job_id, score_json, grade, report_md, archetype, archetype_confidence) -> None` — `UPDATE jobs SET status='scored', score_10d=?, grade=?, report_md=?, archetype=?, archetype_confidence=?, updated_at=? WHERE id=?` + `pool.commit()`
   - `mark_job_score_failed(pool, job_id) -> None` — `UPDATE jobs SET status='score_failed', updated_at=? WHERE id=?` + `pool.commit()`
 
-- [ ] T013 Add the same 3 functions to `agent/agent/db_pg.py` (asyncpg variants using `$1`/`$2` placeholders and `pool.acquire()`)
+- [x] T013 Add the same 3 functions to `agent/agent/db_pg.py` (asyncpg variants using `$1`/`$2` placeholders and `pool.acquire()`)
 
-- [ ] T014 Run `cd agent && poetry run pytest tests/unit/test_db_sqlite.py -v` — confirm all tests PASS 🟢 (existing 20 + 4 new = 24 pass)
+- [x] T014 Run `cd agent && poetry run pytest tests/unit/test_db_sqlite.py -v` — confirm all tests PASS 🟢 (existing 20 + 4 new = 24 pass)
 
-- [ ] T015 Run `cd agent && poetry run python -c "from agent.db_pg import get_jobs_to_score, update_job_score, mark_job_score_failed; print('OK')"` — confirm `OK`
+- [x] T015 Run `cd agent && poetry run python -c "from agent.db_pg import get_jobs_to_score, update_job_score, mark_job_score_failed; print('OK')"` — confirm `OK`
 
 **Checkpoint ✅**: 24 Python DB tests pass. All 3 scoring DB functions importable from both `db_sqlite` and `db_pg`.
 
@@ -84,7 +84,7 @@
 
 > 🔴→🟢 TDD gate: Write T016 first, confirm FAIL, then implement T017.
 
-- [ ] T016 Create `agent/tests/unit/test_scoring_engine.py` with 9 unit tests:
+- [x] T016 Create `agent/tests/unit/test_scoring_engine.py` with 9 unit tests:
   - `test_grade_a_score` — `score_to_grade(4.7, gate_failed=False) == 'A'`
   - `test_grade_b_score` — `score_to_grade(4.2, gate_failed=False) == 'B'`
   - `test_grade_c_score` — `score_to_grade(3.5, gate_failed=False) == 'C'`
@@ -95,9 +95,9 @@
   - `test_compute_weighted_score_all_ones` — all 8 dims = 1.0 → `compute_weighted_score(scores) == 1.0`
   - `test_truncate_jd_over_limit` — 5000-word string → `len(result.split()) <= 4005` and `'truncated' in result`
 
-- [ ] T017 Run `poetry run pytest tests/unit/test_scoring_engine.py -v` — confirm all 9 FAIL 🔴 with `ImportError`
+- [x] T017 Run `poetry run pytest tests/unit/test_scoring_engine.py -v` — confirm all 9 FAIL 🔴 with `ImportError`
 
-- [ ] T018 Create `agent/agent/scoring_engine.py` with:
+- [x] T018 Create `agent/agent/scoring_engine.py` with:
   - `DIMENSION_WEIGHTS: dict[str, int]` — 8 weighted dims with values 3/3/3/2/2/2/2/1 (total 18)
   - `GATE_FAIL_THRESHOLD = 2.5`
   - `MAX_RETRIES = 2`
@@ -109,9 +109,9 @@
   - `async score_job(job, parsed_profile, preferences) -> JobScoreOutput` — LiteLLM call + Pydantic validate + grade recompute; retry loop up to MAX_RETRIES on ValidationError/JSONDecodeError
   - `async generate_report(job, parsed_profile, score_output) -> ScoreReport` — LiteLLM call for report; block_a only if grade=F
 
-- [ ] T019 Run `poetry run pytest tests/unit/test_scoring_engine.py -v` — confirm all 9 PASS 🟢
+- [x] T019 Run `poetry run pytest tests/unit/test_scoring_engine.py -v` — confirm all 9 PASS 🟢
 
-- [ ] T020 Commit: `git add agent/agent/scoring_engine.py agent/tests/unit/test_scoring_engine.py && git commit -m "feat(scoring): add scoring engine — LiteLLM 10D scoring, grade computation, report generation"`
+- [x] T020 Commit: `git add agent/agent/scoring_engine.py agent/tests/unit/test_scoring_engine.py && git commit -m "feat(scoring): add scoring engine — LiteLLM 10D scoring, grade computation, report generation"`
 
 **Checkpoint ✅ Phase 3**: 9 scoring engine tests pass. `compute_weighted_score` and `score_to_grade` are deterministic and fully covered.
 
@@ -121,27 +121,27 @@
 
 **Purpose**: Wire scoring into the LangGraph pipeline following the established `fetch_jds.py` pattern.
 
-- [ ] T021 Create `agent/agent/graphs/scoring.py` with 3 nodes:
+- [x] T021 Create `agent/agent/graphs/scoring.py` with 3 nodes:
   - `load_jobs(state: ScoringState) -> dict` — call `get_jobs_to_score(pool, state.candidate_id)`; log count to pipeline_logs; return `{"jobs_to_score": jobs}`
   - `score_and_report_batch(state: ScoringState) -> dict` — for each job: call `score_job()`, call `generate_report()`, call `update_job_score()` or `mark_job_score_failed()` immediately after each job; log progress `"Scored N/total — Grade X (score) — title @ company"` per job to pipeline_logs; return `{"scored_count": N, "failed_count": M, "skipped_count": K}`
   - `write_score_summary(state: ScoringState) -> dict` — call `update_pipeline_run()` + `update_pipeline_job_status('completed')`; log summary; handle exceptions with last-resort `update_pipeline_job_status('failed')`
   - Wire: `StateGraph(ScoringState)` → `load_jobs → score_and_report_batch → write_score_summary → END`; export `scoring_graph = build_scoring_graph()`
 
-- [ ] T022 Run `cd agent && poetry run python -c "from agent.graphs.scoring import scoring_graph; print('Nodes:', list(scoring_graph.nodes))"` — confirm output includes `load_jobs`, `score_and_report_batch`, `write_score_summary`
+- [x] T022 Run `cd agent && poetry run python -c "from agent.graphs.scoring import scoring_graph; print('Nodes:', list(scoring_graph.nodes))"` — confirm output includes `load_jobs`, `score_and_report_batch`, `write_score_summary`
 
-- [ ] T023 Modify `write_fetch_summary` in `agent/agent/graphs/fetch_jds.py` — after `update_pipeline_job_status('completed')`, call `get_jobs_to_score(pool, candidate_id)`; if result is non-empty, call `queue_pipeline_job(pool, candidate_id, 'score_jobs')` and log `"Queuing scoring for N jobs…"`
+- [x] T023 Modify `write_fetch_summary` in `agent/agent/graphs/fetch_jds.py` — after `update_pipeline_job_status('completed')`, call `get_jobs_to_score(pool, candidate_id)`; if result is non-empty, call `queue_pipeline_job(pool, candidate_id, 'score_jobs')` and log `"Queuing scoring for N jobs…"`
 
-- [ ] T024 Modify `agent/agent/daemon.py` `_dispatch_job` function — add `elif job['job_type'] == 'score_jobs':` branch that imports `scoring_graph` and `ScoringState`, creates state, calls `await scoring_graph.ainvoke(state)`
+- [x] T024 Modify `agent/agent/daemon.py` `_dispatch_job` function — add `elif job['job_type'] == 'score_jobs':` branch that imports `scoring_graph` and `ScoringState`, creates state, calls `await scoring_graph.ainvoke(state)`
 
-- [ ] T025 Modify `src/app/api/pipeline/[jobId]/status/route.ts` — extend `followUpJobId` logic to also detect queued/running `score_jobs` when `jobType == 'fetch_jds'`; update the loop to check `['fetch_jds', 'score_jobs']` from `discovery_only` and `['score_jobs']` from `fetch_jds`
+- [x] T025 Modify `src/app/api/pipeline/[jobId]/status/route.ts` — extend `followUpJobId` logic to also detect queued/running `score_jobs` when `jobType == 'fetch_jds'`; update the loop to check `['fetch_jds', 'score_jobs']` from `discovery_only` and `['score_jobs']` from `fetch_jds`
 
-- [ ] T026 Run `cd agent && poetry run python -c "from agent.daemon import main; print('daemon OK')" 2>&1 | grep daemon` — confirm `daemon OK`
+- [x] T026 Run `cd agent && poetry run python -c "from agent.daemon import main; print('daemon OK')" 2>&1 | grep daemon` — confirm `daemon OK`
 
-- [ ] T027 Run `cd agent && poetry run pytest tests/unit/ -q` — confirm same pass count as before (no regressions)
+- [x] T027 Run `cd agent && poetry run pytest tests/unit/ -q` — confirm same pass count as before (no regressions)
 
-- [ ] T028 Run `npm run test:run && npx tsc --noEmit` — 0 failures, 0 type errors
+- [x] T028 Run `npm run test:run && npx tsc --noEmit` — 0 failures, 0 type errors
 
-- [ ] T029 Commit: `git add agent/agent/graphs/scoring.py agent/agent/graphs/fetch_jds.py agent/agent/daemon.py src/app/api/pipeline/\[jobId\]/status/route.ts && git commit -m "feat(scoring): add scoring LangGraph, auto-chain from fetch_jds, daemon dispatch, status API chains to score_jobs"`
+- [x] T029 Commit: `git add agent/agent/graphs/scoring.py agent/agent/graphs/fetch_jds.py agent/agent/daemon.py src/app/api/pipeline/\[jobId\]/status/route.ts && git commit -m "feat(scoring): add scoring LangGraph, auto-chain from fetch_jds, daemon dispatch, status API chains to score_jobs"`
 
 **Checkpoint ✅ Phase 4**: Full pipeline chain works: `discovery_only → fetch_jds → score_jobs`. Daemon dispatches all three job types.
 
@@ -155,30 +155,30 @@
 
 > 🔴→🟢 TDD gate: Write T030 tests first, confirm FAIL, then implement T031–T033.
 
-- [ ] T030 [P] [US1] Write failing tests in `src/__tests__/api/jobs/jobs.test.ts`:
+- [x] T030 [P] [US1] Write failing tests in `src/__tests__/api/jobs/jobs.test.ts`:
   - Mock Drizzle `db` module
   - `test_returns_empty_when_no_scored_jobs` — mock returns `[]`; call `GET /api/jobs`; assert `{ jobs: [] }`
   - `test_filters_f_grade_jobs` — mock returns job with `grade='F'`; assert response `jobs` is empty
   - `test_returns_200_with_scored_job` — mock returns job with `grade='A'`; assert job appears in response
 
-- [ ] T031 Run `npm run test:run` — confirm new tests FAIL 🔴 with "Cannot find module"
+- [x] T031 Run `npm run test:run` — confirm new tests FAIL 🔴 with "Cannot find module"
 
-- [ ] T032 [US1] Create `src/app/api/jobs/route.ts` — `GET` handler: call `getOrCreateCandidate()`; query `jobs` table filtering by `candidateId`; filter in application layer to exclude F-grade and `discovered`/`score_failed` status; apply `grade` query param filter (`A` | `A+B` | `all`); return `{ jobs: [...] }` with selected columns only
+- [x] T032 [US1] Create `src/app/api/jobs/route.ts` — `GET` handler: call `getOrCreateCandidate()`; query `jobs` table filtering by `candidateId`; filter in application layer to exclude F-grade and `discovered`/`score_failed` status; apply `grade` query param filter (`A` | `A+B` | `all`); return `{ jobs: [...] }` with selected columns only
 
-- [ ] T033 [US2] Create `src/app/api/jobs/[jobId]/decision/route.ts` — `POST` handler: validate `decision` is one of `approved`/`rejected`/`snoozed`; `db.update(jobs).set({status: decision}).where(eq(jobs.id, jobId))`; return `{ jobId, status: decision }`
+- [x] T033 [US2] Create `src/app/api/jobs/[jobId]/decision/route.ts` — `POST` handler: validate `decision` is one of `approved`/`rejected`/`snoozed`; `db.update(jobs).set({status: decision}).where(eq(jobs.id, jobId))`; return `{ jobId, status: decision }`
 
-- [ ] T034 [P] [US2] Create `src/app/api/jobs/[jobId]/report/route.ts` — `GET` handler: select `reportMd` and `grade` from jobs where `id=jobId`; return `{ reportMd, grade }`; 404 if not found
+- [x] T034 [P] [US2] Create `src/app/api/jobs/[jobId]/report/route.ts` — `GET` handler: select `reportMd` and `grade` from jobs where `id=jobId`; return `{ reportMd, grade }`; 404 if not found
 
-- [ ] T035 Add 3 API client functions to `src/lib/api.ts`:
+- [x] T035 Add 3 API client functions to `src/lib/api.ts`:
   - `getJobs(gradeFilter: 'A' | 'A+B' | 'all') -> Promise<{jobs: [...]}>` — `request('/api/jobs?grade=...')`
   - `submitDecision(jobId, decision) -> Promise<{jobId, status}>` — `POST /api/jobs/{jobId}/decision`
   - `getJobReport(jobId) -> Promise<{reportMd, grade}>` — `GET /api/jobs/{jobId}/report`
 
-- [ ] T036 Run `npm run test:run` — confirm new tests PASS 🟢 (existing 66 + new)
+- [x] T036 Run `npm run test:run` — confirm new tests PASS 🟢 (existing 66 + new)
 
-- [ ] T037 Run `npx tsc --noEmit` — zero errors
+- [x] T037 Run `npx tsc --noEmit` — zero errors
 
-- [ ] T038 Commit: `git add src/app/api/jobs/ src/lib/api.ts src/__tests__/api/jobs/ && git commit -m "feat(scoring): add GET /api/jobs, POST /api/jobs/[id]/decision, GET /api/jobs/[id]/report"`
+- [x] T038 Commit: `git add src/app/api/jobs/ src/lib/api.ts src/__tests__/api/jobs/ && git commit -m "feat(scoring): add GET /api/jobs, POST /api/jobs/[id]/decision, GET /api/jobs/[id]/report"`
 
 ---
 
@@ -190,31 +190,31 @@
 
 ### 6A — Type Extension
 
-- [ ] T039 [P] Add `grade_filter?: 'A' | 'A+B' | 'all'` to the `Preferences` interface in `src/types/candidate.ts`
+- [x] T039 [P] Add `grade_filter?: 'A' | 'A+B' | 'all'` to the `Preferences` interface in `src/types/candidate.ts`
 
-- [ ] T040 [P] Run `npx tsc --noEmit` — zero errors
+- [x] T040 [P] Run `npx tsc --noEmit` — zero errors
 
 ### 6B — UI Components (TDD)
 
 > 🔴→🟢 TDD gate: Write T041 before implementing T042–T045.
 
-- [ ] T041 [US3] Write failing tests in `src/__tests__/components/applications/JobCard.test.tsx`:
+- [x] T041 [US3] Write failing tests in `src/__tests__/components/applications/JobCard.test.tsx`:
   - `test_renders_grade_badge` — render `<JobCard>` with `grade='A'`; assert badge with text "A" is visible
   - `test_renders_company_and_title` — assert company name and title text visible
   - `test_approve_button_calls_onDecision` — click Approve; assert `onDecision` called with `('job-id', 'approved')`
   - `test_disabled_when_pending` — pass `isPending=true`; assert Approve button is disabled
 
-- [ ] T042 Run `npm run test:run` — confirm new tests FAIL 🔴 with "Cannot find module"
+- [x] T042 Run `npm run test:run` — confirm new tests FAIL 🔴 with "Cannot find module"
 
-- [ ] T043 [P] [US3] Create `src/components/applications/JobCard.tsx` — job card with: grade badge coloured by A=green/B=blue/C=amber/D=orange; numeric score; title + company; location + archetype pills; Approve/Reject/Snooze buttons (disabled when `isPending`); "Report ↗" link; external link icon
+- [x] T043 [P] [US3] Create `src/components/applications/JobCard.tsx` — job card with: grade badge coloured by A=green/B=blue/C=amber/D=orange; numeric score; title + company; location + archetype pills; Approve/Reject/Snooze buttons (disabled when `isPending`); "Report ↗" link; external link icon
 
-- [ ] T044 [P] [US3] Create `src/components/applications/GradeFilter.tsx` — pill toggle for `A` / `A+B` / `all` with job counts display
+- [x] T044 [P] [US3] Create `src/components/applications/GradeFilter.tsx` — pill toggle for `A` / `A+B` / `all` with job counts display
 
-- [ ] T045 [P] [US3] Create `src/components/applications/ReportDrawer.tsx` — slide-in drawer; loads `getJobReport(jobId)` on mount; renders `reportMd` as `<pre>` (mono text); close button; click-outside-to-close
+- [x] T045 [P] [US3] Create `src/components/applications/ReportDrawer.tsx` — slide-in drawer; loads `getJobReport(jobId)` on mount; renders `reportMd` as `<pre>` (mono text); close button; click-outside-to-close
 
 ### 6C — Applications Page
 
-- [ ] T046 [US3] Replace `src/app/applications/page.tsx` with full HITL review dashboard:
+- [x] T046 [US3] Replace `src/app/applications/page.tsx` with full HITL review dashboard:
   - On mount: load `grade_filter` from `getPreferences()` and `setGradeFilter` accordingly
   - Load jobs via `getJobs(gradeFilter)` on mount and on filter change
   - Render `<GradeFilter>` with counts (A/B/total)
@@ -224,11 +224,11 @@
   - Persist filter change via `updatePreferences({ grade_filter: v })`
   - Empty state message when 0 jobs (with hint to widen filter or run pipeline)
 
-- [ ] T047 Run `npm run test:run` — confirm all tests PASS 🟢 (including new JobCard tests)
+- [x] T047 Run `npm run test:run` — confirm all tests PASS 🟢 (including new JobCard tests)
 
-- [ ] T048 Run `npx tsc --noEmit` — zero errors
+- [x] T048 Run `npx tsc --noEmit` — zero errors
 
-- [ ] T049 Commit: `git add src/app/applications/ src/components/applications/ src/types/candidate.ts && git commit -m "feat(scoring): build HITL review dashboard — grade filter, job cards, approve/reject/snooze, report drawer"`
+- [x] T049 Commit: `git add src/app/applications/ src/components/applications/ src/types/candidate.ts && git commit -m "feat(scoring): build HITL review dashboard — grade filter, job cards, approve/reject/snooze, report drawer"`
 
 ---
 
