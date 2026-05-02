@@ -2,11 +2,34 @@ import {
   sqliteTable,
   text,
   integer,
+  real,
   index,
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core'
 
 // ── inline types (mirrors schema.ts) ──────────────────────────────────────
+type DimensionScore = {
+  score: number
+  reasoning: string
+}
+
+type Score10D = {
+  gate: {
+    roleLevelMatch:   DimensionScore
+    aiStackAlignment: DimensionScore
+  }
+  weighted: {
+    compensation:         DimensionScore
+    companyStage:         DimensionScore
+    interviewProbability: DimensionScore
+    thoughtLeadership:    DimensionScore
+    geography:            DimensionScore
+    growthTrajectory:     DimensionScore
+    domainResonance:      DimensionScore
+    hiringUrgency:        DimensionScore
+  }
+}
+
 type ParsedProfile = {
   name: string
   contact: Record<string, string>
@@ -91,7 +114,12 @@ export const jobs = sqliteTable('jobs', {
   sourceUrl:      text().notNull(),
   applicationUrl: text(),
   postedAt:       text(),
-  status:         text().default('discovered').notNull(),
+  status:              text().default('discovered').notNull(),
+  score10d:            text({ mode: 'json' }).$type<Score10D>(),
+  grade:               text(),
+  reportMd:            text(),
+  archetype:           text(),
+  archetypeConfidence: real(),
   createdAt:      text().$defaultFn(now).notNull(),
   updatedAt:      text().$defaultFn(now).$onUpdateFn(now).notNull(),
 }, (table) => [

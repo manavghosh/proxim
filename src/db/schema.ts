@@ -7,9 +7,32 @@ import {
   pgEnum,
   timestamp,
   integer,
+  numeric,
   index,
   uniqueIndex,
 } from 'drizzle-orm/pg-core'
+
+type DimensionScore = {
+  score: number
+  reasoning: string
+}
+
+type Score10D = {
+  gate: {
+    roleLevelMatch:   DimensionScore
+    aiStackAlignment: DimensionScore
+  }
+  weighted: {
+    compensation:         DimensionScore
+    companyStage:         DimensionScore
+    interviewProbability: DimensionScore
+    thoughtLeadership:    DimensionScore
+    geography:            DimensionScore
+    growthTrajectory:     DimensionScore
+    domainResonance:      DimensionScore
+    hiringUrgency:        DimensionScore
+  }
+}
 
 type ParsedProfile = {
   name: string
@@ -109,7 +132,12 @@ export const jobs = pgTable('jobs', {
   sourceUrl: text().notNull(),
   applicationUrl: text(),
   postedAt: timestamp({ withTimezone: true }),
-  status: jobStatusEnum().default('discovered').notNull(),
+  status:              jobStatusEnum().default('discovered').notNull(),
+  score10d:            jsonb().$type<Score10D>(),
+  grade:               varchar({ length: 1 }),
+  reportMd:            text(),
+  archetype:           text(),
+  archetypeConfidence: numeric({ precision: 3, scale: 2 }),
   createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp({ withTimezone: true }).defaultNow().notNull().$onUpdateFn(() => new Date()),
 }, (table) => [
