@@ -53,8 +53,9 @@ async def load_jobs(state: FetchJdsState) -> dict:
 # ── Node: fetch_jds_batch ─────────────────────────────────────────────────────
 
 async def fetch_jds_batch(state: FetchJdsState) -> dict:
-    """Visit each job detail page and update jd_raw in the database."""
+    """Visit each job detail page and save jd_raw immediately after each fetch."""
     from agent.scrapers.linkedin_jd import LinkedInJdScraper
+    from agent.db import update_job_jd
 
     if not state.jobs_to_fetch:
         logger.info("fetch_jds_batch_skip", reason="no jobs to fetch")
@@ -64,24 +65,32 @@ async def fetch_jds_batch(state: FetchJdsState) -> dict:
     scraper = LinkedInJdScraper()
     fetched = 0
     failed = 0
+    total = len(state.jobs_to_fetch)
 
     try:
         await _log(pool, state.pipeline_job_id, "info", "fetch_jds_batch",
-                   f"Fetching JDs for {len(state.jobs_to_fetch)} jobs…",
-                   {"total": len(state.jobs_to_fetch)})
+                   f"Fetching JDs for {total} jobs…", {"total": total})
 
-        results = await scraper.fetch_jds(state.jobs_to_fetch)
-
-        from agent.db import update_job_jd
-        for job_id, jd_text in results:
+        async def on_fetched(job_id: str, jd_text: str) -> None:
+            """Save each JD to the DB immediately after it is fetched."""
+            nonlocal fetched, failed
             if jd_text:
                 await update_job_jd(pool, job_id, jd_text)
                 fetched += 1
+                words = len(jd_text.split())
+                await _log(pool, state.pipeline_job_id, "info", "fetch_jds_batch",
+                           f"Saved JD {fetched}/{total} — {words} words",
+                           {"fetched": fetched, "total": total, "words": words})
             else:
                 failed += 1
+                await _log(pool, state.pipeline_job_id, "warning", "fetch_jds_batch",
+                           f"JD unavailable for job {fetched + failed}/{total} — will retry next run",
+                           {"fetched": fetched, "failed": failed, "total": total})
+
+        await scraper.fetch_jds(state.jobs_to_fetch, on_fetched=on_fetched)
 
         await _log(pool, state.pipeline_job_id, "info", "fetch_jds_batch",
-                   f"JD fetch complete — {fetched} fetched, {failed} failed",
+                   f"JD fetch complete — {fetched} saved, {failed} unavailable",
                    {"fetched": fetched, "failed": failed})
         logger.info("fetch_jds_batch_done", fetched=fetched, failed=failed)
 
