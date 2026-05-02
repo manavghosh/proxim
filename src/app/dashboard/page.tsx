@@ -75,22 +75,30 @@ export default function DashboardPage() {
       const { jobId } = await triggerPipeline('discovery_only')
       setPipelineJobId(jobId)
       setPipelineStatus('queued')
-      // Poll for status — retries silently on 500 (Neon cold start)
-      const poll = async () => {
+
+      // Poll for status, chaining to any auto-queued follow-up job (e.g. fetch_jds).
+      // currentJobId is passed explicitly so the closure stays in sync when we switch jobs.
+      const poll = async (currentJobId: string) => {
         try {
-          const status = await getPipelineStatus(jobId)
+          const status = await getPipelineStatus(currentJobId)
           setPipelineStatus(status.status)
-          if (status.status !== 'completed' && status.status !== 'failed') {
-            setTimeout(() => { void poll() }, 5000)
+
+          if (status.followUpJobId) {
+            // discovery_only completed and spawned a fetch_jds job — track it
+            setPipelineJobId(status.followUpJobId)
+            setPipelineStatus('running')
+            setTimeout(() => { void poll(status.followUpJobId!) }, 3000)
+          } else if (status.status !== 'completed' && status.status !== 'failed') {
+            setTimeout(() => { void poll(currentJobId) }, 5000)
           } else {
             setPipelineLoading(false)
           }
         } catch {
           // Status fetch failed — retry in 5s without crashing the UI
-          setTimeout(() => { void poll() }, 5000)
+          setTimeout(() => { void poll(currentJobId) }, 5000)
         }
       }
-      void poll()
+      void poll(jobId)
     } catch (e) {
       setPipelineLoading(false)
       setError(e instanceof Error ? e.message : 'Failed to start pipeline. Check the daemon is running.')

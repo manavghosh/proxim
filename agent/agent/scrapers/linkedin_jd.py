@@ -74,7 +74,7 @@ class LinkedInJdScraper:
 
                         results.append((job_id, jd_text))
                         logger.debug("linkedin_jd_fetched",
-                                     job_id=job_id, chars=len(jd_text))
+                                     job_id=job_id, words=len(jd_text.split()))
                         await asyncio.sleep(random.uniform(1.5, 3.0))
 
                     except Exception as e:
