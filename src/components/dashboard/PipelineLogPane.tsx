@@ -220,7 +220,7 @@ export function PipelineLogPane({ chainJobIds }: Props) {
         <div
           ref={containerRef}
           onScroll={handleScroll}
-          className="h-[480px] overflow-y-auto p-3 font-mono text-[11px] space-y-1 scroll-smooth"
+          className="h-[240px] overflow-y-auto p-3 font-mono text-[11px] space-y-1 scroll-smooth"
         >
           {logs.length === 0 ? (
             <p className="text-[#334155]">
