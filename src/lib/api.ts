@@ -113,3 +113,15 @@ export async function getJobReport(
 ): Promise<{ reportMd: string | null; grade: string | null }> {
   return request(`/api/jobs/${jobId}/report`)
 }
+
+export async function getJobStats(): Promise<{ scoreFailed: number }> {
+  try {
+    return await request('/api/jobs/stats')
+  } catch {
+    return { scoreFailed: 0 }
+  }
+}
+
+export async function resetFailedJobs(): Promise<{ reset: number }> {
+  return request('/api/jobs/reset-failed', { method: 'POST' })
+}
