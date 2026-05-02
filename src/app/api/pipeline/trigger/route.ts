@@ -39,21 +39,25 @@ export async function POST(request: Request) {
         ),
       )
 
-    // Check for a genuinely active job (started < 30 min ago)
+    // Check for a conflict: only block if the SAME job type is already active.
+    // This allows e.g. score_jobs to run independently of a discovery_only run.
     const existing = await db
       .select({ id: pipelineJobs.id })
       .from(pipelineJobs)
       .where(
-        or(
-          eq(pipelineJobs.status, 'queued'),
-          eq(pipelineJobs.status, 'running')
+        and(
+          eq(pipelineJobs.jobType, jobType as string),
+          or(
+            eq(pipelineJobs.status, 'queued'),
+            eq(pipelineJobs.status, 'running')
+          )
         )
       )
       .limit(1)
 
     if (existing.length > 0) {
       return NextResponse.json(
-        { error: 'A pipeline job is already queued or running' },
+        { error: `A ${jobType} job is already queued or running` },
         { status: 409 }
       )
     }
