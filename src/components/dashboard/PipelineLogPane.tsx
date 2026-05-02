@@ -43,6 +43,7 @@ export function PipelineLogPane({ chainJobIds }: Props) {
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'polling' | 'error'>('idle')
   const [showScrollBtn, setShowScrollBtn] = useState(false)
 
+  const paneRef       = useRef<HTMLDivElement>(null)  // outer pane — scrolled into view on first log
   const containerRef  = useRef<HTMLDivElement>(null)
   const bottomRef     = useRef<HTMLDivElement>(null)
   const lastLogAtRef  = useRef<string | null>(null)
@@ -67,7 +68,20 @@ export function PipelineLogPane({ chainJobIds }: Props) {
     setShowScrollBtn(false)
   }, [])
 
-  // No auto-scroll — user controls scrolling manually
+  // Scroll the pane into the viewport when the first log entry arrives.
+  // Does NOT scroll inside the log pane — the user controls that manually.
+  const hasScrolledToPaneRef = useRef(false)
+  useEffect(() => {
+    if (logs.length > 0 && !hasScrolledToPaneRef.current) {
+      hasScrolledToPaneRef.current = true
+      if (typeof paneRef.current?.scrollIntoView === 'function') {
+        paneRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    }
+    if (logs.length === 0) {
+      hasScrolledToPaneRef.current = false
+    }
+  }, [logs.length])
 
   // ── Chain change logic ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -170,7 +184,7 @@ export function PipelineLogPane({ chainJobIds }: Props) {
     : null
 
   return (
-    <div className="bg-[#060d1f] border border-[#1e2d4a] rounded-xl overflow-hidden mt-4">
+    <div ref={paneRef} className="bg-[#060d1f] border border-[#1e2d4a] rounded-xl overflow-hidden mt-4">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-[#1e2d4a]">
         <div className="flex items-center gap-2">
