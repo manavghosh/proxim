@@ -2,12 +2,20 @@
 from __future__ import annotations
 
 import json
+import re
 import structlog
 from pydantic import ValidationError
 
 from agent.models import JobScoreOutput, ScoreReport
 
 logger = structlog.get_logger()
+
+
+def _get_api_key(settings) -> str:
+    """Return the API key for the configured provider."""
+    if settings.llm_provider == "gemini":
+        return settings.gemini_api_key
+    return settings.anthropic_api_key
 
 # Weight per weighted dimension (gate dims excluded from weighted average)
 DIMENSION_WEIGHTS: dict[str, int] = {
@@ -168,13 +176,17 @@ Grade: {score_output.grade} ({score_output.numeric_score})
 Archetype: {score_output.archetype}
 
 ## Required JSON Output
+
+IMPORTANT: Every value below MUST be a plain string. Never use JSON arrays or nested objects.
+For multi-line content use newlines (\\n) inside the string.
+
 {{
   "block_a": "<Executive Summary: 1 paragraph — grade, key strengths, primary risk>",
-  "block_b": "<CV Match: markdown table 'JD Requirement | Candidate Proof Point | Strength'. Each proof point MUST be verbatim from parsed profile.>",
-  "block_c": "<Gaps & Mitigation: bulleted list of gaps with severity (Critical/Minor) and mitigation>",
-  "block_d": "<Level & Positioning: detected seniority, recommended archetype, positioning notes>",
-  "block_e": "<Compensation Analysis: JD range vs target, market context, negotiability signal>",
-  "block_f": "<Interview Probability: estimated callback %, key differentiators, likely interview topics>"
+  "block_b": "<CV Match: markdown table string 'JD Requirement | Candidate Proof Point | Strength'. Each proof point MUST be verbatim from parsed profile.>",
+  "block_c": "<Gaps & Mitigation: plain string using '- Critical: ...' and '- Minor: ...' lines for each gap and its mitigation>",
+  "block_d": "<Level & Positioning: plain string — detected seniority, recommended archetype, positioning notes>",
+  "block_e": "<Compensation Analysis: plain string — JD range vs target, market context, negotiability signal>",
+  "block_f": "<Interview Probability: plain string — estimated callback %, key differentiators, likely interview topics>"
 }}"""
 
 
@@ -194,12 +206,18 @@ async def score_job(
         try:
             response = litellm.completion(
                 model=f"{settings.llm_provider}/{settings.llm_model}",
+                api_key=_get_api_key(settings),
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"},
                 temperature=0.1,
                 max_tokens=4096,
             )
             raw = response.choices[0].message.content
+
+            # Strip markdown code fencing that some models add despite response_format
+            if raw:
+                raw = re.sub(r'^```(?:json)?\s*\n?', '', raw.strip())
+                raw = re.sub(r'\n?```\s*$', '', raw).strip()
 
             # Guard: empty/None content means the model didn't return JSON
             if not raw or not raw.strip():
@@ -209,7 +227,7 @@ async def score_job(
                     "JD may be too long — will retry with truncated prompt."
                 )
 
-            parsed = json.loads(raw)
+            parsed, _ = json.JSONDecoder().raw_decode(raw.strip())
 
 
             # Recompute grade + score deterministically — do not trust the LLM's values
@@ -268,11 +286,15 @@ async def generate_report(
         )
         response = litellm.completion(
             model=f"{settings.llm_provider}/{settings.llm_model}",
+            api_key=_get_api_key(settings),
             messages=[{"role": "user", "content": summary_prompt}],
             response_format={"type": "json_object"},
             temperature=0.1,
         )
-        data = json.loads(response.choices[0].message.content)
+        raw_f = response.choices[0].message.content or ""
+        raw_f = re.sub(r'^```(?:json)?\s*\n?', '', raw_f.strip())
+        raw_f = re.sub(r'\n?```\s*$', '', raw_f).strip()
+        data, _ = json.JSONDecoder().raw_decode(raw_f.strip())
         return ScoreReport(
             block_a=data["block_a"],
             block_b="", block_c="", block_d="", block_e="", block_f="",
@@ -281,9 +303,13 @@ async def generate_report(
     prompt = _build_report_prompt(job, parsed_profile, score_output)
     response = litellm.completion(
         model=f"{settings.llm_provider}/{settings.llm_model}",
+        api_key=_get_api_key(settings),
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
         temperature=0.2,
     )
-    data = json.loads(response.choices[0].message.content)
+    raw_r = response.choices[0].message.content or ""
+    raw_r = re.sub(r'^```(?:json)?\s*\n?', '', raw_r.strip())
+    raw_r = re.sub(r'\n?```\s*$', '', raw_r).strip()
+    data, _ = json.JSONDecoder().raw_decode(raw_r.strip())
     return ScoreReport.model_validate(data)

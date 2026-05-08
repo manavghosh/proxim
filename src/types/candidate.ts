@@ -30,10 +30,13 @@ export interface Preferences {
   enabled_sources?: string[]
   custom_job_sites?: string[]
   grade_filter?: 'A' | 'A+B' | 'all'
+  hitl_grade_filter?: 'A' | 'A+B' | 'all'
+  hitl_sort?: 'score' | 'date' | 'company'
 }
 
 export interface CandidateState {
   id: string
+  name: string
   baseCvMd: string | null
   baseCvHash: string | null
   parseStatus: ParseStatus

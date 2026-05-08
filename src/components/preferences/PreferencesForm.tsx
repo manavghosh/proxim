@@ -22,9 +22,10 @@ const SOURCE_OPTIONS = [
 interface PreferencesFormProps {
   initialPreferences: Preferences
   onSaved: (prefs: Preferences) => void
+  candidateId: string
 }
 
-export function PreferencesForm({ initialPreferences, onSaved }: PreferencesFormProps) {
+export function PreferencesForm({ initialPreferences, onSaved, candidateId }: PreferencesFormProps) {
   // Normalise geographic_preference: old DB rows may store a plain string
   const normalisedInitial: Preferences = {
     ...initialPreferences,
@@ -99,7 +100,7 @@ export function PreferencesForm({ initialPreferences, onSaved }: PreferencesForm
         target_companies: parsedCompanies,
         custom_job_sites: parsedCustomSites,
         preferred_domains: mergedDomains,
-      })
+      }, candidateId)
       onSaved(preferences as Preferences)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed.')

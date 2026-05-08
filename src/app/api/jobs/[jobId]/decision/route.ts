@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { jobs } from '@/db/schema'
 
-const VALID_DECISIONS = ['approved', 'rejected', 'snoozed'] as const
+const VALID_DECISIONS = ['approved', 'rejected', 'snoozed', 'scored'] as const
 type Decision = typeof VALID_DECISIONS[number]
 
 export async function POST(

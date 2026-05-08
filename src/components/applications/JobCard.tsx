@@ -1,56 +1,65 @@
 'use client'
 
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, BellOff, Bell, FileTextIcon, DownloadIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import type { ScoredJob } from '@/lib/api'
 
-const GRADE_COLOURS: Record<string, string> = {
-  A: 'bg-emerald-500 text-white',
-  B: 'bg-blue-500 text-white',
-  C: 'bg-amber-500 text-white',
-  D: 'bg-orange-500 text-white',
-}
-
-function GradeBadge({ grade }: { grade: string }) {
-  return (
-    <span
-      className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold shrink-0 ${
-        GRADE_COLOURS[grade] ?? 'bg-[#1e2d4a] text-[#94a3b8]'
-      }`}
-    >
-      {grade}
-    </span>
-  )
+const GRADE_STYLES: Record<string, { badge: string }> = {
+  A: { badge: 'bg-emerald-500 text-white border-transparent' },
+  B: { badge: 'bg-blue-500   text-white border-transparent' },
+  C: { badge: 'bg-amber-500  text-white border-transparent' },
+  D: { badge: 'bg-orange-500 text-white border-transparent' },
+  F: { badge: 'bg-red-600    text-white border-transparent' },
 }
 
 interface Props {
   job: ScoredJob
-  onDecision: (jobId: string, decision: 'approved' | 'rejected' | 'snoozed') => void
+  candidateId?: string
+  onDecision: (jobId: string, decision: 'approved' | 'rejected' | 'snoozed' | 'scored') => void
   onViewReport: (jobId: string) => void
+  onViewResume?: (jobId: string) => void
   isPending: boolean
 }
 
-export function JobCard({ job, onDecision, onViewReport, isPending }: Props) {
+export function JobCard({ job, candidateId, onDecision, onViewReport, onViewResume, isPending }: Props) {
   const score = (job.score10d as Record<string, unknown> | null)?.numeric_score as number | undefined
+  const isSnoozed  = job.status === 'snoozed'
+  const isApproved = job.status === 'approved'
+  const isRejected = job.status === 'rejected'
+  const gradeStyle = job.grade ? (GRADE_STYLES[job.grade] ?? GRADE_STYLES.F) : null
 
   return (
-    <div className="bg-[#0d1f3c] border border-[#1e2d4a] rounded-xl p-4 flex flex-col gap-3">
+    <div className={`bg-[#0d1f3c] border rounded-xl p-4 flex flex-col gap-3 transition-opacity ${
+      isSnoozed ? 'border-[#1e2d4a] opacity-60' : 'border-[#1e2d4a]'
+    }`}>
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          {job.grade && <GradeBadge grade={job.grade} />}
+          {gradeStyle && job.grade && (
+            <Badge className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold shrink-0 ${gradeStyle.badge}`}>
+              {job.grade}
+            </Badge>
+          )}
           <div>
             <h3 className="text-[#e2e8f0] font-semibold text-sm leading-tight">{job.title}</h3>
             <p className="text-[#64748b] text-xs mt-0.5">{job.company}</p>
           </div>
         </div>
         <div className="text-right shrink-0">
-          {score && (
-            <p className="text-[#94a3b8] text-xs font-mono">
-              {typeof score === 'number' ? score.toFixed(1) : score}
-            </p>
+          {score !== undefined && (
+            <p className="text-[#94a3b8] text-xs font-mono">{score.toFixed(1)}</p>
           )}
           <p className="text-[#475569] text-[10px] capitalize">{job.source}</p>
+          {isSnoozed && (
+            <Badge variant="secondary" className="text-[10px] mt-1">Snoozed</Badge>
+          )}
+          {isApproved && (
+            <Badge className="text-[10px] mt-1 bg-emerald-600 text-white border-transparent">Approved</Badge>
+          )}
+          {isRejected && (
+            <Badge variant="destructive" className="text-[10px] mt-1">Rejected</Badge>
+          )}
         </div>
       </div>
 
@@ -58,65 +67,98 @@ export function JobCard({ job, onDecision, onViewReport, isPending }: Props) {
       {(job.location || job.archetype) && (
         <div className="flex gap-2 flex-wrap">
           {job.location && (
-            <span className="text-[10px] text-[#475569] bg-[#0d1829] px-2 py-0.5 rounded">
+            <Badge variant="outline" className="text-[10px] text-[#475569] border-[#1e2d4a] bg-[#0d1829]">
               {job.location}
-            </span>
+            </Badge>
           )}
           {job.archetype && (
-            <span className="text-[10px] text-[#64748b] bg-[#0d1829] px-2 py-0.5 rounded">
+            <Badge variant="outline" className="text-[10px] text-[#64748b] border-[#1e2d4a] bg-[#0d1829]">
               {job.archetype}
-            </span>
+            </Badge>
           )}
         </div>
       )}
 
       {/* Actions */}
-      <div className="flex items-center gap-2 pt-1">
+      <div className="flex items-center gap-2 pt-1 flex-wrap">
         <Button
           size="sm"
           className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3"
           onClick={() => onDecision(job.id, 'approved')}
-          disabled={isPending || job.status === 'approved'}
-          isLoading={isPending}
-          aria-label="Approve"
+          disabled={isPending || isApproved}
+          isLoading={isPending && !isSnoozed}
         >
           ✓ Approve
         </Button>
+
         <Button
           size="sm"
           variant="outline"
-          className="h-7 text-xs border-[#1e2d4a] text-[#94a3b8] hover:text-red-400 px-3"
+          className="h-7 text-xs border-[#1e2d4a] text-[#94a3b8] hover:text-red-400 hover:border-red-400/30 px-3"
           onClick={() => onDecision(job.id, 'rejected')}
-          disabled={isPending || job.status === 'rejected'}
-          aria-label="Reject"
+          disabled={isPending || isRejected}
         >
           ✕ Reject
         </Button>
+
+        {/* Snooze toggle */}
         <Button
           size="sm"
-          variant="outline"
-          className="h-7 text-xs border-[#1e2d4a] text-[#94a3b8] px-3"
-          onClick={() => onDecision(job.id, 'snoozed')}
-          disabled={isPending || job.status === 'snoozed'}
-          aria-label="Snooze"
+          variant={isSnoozed ? 'default' : 'outline'}
+          className={`h-7 text-xs px-3 gap-1 ${
+            isSnoozed
+              ? 'bg-amber-600 hover:bg-amber-700 text-white border-transparent'
+              : 'border-[#1e2d4a] text-[#94a3b8] hover:text-amber-400 hover:border-amber-400/30'
+          }`}
+          onClick={() => onDecision(job.id, isSnoozed ? 'scored' : 'snoozed')}
+          disabled={isPending}
         >
-          ⏸ Snooze
+          {isSnoozed ? (
+            <><Bell className="w-3 h-3" /> Unsnooze</>
+          ) : (
+            <><BellOff className="w-3 h-3" /> Snooze</>
+          )}
         </Button>
-        <div className="ml-auto flex gap-2 items-center">
-          <button
+
+        <div className="ml-auto flex gap-2 items-center flex-wrap justify-end">
+          {/* Resume generation buttons */}
+          {job.status === 'approved' && candidateId && (
+            <Button size="sm" variant="outline"
+              className="h-7 text-[10px] border-blue-700/40 text-blue-400 hover:bg-blue-950/30 gap-1"
+              onClick={() => onViewResume?.(job.id)}>
+              <FileTextIcon className="w-3 h-3" /> Generate Resume
+            </Button>
+          )}
+          {['resume_ready', 'resume_failed', 'submitted'].includes(job.status) && (
+            <Button size="sm" variant="outline"
+              className={`h-7 text-[10px] gap-1 ${
+                job.status === 'resume_failed'
+                  ? 'border-red-700/40 text-red-400 hover:bg-red-950/30'
+                  : 'border-[#1e2d4a] text-[#93c5fd]'
+              }`}
+              onClick={() => onViewResume?.(job.id)}>
+              <DownloadIcon className="w-3 h-3" />
+              {job.status === 'resume_failed' ? 'Resume Failed — Retry' : 'View Resume'}
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 text-[10px] text-[#475569] hover:text-[#94a3b8] px-2"
             onClick={() => onViewReport(job.id)}
-            className="text-[10px] text-[#475569] hover:text-[#94a3b8] transition-colors"
           >
             Report ↗
-          </button>
-          <a
-            href={job.sourceUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[#475569] hover:text-[#94a3b8] transition-colors"
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0 text-[#475569] hover:text-[#94a3b8]"
+            asChild
           >
-            <ExternalLink className="w-3 h-3" />
-          </a>
+            <a href={job.sourceUrl} target="_blank" rel="noopener noreferrer" aria-label="Open job listing">
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </Button>
         </div>
       </div>
     </div>

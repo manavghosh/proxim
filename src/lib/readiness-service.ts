@@ -27,9 +27,13 @@ export function computeReadiness(candidate: Candidate | null): ReadinessResult {
   }
 }
 
-export async function getReadiness(): Promise<ReadinessResult> {
+export async function getReadiness(candidateId?: string): Promise<ReadinessResult> {
   const { db } = await import('@/db')
   const { candidates } = await import('@/db/schema')
-  const [candidate] = await db.select().from(candidates).limit(1)
+  const { eq } = await import('drizzle-orm')
+  const query = candidateId
+    ? db.select().from(candidates).where(eq(candidates.id, candidateId)).limit(1)
+    : db.select().from(candidates).limit(1)
+  const [candidate] = await query
   return computeReadiness(candidate ?? null)
 }

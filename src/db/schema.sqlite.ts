@@ -61,6 +61,7 @@ const newId = () => crypto.randomUUID()
 // ── tables ─────────────────────────────────────────────────────────────────
 export const candidates = sqliteTable('candidates', {
   id:             text().primaryKey().$defaultFn(newId),
+  name:           text().default('New Candidate').notNull(),
   candidateId:    text(),
   baseCvMd:       text(),
   baseCvHash:     text(),
@@ -151,3 +152,48 @@ export const pipelineLogs = sqliteTable('pipeline_logs', {
 ])
 
 export type PipelineLog = typeof pipelineLogs.$inferSelect
+
+// ── Resume Builder (F10) ──────────────────────────────────────────────────────
+
+export const resumeVersions = sqliteTable('resume_versions', {
+  id:                  text().primaryKey().$defaultFn(newId),
+  jobId:               text().notNull().references(() => jobs.id),
+  candidateId:         text().references(() => candidates.id),
+  archetype:           text().notNull(),
+  archetypeConfidence: real(),
+  keywords:            text({ mode: 'json' }).$type<string[]>(),
+  scoreAtGeneration:   real(),
+  resumePdfPath:       text(),
+  coverLetterPdfPath:  text(),
+  baseCvHash:          text().notNull(),
+  isSubmitted:         integer({ mode: 'boolean' }).default(false).notNull(),
+  companyResearchUsed: integer({ mode: 'boolean' }).default(false).notNull(),
+  generationStatus:    text().default('pending').notNull(),
+  errorMessage:        text(),
+  versionN:            integer().default(1).notNull(),
+  createdAt:           text().$defaultFn(now).notNull(),
+}, (table) => [
+  index('resume_versions_job_id_idx').on(table.jobId),
+  index('resume_versions_base_cv_hash_idx').on(table.baseCvHash),
+])
+
+export type ResumeVersion = typeof resumeVersions.$inferSelect
+
+// ── HITL Review Dashboard (F4) ────────────────────────────────────────────────
+
+export const hitlCheckpoints = sqliteTable('hitl_checkpoints', {
+  id:           text().primaryKey().$defaultFn(newId),
+  jobId:        text().notNull().references(() => jobs.id),
+  candidateId:  text().notNull().references(() => candidates.id),
+  status:       text().default('awaiting').notNull(),
+  decisionType: text(),
+  snoozedUntil: text(),
+  decidedAt:    text(),
+  createdAt:    text().$defaultFn(now).notNull(),
+}, (table) => [
+  index('hitl_checkpoints_candidate_status_idx').on(table.candidateId, table.status),
+  index('hitl_checkpoints_job_id_idx').on(table.jobId),
+  uniqueIndex('hitl_checkpoints_job_id_unique').on(table.jobId),
+])
+
+export type HitlCheckpoint = typeof hitlCheckpoints.$inferSelect

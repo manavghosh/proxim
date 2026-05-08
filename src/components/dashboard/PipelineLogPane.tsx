@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { ChevronDown } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 interface LogEntry {
   id: string
@@ -15,6 +16,7 @@ interface LogEntry {
 function stepIcon(level: string, step: string): string {
   if (level === 'error') return '❌'
   if (level === 'warning') return '⚠️'
+  if (step === 'review_required') return '🔍'
   if (step.includes('persist')) return '💾'
   if (step.includes('dedup') || step.includes('normalise')) return '🔄'
   if (step === 'write_run_summary' || step === 'write_fetch_summary' || step === 'write_score_summary') return '🏁'
@@ -32,12 +34,13 @@ function formatTime(iso: string): string {
 
 interface Props {
   chainJobIds: string[]   // ordered list of job IDs in the current pipeline chain
+  onReviewRequired?: () => void   // called when the user clicks the inline "Review" CTA
 }
 
 const POLL_INTERVAL_MS = 2000
 const TERMINAL_STATUSES = new Set(['completed', 'failed'])
 
-export function PipelineLogPane({ chainJobIds }: Props) {
+export function PipelineLogPane({ chainJobIds, onReviewRequired }: Props) {
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [running, setRunning] = useState(false)
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'polling' | 'error'>('idle')
@@ -214,12 +217,14 @@ export function PipelineLogPane({ chainJobIds }: Props) {
             <span className="text-[9px] text-[#334155]">{logs.length} entries</span>
           )}
           {!running && logs.length > 0 && (
-            <button
+            <Button
+              variant="ghost"
+              size="xs"
+              className="h-auto px-1 py-0 text-[10px] text-[#475569]"
               onClick={() => { setLogs([]); setShowScrollBtn(false) }}
-              className="text-[10px] text-[#475569] hover:text-[#94a3b8] transition-colors"
             >
               Clear
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -238,18 +243,19 @@ export function PipelineLogPane({ chainJobIds }: Props) {
                 : 'Click ▶ Run Pipeline to begin job discovery'}
             </p>
           ) : (
-            logs.map((entry, i) => {
-              // Insert a phase divider when we cross into a new job's logs
-              // (detected by a big timestamp gap or the phase count)
+            logs.map((entry) => {
+              const isReviewCta = entry.step === 'review_required' && !!onReviewRequired
               return (
                 <div
                   key={entry.id}
-                  className={`flex gap-2 ${
+                  className={`flex flex-wrap items-center gap-2 ${
                     entry.level === 'warning'
                       ? 'text-amber-400'
                       : entry.level === 'error'
                         ? 'text-red-400'
-                        : 'text-[#94a3b8]'
+                        : isReviewCta
+                          ? 'text-cyan-300'
+                          : 'text-[#94a3b8]'
                   }`}
                 >
                   <span className="text-[#475569] shrink-0 tabular-nums">
@@ -257,6 +263,16 @@ export function PipelineLogPane({ chainJobIds }: Props) {
                   </span>
                   <span className="shrink-0">{stepIcon(entry.level, entry.step)}</span>
                   <span className="break-all">{entry.message}</span>
+                  {isReviewCta && (
+                    <Button
+                      variant="link"
+                      size="xs"
+                      className="h-auto p-0 text-cyan-300 hover:text-cyan-200"
+                      onClick={() => onReviewRequired?.()}
+                    >
+                      Review →
+                    </Button>
+                  )}
                 </div>
               )
             })
@@ -266,13 +282,15 @@ export function PipelineLogPane({ chainJobIds }: Props) {
 
         {/* Scroll-to-bottom button — only shows when scrolled up */}
         {showScrollBtn && (
-          <button
+          <Button
+            variant="outline"
+            size="xs"
             onClick={scrollToBottom}
-            className="absolute bottom-3 right-3 flex items-center gap-1 bg-[#1e2d4a] hover:bg-[#1e3a5f] text-[#94a3b8] text-[10px] px-2 py-1 rounded-full border border-[#334155] transition-colors shadow-lg"
+            className="absolute bottom-3 right-3 gap-1 rounded-full border-[#334155] bg-[#1e2d4a] text-[#94a3b8] text-[10px] shadow-lg hover:bg-[#1e3a5f]"
           >
             <ChevronDown className="w-3 h-3" />
             Latest
-          </button>
+          </Button>
         )}
       </div>
     </div>

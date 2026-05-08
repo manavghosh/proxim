@@ -8,6 +8,7 @@ import {
   timestamp,
   integer,
   numeric,
+  boolean,
   index,
   uniqueIndex,
 } from 'drizzle-orm/pg-core'
@@ -67,7 +68,8 @@ export const parseStatusEnum = pgEnum('parse_status', [
 
 export const candidates = pgTable('candidates', {
   id: uuid().defaultRandom().primaryKey(),
-  candidateId: uuid(), // nullable FK — reserved for future auth integration
+  name: varchar({ length: 255 }).default('New Candidate').notNull(),
+  candidateId: uuid(),
   baseCvMd: text(),
   baseCvHash: varchar({ length: 64 }),
   parsedProfile: jsonb().$type<ParsedProfile>(),
@@ -90,6 +92,7 @@ export const pipelineJobStatusEnum = pgEnum('pipeline_job_status', [
 export const jobStatusEnum = pgEnum('job_status', [
   'discovered', 'scored', 'awaiting', 'approved',
   'rejected', 'snoozed', 'score_failed', 'resume_failed',
+  'resume_ready', 'submitted',
 ])
 
 export const pipelineJobs = pgTable('pipeline_jobs', {
@@ -169,3 +172,52 @@ export const pipelineLogs = pgTable('pipeline_logs', {
 ])
 
 export type PipelineLog = typeof pipelineLogs.$inferSelect
+
+// ── Resume Builder (F10) ──────────────────────────────────────────────────────
+
+export const resumeVersions = pgTable('resume_versions', {
+  id:                  uuid().defaultRandom().primaryKey(),
+  jobId:               uuid().references(() => jobs.id).notNull(),
+  candidateId:         uuid().references(() => candidates.id),
+  archetype:           text().notNull(),
+  archetypeConfidence: numeric({ precision: 3, scale: 2 }),
+  keywords:            jsonb().$type<string[]>(),
+  scoreAtGeneration:   numeric({ precision: 4, scale: 2 }),
+  resumePdfPath:       text(),
+  coverLetterPdfPath:  text(),
+  baseCvHash:          text().notNull(),
+  isSubmitted:         boolean().default(false).notNull(),
+  companyResearchUsed: boolean().default(false).notNull(),
+  generationStatus:    text().default('pending').notNull(),
+  errorMessage:        text(),
+  versionN:            integer().default(1).notNull(),
+  createdAt:           timestamp({ withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index('resume_versions_job_id_idx').on(table.jobId),
+  index('resume_versions_base_cv_hash_idx').on(table.baseCvHash),
+])
+
+export type ResumeVersion = typeof resumeVersions.$inferSelect
+
+// ── HITL Review Dashboard (F4) ────────────────────────────────────────────────
+
+export const hitlCheckpointStatusEnum = pgEnum('hitl_checkpoint_status', [
+  'awaiting', 'approved', 'rejected', 'snoozed',
+])
+
+export const hitlCheckpoints = pgTable('hitl_checkpoints', {
+  id:           uuid().defaultRandom().primaryKey(),
+  jobId:        uuid().references(() => jobs.id).notNull(),
+  candidateId:  uuid().references(() => candidates.id).notNull(),
+  status:       hitlCheckpointStatusEnum().default('awaiting').notNull(),
+  decisionType: text(),
+  snoozedUntil: timestamp({ withTimezone: true }),
+  decidedAt:    timestamp({ withTimezone: true }),
+  createdAt:    timestamp({ withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index('hitl_checkpoints_candidate_status_idx').on(table.candidateId, table.status),
+  index('hitl_checkpoints_job_id_idx').on(table.jobId),
+  uniqueIndex('hitl_checkpoints_job_id_unique').on(table.jobId),
+])
+
+export type HitlCheckpoint = typeof hitlCheckpoints.$inferSelect

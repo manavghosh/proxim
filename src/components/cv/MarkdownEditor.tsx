@@ -9,9 +9,10 @@ import type { CandidateState } from '@/types/candidate'
 interface MarkdownEditorProps {
   initialMarkdown: string
   onSaved: (candidate: CandidateState) => void
+  candidateId: string
 }
 
-export function MarkdownEditor({ initialMarkdown, onSaved }: MarkdownEditorProps) {
+export function MarkdownEditor({ initialMarkdown, onSaved, candidateId }: MarkdownEditorProps) {
   const [markdown, setMarkdown] = useState(initialMarkdown)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -20,7 +21,7 @@ export function MarkdownEditor({ initialMarkdown, onSaved }: MarkdownEditorProps
     setError(null)
     setSaving(true)
     try {
-      const candidate = await saveCV(markdown)
+      const candidate = await saveCV(markdown, candidateId)
       onSaved(candidate)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed. Try again.')

@@ -1,5 +1,9 @@
-"""TDD tests for insert_pipeline_log — written before implementation."""
+"""Tests for insert_pipeline_log — exercises the asyncpg (db_pg) backend
+directly so the asyncpg-style mock matches the implementation regardless
+of which DB the local dev environment is currently pointed at."""
 from unittest.mock import AsyncMock, MagicMock
+
+from agent.db_pg import insert_pipeline_log
 
 
 class TestInsertPipelineLog:
@@ -10,7 +14,6 @@ class TestInsertPipelineLog:
         mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=mock_connection)
         mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
 
-        from agent.db import insert_pipeline_log
         await insert_pipeline_log(
             mock_pool,
             pipeline_job_id="job-1",
@@ -31,7 +34,6 @@ class TestInsertPipelineLog:
         mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=mock_connection)
         mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
 
-        from agent.db import insert_pipeline_log
         await insert_pipeline_log(
             mock_pool,
             pipeline_job_id="job-1",

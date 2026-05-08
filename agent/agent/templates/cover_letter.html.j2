@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; }
+  body {
+    font-family: Helvetica, Arial, sans-serif;
+    font-size: 11pt;
+    color: #1a1a1a;
+    line-height: 1.6;
+  }
+  @page {
+    size: a4 portrait;
+    margin: 2.5cm;
+  }
+
+  .sender-name {
+    font-size: 16pt;
+    font-weight: 700;
+    color: #0d1829;
+    margin-bottom: 2pt;
+  }
+  .sender-contact {
+    font-size: 9pt;
+    color: #475569;
+    margin-bottom: 24pt;
+  }
+  .date-line { font-size: 10pt; color: #64748b; margin-bottom: 18pt; }
+  .salutation { font-weight: 600; margin-bottom: 12pt; }
+  .body-para { margin-bottom: 14pt; font-size: 11pt; text-align: justify; }
+  .closing { margin-top: 24pt; font-size: 11pt; }
+  .signature { margin-top: 8pt; font-weight: 700; }
+</style>
+</head>
+<body>
+
+<p class="sender-name">{{ profile.name | default("Candidate Name") }}</p>
+{% if profile.contact %}
+<p class="sender-contact">
+  {% for k, v in profile.contact.items() %}{{ v }}{% if not loop.last %} · {% endif %}{% endfor %}
+</p>
+{% endif %}
+
+<p class="date-line">{{ date }}</p>
+
+<p style="margin-bottom:18pt;">
+  <strong>Hiring Manager</strong><br>
+  {{ job.company }}
+</p>
+
+<p class="salutation">Dear Hiring Manager,</p>
+
+<p class="body-para">{{ cover_letter.opening }}</p>
+
+<p class="body-para">{{ cover_letter.body }}</p>
+
+<p class="body-para">{{ cover_letter.closing }}</p>
+
+<div class="closing">
+  <p>Sincerely,</p>
+  <p class="signature">{{ profile.name | default("Candidate Name") }}</p>
+</div>
+
+</body>
+</html>

@@ -57,15 +57,21 @@ async def _load_candidate_context(pool, candidate_id: str) -> tuple[dict, dict]:
 # ── Node: load_jobs ───────────────────────────────────────────────────────────
 
 async def load_jobs(state: ScoringState) -> dict:
-    """Load all discovered jobs with non-empty jd_raw ready to be scored."""
+    """Load discovered jobs with non-empty jd_raw ready to be scored.
+
+    Honors state.job_ids if provided (batch selection); otherwise loads every
+    ready job for the candidate (legacy/escape-hatch behaviour).
+    """
     pool = await _make_pool()
     try:
         from agent.db import get_jobs_to_score
-        jobs = await get_jobs_to_score(pool, state.candidate_id)
+        filter_ids = state.job_ids if state.job_ids else None
+        jobs = await get_jobs_to_score(pool, state.candidate_id, job_ids=filter_ids)
+        scope_label = f"selected batch ({len(filter_ids)} requested)" if filter_ids else "all ready"
         await _log(pool, state.pipeline_job_id, "info", "load_jobs",
-                   f"Found {len(jobs)} jobs to score",
-                   {"count": len(jobs)})
-        logger.info("scoring_load", count=len(jobs))
+                   f"Found {len(jobs)} jobs to score — {scope_label}",
+                   {"count": len(jobs), "requested": len(filter_ids) if filter_ids else None})
+        logger.info("scoring_load", count=len(jobs), requested=len(filter_ids) if filter_ids else None)
     finally:
         await _close_pool(pool)
     return {"jobs_to_score": jobs}

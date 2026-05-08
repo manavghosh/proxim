@@ -238,20 +238,49 @@ async def queue_pipeline_job(
 async def get_jobs_to_score(
     pool: asyncpg.Pool,
     candidate_id: str,
+    job_ids: list[str] | None = None,
 ) -> list[dict]:
-    """Return discovered jobs with non-empty jd_raw that have not yet been scored."""
+    """Return discovered jobs with non-empty jd_raw that have not yet been scored.
+
+    When `job_ids` is a non-empty list, the result is restricted to that subset
+    (still excluding any whose jd_raw is empty or status is not 'discovered').
+    Pass None or [] to score every ready job (legacy behaviour).
+    """
     async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            "SELECT id, title, company, jd_raw, source FROM jobs "
-            "WHERE candidate_id = $1 AND status = 'discovered' AND jd_raw != '' "
-            "ORDER BY created_at",
-            candidate_id,
-        )
+        if job_ids:
+            rows = await conn.fetch(
+                "SELECT id, title, company, jd_raw, source FROM jobs "
+                "WHERE candidate_id = $1 AND status = 'discovered' AND jd_raw != '' "
+                "AND id = ANY($2::uuid[]) "
+                "ORDER BY created_at",
+                candidate_id, job_ids,
+            )
+        else:
+            rows = await conn.fetch(
+                "SELECT id, title, company, jd_raw, source FROM jobs "
+                "WHERE candidate_id = $1 AND status = 'discovered' AND jd_raw != '' "
+                "ORDER BY created_at",
+                candidate_id,
+            )
     return [
         {"id": str(row["id"]), "title": row["title"], "company": row["company"],
          "jd_raw": row["jd_raw"], "source": row["source"]}
         for row in rows
     ]
+
+
+async def count_ready_to_score(
+    pool: asyncpg.Pool,
+    candidate_id: str,
+) -> int:
+    """Count jobs in 'discovered' state with non-empty jd_raw — i.e. ready to score."""
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT COUNT(*) AS c FROM jobs "
+            "WHERE candidate_id = $1 AND status = 'discovered' AND jd_raw != ''",
+            candidate_id,
+        )
+    return row["c"] if row else 0
 
 
 async def update_job_score(
@@ -281,5 +310,34 @@ async def mark_job_score_failed(
     async with pool.acquire() as conn:
         await conn.execute(
             "UPDATE jobs SET status = 'score_failed', updated_at = NOW() WHERE id = $1",
+            job_id,
+        )
+
+
+# ── HITL Snooze Resurface (F4) ────────────────────────────────────────────────
+
+async def get_snoozed_jobs_to_resurface(pool: asyncpg.Pool) -> list[dict]:
+    """Return HITL checkpoints whose snooze has expired."""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT hc.id, hc.job_id FROM hitl_checkpoints hc
+            WHERE hc.status = 'snoozed' AND hc.snoozed_until <= NOW()
+        """)
+    return [{"checkpoint_id": str(row["id"]), "job_id": str(row["job_id"])} for row in rows]
+
+
+async def resurface_snoozed_job(
+    pool: asyncpg.Pool,
+    checkpoint_id: str,
+    job_id: str,
+) -> None:
+    """Reset a snoozed job to awaiting status."""
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE hitl_checkpoints SET status = 'awaiting', snoozed_until = NULL WHERE id = $1",
+            checkpoint_id,
+        )
+        await conn.execute(
+            "UPDATE jobs SET status = 'awaiting', updated_at = NOW() WHERE id = $1",
             job_id,
         )

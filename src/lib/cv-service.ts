@@ -22,11 +22,19 @@ export async function getOrCreateCandidate(): Promise<Candidate> {
   return created
 }
 
+export async function getCandidateById(id: string): Promise<Candidate | null> {
+  const [candidate] = await db.select().from(candidates).where(eq(candidates.id, id))
+  return candidate ?? null
+}
+
 export async function saveCVMarkdown(
-  markdown: string
+  markdown: string,
+  candidateId?: string
 ): Promise<{ candidate: Candidate; hashChanged: boolean }> {
   const newHash = computeSHA256(markdown)
-  const candidate = await getOrCreateCandidate()
+  const candidate = candidateId
+    ? (await getCandidateById(candidateId)) ?? await getOrCreateCandidate()
+    : await getOrCreateCandidate()
 
   if (!shouldTriggerParse(candidate.baseCvHash, newHash)) {
     return { candidate, hashChanged: false }

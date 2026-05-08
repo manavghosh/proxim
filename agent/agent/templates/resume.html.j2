@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; }
+  body {
+    font-family: Helvetica, Arial, sans-serif;
+    font-size: 10.5pt;
+    color: #1a1a1a;
+    line-height: 1.45;
+  }
+  @page {
+    size: a4 portrait;
+    margin: 1.5cm;
+  }
+  article.role { page-break-inside: avoid; }
+  section { page-break-inside: avoid; margin-bottom: 14pt; }
+  .tier-3 { display: none; }
+
+  h1.candidate-name {
+    font-size: 22pt;
+    font-weight: 700;
+    letter-spacing: -0.5pt;
+    color: #0d1829;
+    margin-bottom: 2pt;
+  }
+  .contact-line {
+    font-size: 9pt;
+    color: #475569;
+    margin-bottom: 12pt;
+  }
+  h2.section-title {
+    font-size: 10pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1pt;
+    color: #334155;
+    border-bottom: 1pt solid #cbd5e1;
+    padding-bottom: 2pt;
+    margin-bottom: 8pt;
+  }
+  .summary-text { font-size: 10.5pt; color: #1e293b; }
+
+  article.role { margin-bottom: 10pt; }
+  .role-header { display: flex; justify-content: space-between; align-items: baseline; }
+  .role-title  { font-weight: 700; font-size: 11pt; color: #0f172a; }
+  .role-company { font-weight: 600; font-size: 10pt; color: #1e40af; }
+  .role-dates  { font-size: 9pt; color: #64748b; }
+  ul.bullets   { margin-left: 14pt; margin-top: 4pt; }
+  ul.bullets li { margin-bottom: 2pt; font-size: 10pt; }
+
+  .skills-grid { display: flex; flex-wrap: wrap; gap: 4pt; }
+  .skill-tag {
+    background: #f1f5f9;
+    border: 0.5pt solid #cbd5e1;
+    border-radius: 3pt;
+    padding: 1pt 6pt;
+    font-size: 9.5pt;
+    color: #334155;
+  }
+  .proof-item { font-size: 10pt; margin-bottom: 3pt; padding-left: 10pt; position: relative; }
+  .proof-item::before { content: "▸"; position: absolute; left: 0; color: #1e40af; }
+</style>
+</head>
+<body>
+
+{# ── Header ── #}
+<h1 class="candidate-name">{{ profile.name | default("Candidate Name") }}</h1>
+{% if profile.contact %}
+<p class="contact-line">
+  {% for k, v in profile.contact.items() %}{{ v }}{% if not loop.last %} · {% endif %}{% endfor %}
+</p>
+{% endif %}
+
+{# ── Sections rendered per archetype_section_order ── #}
+{% for section_key in section_order %}
+
+  {% if section_key == "summary" and personalised.summary %}
+  <section>
+    <h2 class="section-title">Professional Summary</h2>
+    <p class="summary-text">{{ personalised.summary }}</p>
+  </section>
+  {% endif %}
+
+  {% if section_key == "proof_points" and personalised.proof_points %}
+  <section>
+    <h2 class="section-title">Key Achievements & Proof Points</h2>
+    {% for pp in personalised.proof_points %}
+    <p class="proof-item">{{ pp }}</p>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if section_key == "roles" and personalised.roles %}
+  <section>
+    <h2 class="section-title">Professional Experience</h2>
+    {% for role in personalised.roles %}
+    <article class="role">
+      <div class="role-header">
+        <div>
+          <span class="role-title">{{ role.title }}</span>
+          <span style="color:#475569;"> · </span>
+          <span class="role-company">{{ role.company }}</span>
+        </div>
+        <span class="role-dates">{{ role.start_date }} – {{ role.end_date }}</span>
+      </div>
+      {% if role.bullets %}
+      <ul class="bullets">
+        {% for bullet in role.bullets %}
+        <li>{{ bullet }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if section_key == "skills" and personalised.skills %}
+  <section>
+    <h2 class="section-title">Core Competencies</h2>
+    <div class="skills-grid">
+      {% for skill in personalised.skills %}
+      <span class="skill-tag">{{ skill }}</span>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if section_key == "patents" and profile.patents %}
+  <section>
+    <h2 class="section-title">Patents & Publications</h2>
+    {% for item in profile.patents %}
+    <p class="proof-item">{{ item }}</p>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if section_key == "education" and profile.education %}
+  {# Tier 3 — truncated if page overflow #}
+  <section class="tier-3">
+    <h2 class="section-title">Education</h2>
+    {% for edu in profile.education %}
+    <p style="font-size:10pt; margin-bottom:3pt;">{{ edu }}</p>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+{% endfor %}
+
+</body>
+</html>

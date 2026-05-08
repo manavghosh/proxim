@@ -10,6 +10,7 @@ import type { Candidate } from '@/db/schema'
 
 const base: Candidate = {
   id: 'test-id',
+  name: 'Test Candidate',
   candidateId: null,
   baseCvMd: null,
   baseCvHash: null,

@@ -19,7 +19,7 @@ const basePrefs: Preferences = {
 function setup(prefs: Preferences = basePrefs) {
   const onSaved = vi.fn()
   mockUpdatePreferences.mockResolvedValue({ preferences: prefs } as any)
-  render(<PreferencesForm initialPreferences={prefs} onSaved={onSaved} />)
+  render(<PreferencesForm initialPreferences={prefs} onSaved={onSaved} candidateId="test-id" />)
   return { onSaved }
 }
 

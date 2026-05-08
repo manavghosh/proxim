@@ -10,6 +10,7 @@ vi.mock('@/db', () => ({
 
 vi.mock('@/lib/cv-service', () => ({
   getOrCreateCandidate: vi.fn().mockResolvedValue({ id: 'cand-1' }),
+  getCandidateById: vi.fn().mockResolvedValue({ id: 'cand-1' }),
 }))
 
 vi.mock('@/db/schema', () => ({
@@ -56,7 +57,7 @@ describe('GET /api/jobs', () => {
     vi.mocked(db.select).mockReturnValue(mockChain as never)
 
     const { GET } = await import('@/app/api/jobs/route')
-    const req = new Request('http://localhost/api/jobs?grade=all')
+    const req = new Request('http://localhost/api/jobs?grades=A,B,C,D')
     const res = await GET(req)
     const body = await res.json()
 
@@ -81,7 +82,7 @@ describe('GET /api/jobs', () => {
     vi.mocked(db.select).mockReturnValue(mockChain as never)
 
     const { GET } = await import('@/app/api/jobs/route')
-    const req = new Request('http://localhost/api/jobs?grade=A')
+    const req = new Request('http://localhost/api/jobs?grades=A')
     const res = await GET(req)
     const body = await res.json()
 

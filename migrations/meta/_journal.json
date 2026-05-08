@@ -29,6 +29,27 @@
       "when": 1777689782108,
       "tag": "0003_lying_beyonder",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1777800838770,
+      "tag": "0004_fantastic_shocker",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1777856089008,
+      "tag": "0005_adorable_thaddeus_ross",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777948419222,
+      "tag": "0006_wild_talon",
+      "breakpoints": true
     }
   ]
 }

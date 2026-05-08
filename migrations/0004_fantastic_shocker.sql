@@ -1,0 +1,1 @@
+ALTER TABLE "candidates" ADD COLUMN "name" varchar(255) DEFAULT 'New Candidate' NOT NULL;

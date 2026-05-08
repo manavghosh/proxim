@@ -6,6 +6,8 @@ class Settings(BaseSettings):
     llm_provider: str = "anthropic"
     llm_model: str = "claude-sonnet-4-6"
     anthropic_api_key: str = ""
+    gemini_api_key: str = ""
+    resume_output_dir: str = "agent/output/resumes"
     langchain_tracing_v2: bool = False
     langchain_api_key: str = ""
     langchain_project: str = "proxim-dev"

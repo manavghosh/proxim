@@ -296,20 +296,47 @@ async def queue_pipeline_job(
 async def get_jobs_to_score(
     pool: aiosqlite.Connection,
     candidate_id: str,
+    job_ids: list[str] | None = None,
 ) -> list[dict]:
-    """Return discovered jobs with non-empty jd_raw that have not yet been scored."""
-    async with pool.execute(
+    """Return discovered jobs with non-empty jd_raw that have not yet been scored.
+
+    When `job_ids` is a non-empty list, the result is restricted to that subset
+    (still excluding any whose jd_raw is empty or status is not 'discovered').
+    Pass None or [] to score every ready job (legacy behaviour).
+    """
+    base_sql = (
         "SELECT id, title, company, jd_raw, source FROM jobs "
-        "WHERE candidate_id = ? AND status = 'discovered' AND jd_raw != '' "
-        "ORDER BY created_at",
-        (candidate_id,),
-    ) as cursor:
+        "WHERE candidate_id = ? AND status = 'discovered' AND jd_raw != ''"
+    )
+    if job_ids:
+        placeholders = ",".join("?" for _ in job_ids)
+        sql = f"{base_sql} AND id IN ({placeholders}) ORDER BY created_at"
+        params: tuple = (candidate_id, *job_ids)
+    else:
+        sql = f"{base_sql} ORDER BY created_at"
+        params = (candidate_id,)
+
+    async with pool.execute(sql, params) as cursor:
         rows = await cursor.fetchall()
     return [
         {"id": row[0], "title": row[1], "company": row[2],
          "jd_raw": row[3], "source": row[4]}
         for row in rows
     ]
+
+
+async def count_ready_to_score(
+    pool: aiosqlite.Connection,
+    candidate_id: str,
+) -> int:
+    """Count jobs in 'discovered' state with non-empty jd_raw — i.e. ready to score."""
+    async with pool.execute(
+        "SELECT COUNT(*) FROM jobs "
+        "WHERE candidate_id = ? AND status = 'discovered' AND jd_raw != ''",
+        (candidate_id,),
+    ) as cursor:
+        row = await cursor.fetchone()
+    return row[0] if row else 0
 
 
 async def update_job_score(
@@ -340,3 +367,158 @@ async def mark_job_score_failed(
         (_now(), job_id),
     )
     await pool.commit()
+
+
+# ── Resume Builder DB functions (F10) ─────────────────────────────────────────
+
+async def get_approved_jobs_without_resume(
+    pool: aiosqlite.Connection,
+    candidate_id: str = "",
+) -> list[dict]:
+    """Return approved jobs that have no completed resume version."""
+    where = "WHERE j.status = 'approved' AND j.id NOT IN (SELECT job_id FROM resume_versions WHERE generation_status = 'completed')"
+    params: tuple = ()
+    if candidate_id:
+        where += " AND j.candidate_id = ?"
+        params = (candidate_id,)
+    async with pool.execute(
+        f"SELECT j.id, j.title, j.company, j.jd_raw, j.candidate_id, j.status, "
+        f"j.archetype, j.archetype_confidence FROM jobs j {where} ORDER BY j.created_at",
+        params,
+    ) as cur:
+        rows = await cur.fetchall()
+    cols = ["id", "title", "company", "jd_raw", "candidate_id", "status", "archetype", "archetype_confidence"]
+    return [dict(zip(cols, row)) for row in rows]
+
+
+async def insert_resume_version(
+    pool: aiosqlite.Connection,
+    job_id: str,
+    candidate_id: str,
+    archetype: str,
+    base_cv_hash: str,
+    archetype_confidence: float = 1.0,
+    keywords: list | None = None,
+    score_at_generation: float | None = None,
+    resume_pdf_path: str = "",
+    cover_letter_pdf_path: str = "",
+    generation_status: str = "pending",
+    version_n: int = 1,
+) -> str:
+    vid = _new_id()
+    await pool.execute(
+        "INSERT INTO resume_versions (id, job_id, candidate_id, archetype, archetype_confidence, "
+        "keywords, score_at_generation, resume_pdf_path, cover_letter_pdf_path, base_cv_hash, "
+        "generation_status, version_n, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (vid, job_id, candidate_id, archetype, archetype_confidence,
+         json.dumps(keywords or []), score_at_generation,
+         resume_pdf_path, cover_letter_pdf_path, base_cv_hash,
+         generation_status, version_n, _now()),
+    )
+    await pool.commit()
+    return vid
+
+
+async def get_resume_versions(
+    pool: aiosqlite.Connection,
+    job_id: str,
+) -> list[dict]:
+    async with pool.execute(
+        "SELECT id, job_id, candidate_id, archetype, archetype_confidence, keywords, "
+        "score_at_generation, resume_pdf_path, cover_letter_pdf_path, base_cv_hash, "
+        "is_submitted, company_research_used, generation_status, error_message, version_n, created_at "
+        "FROM resume_versions WHERE job_id = ? ORDER BY version_n DESC",
+        (job_id,),
+    ) as cur:
+        rows = await cur.fetchall()
+    cols = ["id", "job_id", "candidate_id", "archetype", "archetype_confidence", "keywords",
+            "score_at_generation", "resume_pdf_path", "cover_letter_pdf_path", "base_cv_hash",
+            "is_submitted", "company_research_used", "generation_status", "error_message",
+            "version_n", "created_at"]
+    return [dict(zip(cols, row)) for row in rows]
+
+
+async def mark_resume_failed(
+    pool: aiosqlite.Connection,
+    job_id: str,
+    error: str,
+) -> None:
+    await pool.execute(
+        "UPDATE resume_versions SET generation_status = 'failed', error_message = ? "
+        "WHERE job_id = ? AND generation_status != 'completed'",
+        (error, job_id),
+    )
+    await pool.execute(
+        "UPDATE jobs SET status = 'resume_failed' WHERE id = ?",
+        (job_id,),
+    )
+    await pool.commit()
+
+
+async def lock_submitted_resume(
+    pool: aiosqlite.Connection,
+    version_id: str,
+) -> None:
+    async with pool.execute(
+        "SELECT is_submitted FROM resume_versions WHERE id = ?", (version_id,)
+    ) as cur:
+        row = await cur.fetchone()
+    if row is None:
+        raise ValueError(f"Resume version {version_id} not found")
+    if row[0]:
+        raise ValueError(f"Resume version {version_id} is already submitted")
+    await pool.execute(
+        "UPDATE resume_versions SET is_submitted = 1 WHERE id = ?",
+        (version_id,),
+    )
+    await pool.commit()
+
+
+async def update_resume_version_status(
+    pool: aiosqlite.Connection,
+    version_id: str,
+    status: str,
+    resume_pdf_path: str = "",
+    cover_letter_pdf_path: str = "",
+) -> None:
+    await pool.execute(
+        "UPDATE resume_versions SET generation_status = ?, "
+        "resume_pdf_path = ?, cover_letter_pdf_path = ? WHERE id = ?",
+        (status, resume_pdf_path, cover_letter_pdf_path, version_id),
+    )
+    await pool.commit()
+
+
+# ── HITL Snooze Resurface (F4) ────────────────────────────────────────────────
+
+async def get_snoozed_jobs_to_resurface(
+    pool: aiosqlite.Connection,
+) -> list[dict]:
+    """Return HITL checkpoints whose snooze has expired."""
+    now = _now()
+    async with pool.execute(
+        "SELECT hc.id, hc.job_id FROM hitl_checkpoints hc "
+        "WHERE hc.status = 'snoozed' AND hc.snoozed_until <= ?",
+        (now,),
+    ) as cursor:
+        rows = await cursor.fetchall()
+    return [{"checkpoint_id": row[0], "job_id": row[1]} for row in rows]
+
+
+async def resurface_snoozed_job(
+    pool: aiosqlite.Connection,
+    checkpoint_id: str,
+    job_id: str,
+) -> None:
+    """Reset a snoozed job to awaiting status."""
+    await pool.execute(
+        "UPDATE hitl_checkpoints SET status = 'awaiting', snoozed_until = NULL WHERE id = ?",
+        (checkpoint_id,),
+    )
+    await pool.execute(
+        "UPDATE jobs SET status = 'awaiting', updated_at = ? WHERE id = ?",
+        (_now(), job_id),
+    )
+    await pool.commit()
+

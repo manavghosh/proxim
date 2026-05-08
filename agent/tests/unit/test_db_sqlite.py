@@ -20,6 +20,7 @@ from agent.db_sqlite import (
     get_jobs_to_score,
     update_job_score,
     mark_job_score_failed,
+    count_ready_to_score,
 )
 
 SCHEMA_SQL = """
@@ -391,3 +392,72 @@ async def test_mark_job_score_failed_sets_status(conn, job_id):
     async with conn.execute('SELECT status FROM jobs WHERE id = ?', (j_id,)) as cur:
         row = await cur.fetchone()
     assert row[0] == 'score_failed'
+
+
+# ── Scoring batch selection (job_ids filter + count) ──────────────────────────
+
+async def test_count_ready_to_score_returns_zero_when_no_jobs(conn):
+    assert await count_ready_to_score(conn, CANDIDATE_ID) == 0
+
+
+async def test_count_ready_to_score_counts_only_discovered_with_jd(conn, job_id):
+    run_id = await insert_pipeline_run(conn, job_id, CANDIDATE_ID)
+    await bulk_insert_jobs(conn, [
+        {**_JOB_FIXTURE, 'pipeline_run_id': run_id, 'jd_raw': 'JD A',
+         'source_url': 'https://linkedin.com/jobs/cnt-1'},
+        {**_JOB_FIXTURE, 'pipeline_run_id': run_id, 'jd_raw': 'JD B',
+         'source_url': 'https://linkedin.com/jobs/cnt-2'},
+        {**_JOB_FIXTURE, 'pipeline_run_id': run_id, 'jd_raw': '',
+         'source_url': 'https://linkedin.com/jobs/cnt-3'},
+    ])
+    assert await count_ready_to_score(conn, CANDIDATE_ID) == 2
+
+
+async def test_get_jobs_to_score_with_job_ids_filters_to_those_jobs(conn, job_id):
+    run_id = await insert_pipeline_run(conn, job_id, CANDIDATE_ID)
+    ids = await bulk_insert_jobs(conn, [
+        {**_JOB_FIXTURE, 'pipeline_run_id': run_id, 'jd_raw': 'JD A',
+         'source_url': 'https://linkedin.com/jobs/f-1'},
+        {**_JOB_FIXTURE, 'pipeline_run_id': run_id, 'jd_raw': 'JD B',
+         'source_url': 'https://linkedin.com/jobs/f-2'},
+        {**_JOB_FIXTURE, 'pipeline_run_id': run_id, 'jd_raw': 'JD C',
+         'source_url': 'https://linkedin.com/jobs/f-3'},
+    ])
+    selected = [ids[0], ids[2]]
+    result = await get_jobs_to_score(conn, CANDIDATE_ID, job_ids=selected)
+    assert {row['id'] for row in result} == set(selected)
+
+
+async def test_get_jobs_to_score_with_empty_job_ids_returns_all(conn, job_id):
+    run_id = await insert_pipeline_run(conn, job_id, CANDIDATE_ID)
+    await bulk_insert_jobs(conn, [
+        {**_JOB_FIXTURE, 'pipeline_run_id': run_id, 'jd_raw': 'JD A',
+         'source_url': 'https://linkedin.com/jobs/all-1'},
+        {**_JOB_FIXTURE, 'pipeline_run_id': run_id, 'jd_raw': 'JD B',
+         'source_url': 'https://linkedin.com/jobs/all-2'},
+    ])
+    result = await get_jobs_to_score(conn, CANDIDATE_ID, job_ids=None)
+    assert len(result) == 2
+
+
+async def test_get_jobs_to_score_with_job_ids_still_excludes_empty_jd(conn, job_id):
+    run_id = await insert_pipeline_run(conn, job_id, CANDIDATE_ID)
+    ids = await bulk_insert_jobs(conn, [
+        {**_JOB_FIXTURE, 'pipeline_run_id': run_id, 'jd_raw': 'JD A',
+         'source_url': 'https://linkedin.com/jobs/x-1'},
+        {**_JOB_FIXTURE, 'pipeline_run_id': run_id, 'jd_raw': '',
+         'source_url': 'https://linkedin.com/jobs/x-2'},
+    ])
+    result = await get_jobs_to_score(conn, CANDIDATE_ID, job_ids=ids)
+    assert len(result) == 1
+    assert result[0]['id'] == ids[0]
+
+
+async def test_get_jobs_to_score_with_unknown_ids_returns_empty(conn, job_id):
+    run_id = await insert_pipeline_run(conn, job_id, CANDIDATE_ID)
+    await bulk_insert_jobs(conn, [
+        {**_JOB_FIXTURE, 'pipeline_run_id': run_id, 'jd_raw': 'JD A',
+         'source_url': 'https://linkedin.com/jobs/u-1'},
+    ])
+    result = await get_jobs_to_score(conn, CANDIDATE_ID, job_ids=['00000000-0000-0000-0000-deadbeef0000'])
+    assert result == []

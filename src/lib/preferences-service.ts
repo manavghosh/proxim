@@ -9,15 +9,22 @@ export function mergePreferences(
   return { ...existing, ...updates }
 }
 
-export async function getPreferences(): Promise<Record<string, unknown>> {
-  const [candidate] = await db.select().from(candidates).limit(1)
+export async function getPreferences(candidateId?: string): Promise<Record<string, unknown>> {
+  const query = candidateId
+    ? db.select().from(candidates).where(eq(candidates.id, candidateId)).limit(1)
+    : db.select().from(candidates).limit(1)
+  const [candidate] = await query
   return (candidate?.preferences as Record<string, unknown>) ?? {}
 }
 
 export async function updatePreferences(
-  updates: Record<string, unknown>
+  updates: Record<string, unknown>,
+  candidateId?: string
 ): Promise<Record<string, unknown>> {
-  const [candidate] = await db.select().from(candidates).limit(1)
+  const query = candidateId
+    ? db.select().from(candidates).where(eq(candidates.id, candidateId)).limit(1)
+    : db.select().from(candidates).limit(1)
+  const [candidate] = await query
 
   if (!candidate) {
     const [created] = await db

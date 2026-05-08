@@ -2,11 +2,53 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Library & Framework Documentation (MANDATORY)
+
+**Always use the context7 MCP server to fetch current documentation** before using or configuring any library, framework, SDK, API, or CLI tool — even well-known ones like Next.js, Drizzle ORM, LangGraph, LiteLLM, WeasyPrint, xhtml2pdf, or shadcn/ui.
+
+Use the `mcp__context7__resolve-library-id` and `mcp__context7__query-docs` tools to get up-to-date API syntax, configuration options, version-specific behaviour, and migration guides. Never rely solely on training data for library usage — APIs change, and outdated patterns cause bugs.
+
+**Triggers**: any `import`, `require`, `poetry add`, or `npm install` of a new or existing library; any configuration of an external service; any question about "how do I use X".
+
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan at:
-specs/002-10d-scoring-engine/plan.md
+specs/005-linkedin-connector-agent/plan.md
 <!-- SPECKIT END -->
+
+---
+
+## UI Components — shadcn/ui + Tailwind CSS Only (MANDATORY)
+
+All UI elements MUST use **shadcn/ui components** from `src/components/ui/`. Raw HTML elements are not permitted for interactive elements.
+
+| Instead of | Use |
+|---|---|
+| `<button>` | `<Button>` from `@/components/ui/button` |
+| `<input>` | `<Input>` from `@/components/ui/input` |
+| `<a href>` | `<Button asChild><a href>...</a></Button>` |
+| Custom drawer/modal | `<Sheet>` from `@/components/ui/sheet` |
+| Custom card div | `<Card>` from `@/components/ui/card` |
+| Custom badge span | `<Badge>` from `@/components/ui/badge` |
+| Loading div | `<Skeleton>` from `@/components/ui/skeleton` |
+| Custom dropdown | `<DropdownMenu>` from `@/components/ui/dropdown-menu` |
+
+- Styling MUST use **Tailwind CSS v4** utility classes only — no inline `style={{}}` except for dynamic values (e.g. chart colours) that cannot be expressed as Tailwind utilities.
+- New shadcn/ui components are added by creating a wrapper in `src/components/ui/` following the existing pattern (radix-ui primitives + `cn()` utility).
+- `lucide-react` is the only permitted icon library.
+- Never install a third-party UI library (MUI, Chakra, Ant Design, etc.).
+
+---
+
+## Database — Single Shared DB (MANDATORY)
+
+Both the **Next.js UI layer** and the **Python agent** MUST always connect to the **same database**.
+
+- `DATABASE_URL` in `.env.local` (Next.js) and `DATABASE_URL` in `agent/.env` (Python) MUST point to the **same file or server** at all times.
+- Local development: both point to the SQLite file (e.g. `./proxim-dev.db` or `../proxim-dev.db`).
+- Production: both point to the Neon PostgreSQL connection string.
+- `src/db/index.ts` auto-detects the driver: SQLite (`better-sqlite3`) when `DATABASE_URL` is a file path; Neon HTTP when it starts with `postgresql://`.
+- **Never configure one runtime to use SQLite while the other uses Neon** — data written by the agent will not be visible in the UI and vice versa.
 
 ---
 
@@ -64,9 +106,9 @@ npx tsc --noEmit
 
 ## Architecture
 
-### Single-user, single-table MVP
+### Multi-candidate, multi-user
 
-All candidate data lives in one `candidates` row (Neon PostgreSQL via Drizzle ORM). The `candidate_id` FK is nullable — no auth in Phase 1. `getOrCreateCandidate()` in `src/lib/cv-service.ts` always returns the first (and only) row, creating one on first call.
+Multiple candidates are supported. Each candidate has their own row in the `candidates` table, and all downstream data (jobs, pipeline runs, resume versions, HITL checkpoints, scan history) is scoped by `candidateId` FK. There is no auth layer yet — candidate identity is passed explicitly via query params or request context.
 
 ### Data flow: CV save → parse
 
@@ -84,7 +126,7 @@ Parsing runs **synchronously** in the route handler (not via `after()`). The cli
 
 | Layer | Path | Role |
 |---|---|---|
-| DB schema + types | `src/db/schema.ts` | Single `candidates` table; `Preferences` and `ParsedProfile` stored as JSONB; `Candidate` type inferred from Drizzle |
+| DB schema + types | `src/db/schema.ts` | `candidates`, `jobs`, `pipeline_jobs`, `pipeline_runs`, `pipeline_logs`, `scan_history`, `resume_versions`, `hitl_checkpoints` — all job/pipeline/resume tables FK to `candidates.id`; `Preferences` and `ParsedProfile` stored as JSONB; `Candidate` type inferred from Drizzle |
 | App-level types | `src/types/candidate.ts` | `CandidateState`, `Preferences`, `PipelineReadiness` — used on both client and server |
 | Services (pure, testable) | `src/lib/*-service.ts` | `cv-service`, `preferences-service`, `readiness-service` — no HTTP concerns; all business logic lives here |
 | LLM | `src/lib/llm.ts` + `src/lib/cv-parser.ts` | `getModel()` reads `LLM_PROVIDER` + `LLM_MODEL` env vars; `parseCV()` calls `generateObject` (Vercel AI SDK) with `ParsedProfileSchema` (Zod) |

@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server'
 import { and, eq, isNull, lt, or } from 'drizzle-orm'
 import { db } from '@/db'
 import { pipelineJobs } from '@/db/schema'
-import { getOrCreateCandidate } from '@/lib/cv-service'
+import { getOrCreateCandidate, getCandidateById } from '@/lib/cv-service'
 
-const VALID_JOB_TYPES = ['full_pipeline', 'discovery_only', 'fetch_jds', 'score_jobs'] as const
+const VALID_JOB_TYPES = ['full_pipeline', 'discovery_only', 'fetch_jds', 'score_jobs', 'resume_builder'] as const
 
 export async function POST(request: Request) {
   let body: unknown
@@ -14,6 +14,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
+  const { searchParams } = new URL(request.url)
   const { jobType } = body as Record<string, unknown>
 
   if (!jobType || !VALID_JOB_TYPES.includes(jobType as typeof VALID_JOB_TYPES[number])) {
@@ -24,7 +25,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const candidate = await getOrCreateCandidate()
+    const candidateIdParam = searchParams.get('candidateId')
+    const candidate = candidateIdParam ? await getCandidateById(candidateIdParam) : await getOrCreateCandidate()
+    if (!candidate) return NextResponse.json({ error: 'Candidate not found' }, { status: 404 })
 
     // Auto-expire jobs stuck in running/queued for > 30 minutes (daemon was killed).
     // Use ISO string so it binds correctly for both SQLite (text) and PG (timestamp).
@@ -57,8 +60,8 @@ export async function POST(request: Request) {
 
     if (existing.length > 0) {
       return NextResponse.json(
-        { error: `A ${jobType} job is already queued or running` },
-        { status: 409 }
+        { jobId: existing[0].id, status: 'running' },
+        { status: 200 }
       )
     }
 

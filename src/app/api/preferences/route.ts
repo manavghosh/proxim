@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getPreferences, updatePreferences } from '@/lib/preferences-service'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const preferences = await getPreferences()
+    const { searchParams } = new URL(request.url)
+    const candidateId = searchParams.get('candidateId') ?? undefined
+    const preferences = await getPreferences(candidateId)
     return NextResponse.json({ preferences }, {
       headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' },
     })
@@ -13,6 +15,9 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const candidateId = searchParams.get('candidateId') ?? undefined
+
   let updates: unknown
   try {
     updates = await request.json()
@@ -23,7 +28,7 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: 'Body must be a JSON object' }, { status: 400 })
   }
   try {
-    const preferences = await updatePreferences(updates as Record<string, unknown>)
+    const preferences = await updatePreferences(updates as Record<string, unknown>, candidateId)
     return NextResponse.json({ preferences })
   } catch {
     return NextResponse.json({ error: 'Failed to update preferences' }, { status: 500 })

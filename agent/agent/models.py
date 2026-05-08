@@ -3,7 +3,7 @@ from __future__ import annotations
 import operator
 from datetime import datetime
 from typing import Annotated, Literal, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class RawJob(BaseModel):
@@ -97,6 +97,13 @@ class ScoreReport(BaseModel):
     block_e: str   # Compensation Analysis — B+ only
     block_f: str   # Interview Probability — B+ only
 
+    @field_validator('block_a', 'block_b', 'block_c', 'block_d', 'block_e', 'block_f', mode='before')
+    @classmethod
+    def coerce_list_to_string(cls, v: object) -> str:
+        if isinstance(v, list):
+            return '\n'.join(str(item) for item in v)
+        return v  # type: ignore[return-value]
+
 
 class ScoringState(BaseModel):
     candidate_id:    str
@@ -104,7 +111,83 @@ class ScoringState(BaseModel):
     pipeline_run_id: str = ""
     parsed_profile:  dict = {}
     preferences:     dict = {}
+    job_ids:         list[str] = []  # optional batch filter — empty = score all ready jobs
     jobs_to_score:   list[dict] = []
     scored_count:    int = 0
     failed_count:    int = 0
     skipped_count:   int = 0
+
+
+# ── Resume Builder (F10) ──────────────────────────────────────────────────────
+
+class RoleSection(BaseModel):
+    title:      str
+    company:    str
+    start_date: str
+    end_date:   str
+    bullets:    list[str] = []
+
+
+class KeywordSet(BaseModel):
+    keywords: list[str]
+
+    @field_validator('keywords', mode='before')
+    @classmethod
+    def unique_and_trimmed(cls, v: list[str]) -> list[str]:
+        seen: dict[str, None] = {}
+        for kw in v:
+            key = kw.strip().lower()
+            if key:
+                seen[key] = None
+        unique = list(seen.keys())
+        if len(unique) < 15:
+            raise ValueError(f'Too few unique keywords after dedup: {len(unique)} (need ≥15)')
+        return unique[:20]
+
+
+class PersonalisedResume(BaseModel):
+    summary:      str
+    roles:        list[RoleSection] = []
+    skills:       list[str] = []
+    proof_points: list[str] = []
+    coherence_ok: bool = False
+
+
+class CoverLetterContent(BaseModel):
+    opening:               str
+    body:                  str
+    closing:               str
+    company_research_used: bool = False
+
+
+class ResumeBuilderState(BaseModel):
+    # Inputs
+    candidate_id:         str
+    pipeline_job_id:      str
+    pipeline_run_id:      str = ""
+    job_id:               str = ""
+    job_title:            str = ""
+    job_company:          str = ""
+    jd_raw:               str = ""
+    parsed_profile:       dict = {}
+    archetype:            str = ""
+    archetype_confidence: float = 1.0
+
+    # Intermediate outputs
+    keywords:           list[str] = []
+    personalised_resume: str = ""   # JSON-serialised PersonalisedResume
+    review_feedback:    str = ""
+    cover_letter:       str = ""    # JSON-serialised CoverLetterContent
+
+    # Retry tracking
+    self_review_attempt: int  = 0
+    review_passed:       bool = False
+
+    # Final outputs
+    resume_pdf_path:       str = ""
+    cover_letter_pdf_path: str = ""
+    base_cv_hash:          str = ""
+    version_id:            str = ""
+
+    # Error tracking
+    error: str = ""

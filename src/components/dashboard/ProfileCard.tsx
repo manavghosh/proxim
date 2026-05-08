@@ -3,6 +3,7 @@ import type { CandidateState } from '@/types/candidate'
 
 interface ProfileCardProps {
   candidate: CandidateState | null
+  candidateId: string
 }
 
 function initials(name: string): string {
@@ -28,7 +29,7 @@ const STATUS_LABEL: Record<string, string> = {
   failed: 'Parse failed',
 }
 
-export function ProfileCard({ candidate }: ProfileCardProps) {
+export function ProfileCard({ candidate, candidateId }: ProfileCardProps) {
   if (!candidate?.parsedProfile) {
     return (
       <div className="bg-[#0d1f3c] border border-[#1e3a5f] rounded-xl p-5 flex flex-col items-center justify-center min-h-[240px] gap-3 text-center">
@@ -39,7 +40,7 @@ export function ProfileCard({ candidate }: ProfileCardProps) {
           Upload your CV in Settings to populate your profile.
         </p>
         <Link
-          href="/settings"
+          href={`/candidates/${candidateId}/settings`}
           className="text-[11px] text-[#3b82f6] hover:text-[#60a5fa] transition-colors"
         >
           Go to Settings →
@@ -87,14 +88,14 @@ export function ProfileCard({ candidate }: ProfileCardProps) {
       {/* Skills */}
       {topSkills.length > 0 && (
         <>
-          <p className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase mb-2">
+          <p className="text-[9px] font-semibold text-[#475569] tracking-widest uppercase mb-2">
             Top Skills
           </p>
-          <div className="flex flex-wrap gap-1 mb-4">
+          <div className="flex flex-wrap gap-1.5 mb-4">
             {topSkills.map((skill) => (
               <span
                 key={skill}
-                className="text-[10px] bg-[#0a1835] border border-[#1e3a5f] text-[#93c5fd] px-2 py-0.5 rounded"
+                className="text-[10px] bg-teal-950/60 border border-teal-800/30 text-teal-300 px-2 py-0.5 rounded-md"
               >
                 {skill}
               </span>
@@ -107,14 +108,14 @@ export function ProfileCard({ candidate }: ProfileCardProps) {
       {/* Target roles */}
       {seniorityLevels.length > 0 && (
         <>
-          <p className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase mb-2">
+          <p className="text-[9px] font-semibold text-[#475569] tracking-widest uppercase mb-2">
             Target Roles
           </p>
-          <div className="flex flex-wrap gap-1 mb-4">
+          <div className="flex flex-wrap gap-1.5 mb-4">
             {seniorityLevels.map((level) => (
               <span
                 key={level}
-                className="text-[10px] bg-[#0a1835] border border-[#1d4ed8] text-[#93c5fd] px-2 py-0.5 rounded"
+                className="text-[10px] bg-violet-950/60 border border-violet-700/30 text-violet-300 px-2 py-0.5 rounded-md"
               >
                 {level}
               </span>
@@ -127,12 +128,12 @@ export function ProfileCard({ candidate }: ProfileCardProps) {
       {/* Geo */}
       {geoPrefs.length > 0 && (
         <>
-          <p className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase mb-1">
+          <p className="text-[9px] font-semibold text-[#475569] tracking-widest uppercase mb-1">
             Location
           </p>
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-1.5">
             {geoPrefs.map((g) => (
-              <span key={g} className="text-[10px] bg-[#0a1835] border border-[#1e3a5f] text-[#94a3b8] px-2 py-0.5 rounded">
+              <span key={g} className="text-[10px] bg-sky-950/40 border border-sky-700/20 text-sky-200/80 px-2 py-0.5 rounded-md">
                 {g}
               </span>
             ))}

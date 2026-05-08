@@ -123,23 +123,25 @@ async def write_fetch_summary(state: FetchJdsState) -> dict:
 
         await update_pipeline_job_status(pool, state.pipeline_job_id, "completed")
 
-        # Auto-queue score_jobs if there are discovered jobs with non-empty jd_raw
-        from agent.db import get_jobs_to_score, queue_pipeline_job
-        jobs_to_score = await get_jobs_to_score(pool, state.candidate_id)
-        scoring_queued = len(jobs_to_score) > 0
-        if scoring_queued:
-            await queue_pipeline_job(pool, state.candidate_id, "score_jobs")
+        # Gate scoring on user review — emit review_required log instead of auto-queueing.
+        from agent.db import count_ready_to_score
+        ready_count = await count_ready_to_score(pool, state.candidate_id)
+        if ready_count > 0:
+            await _log(pool, state.pipeline_job_id, "info", "review_required",
+                       f"Ready to score {ready_count} jobs — open the dashboard "
+                       f"and select positions to score",
+                       {"ready_count": ready_count})
 
         pending_msg = f", {state.failed_count} still pending" if state.failed_count else ""
-        scoring_msg = f" Queuing scoring for {len(jobs_to_score)} jobs…" if scoring_queued else ""
         await _log(pool, state.pipeline_job_id, "info", "write_fetch_summary",
-                   f"JD fetch complete — {state.fetched_count} updated{pending_msg}.{scoring_msg}",
+                   f"JD fetch complete — {state.fetched_count} updated{pending_msg}. "
+                   f"{ready_count} jobs awaiting user review before scoring.",
                    {"fetched": state.fetched_count, "pending": state.failed_count,
-                    "scoring_queued": len(jobs_to_score)})
+                    "ready_count": ready_count})
 
         logger.info("fetch_jds_complete",
                     fetched=state.fetched_count, failed=state.failed_count,
-                    scoring_queued=scoring_queued)
+                    ready_count=ready_count)
 
     except Exception as e:
         logger.error("write_fetch_summary_failed", error=str(e))

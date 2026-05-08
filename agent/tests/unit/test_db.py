@@ -1,5 +1,9 @@
-"""Tests for agent/db.py — written before implementation (TDD)."""
+"""Tests for the asyncpg (db_pg) backend — imports directly so the asyncpg-style
+mocks line up with the implementation regardless of which DB the local dev
+environment is currently pointed at. SQLite parity is covered by test_db_sqlite.py."""
 from unittest.mock import AsyncMock, MagicMock
+
+from agent.db_pg import claim_pipeline_job, update_pipeline_job_status
 
 
 class TestClaimPipelineJob:
@@ -16,7 +20,6 @@ class TestClaimPipelineJob:
         mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=mock_connection)
         mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
 
-        from agent.db import claim_pipeline_job
         result = await claim_pipeline_job(mock_pool)
 
         assert result is not None
@@ -30,7 +33,6 @@ class TestClaimPipelineJob:
         mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=mock_connection)
         mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
 
-        from agent.db import claim_pipeline_job
         result = await claim_pipeline_job(mock_pool)
 
         assert result is None
@@ -44,7 +46,6 @@ class TestUpdatePipelineJobStatus:
         mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=mock_connection)
         mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
 
-        from agent.db import update_pipeline_job_status
         await update_pipeline_job_status(mock_pool, 'job-uuid-1', 'completed')
 
         mock_connection.execute.assert_called_once()

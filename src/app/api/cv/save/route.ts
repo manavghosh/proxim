@@ -1,35 +1,34 @@
 import { NextResponse } from 'next/server'
-import { saveCVMarkdown, markParseReady, markParseFailed, getOrCreateCandidate } from '@/lib/cv-service'
+import { saveCVMarkdown, markParseReady, markParseFailed, getCandidateById, getOrCreateCandidate } from '@/lib/cv-service'
 import { parseCV } from '@/lib/cv-parser'
 
 export async function POST(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const candidateId = searchParams.get('candidateId')
+
   const body = await request.json() as { markdown?: string }
 
   if (typeof body.markdown !== 'string' || !body.markdown.trim()) {
     return NextResponse.json({ error: 'markdown is required' }, { status: 400 })
   }
 
-  const { candidate, hashChanged } = await saveCVMarkdown(body.markdown)
+  const { candidate, hashChanged } = await saveCVMarkdown(body.markdown, candidateId ?? undefined)
 
-  if (!hashChanged) {
-    return NextResponse.json(candidate)
-  }
+  if (!hashChanged) return NextResponse.json(candidate)
 
-  const candidateId = candidate.id
+  const id = candidate.id
   const markdown = body.markdown
 
   try {
     const profile = await parseCV(markdown)
-    await markParseReady(candidateId, profile)
+    await markParseReady(id, profile)
   } catch (e) {
     console.error('[cv/save] parseCV failed:', e)
-    try {
-      await markParseFailed(candidateId)
-    } catch (dbError) {
-      console.error('[cv/save] markParseFailed failed:', dbError)
-    }
+    try { await markParseFailed(id) } catch {}
   }
 
-  const updated = await getOrCreateCandidate()
+  const updated = candidateId
+    ? await getCandidateById(candidateId)
+    : await getOrCreateCandidate()
   return NextResponse.json(updated)
 }

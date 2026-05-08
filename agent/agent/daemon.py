@@ -36,16 +36,40 @@ async def _dispatch_job(pool, job: dict) -> None:
         )
         await fetch_jds_graph.ainvoke(state)
 
+    elif job['job_type'] == 'resume_builder':
+        from agent.graphs.resume_builder import resume_builder_graph
+        from agent.models import ResumeBuilderState
+
+        payload = job.get('payload') or {}
+        job_id = payload.get('job_id', '')
+        logger.info("job_dispatching", job_id=job['id'], job_type='resume_builder', target_job_id=job_id)
+
+        state = ResumeBuilderState(
+            candidate_id=str(job['candidate_id']),
+            pipeline_job_id=str(job['id']),
+            pipeline_run_id=run_id,
+            job_id=job_id,
+        )
+        await resume_builder_graph.ainvoke(state)
+
     elif job['job_type'] == 'score_jobs':
         from agent.graphs.scoring import scoring_graph
         from agent.models import ScoringState
 
-        logger.info("job_dispatching", job_id=job['id'], job_type='score_jobs')
+        payload = job.get('payload') or {}
+        job_ids = payload.get('job_ids') or []
+        logger.info(
+            "job_dispatching",
+            job_id=job['id'],
+            job_type='score_jobs',
+            batch_size=len(job_ids) if job_ids else 'all_ready',
+        )
 
         state = ScoringState(
             candidate_id=str(job['candidate_id']),
             pipeline_job_id=str(job['id']),
             pipeline_run_id=run_id,
+            job_ids=list(job_ids),
         )
         await scoring_graph.ainvoke(state)
 
@@ -74,6 +98,25 @@ async def _dispatch_job(pool, job: dict) -> None:
         logger.info("graph_complete", graph="discovery", job_id=job['id'])
 
 
+async def _snooze_resurface_loop(pool) -> None:
+    """Poll every 60 seconds for expired snoozed jobs and resurface them."""
+    from agent.db import get_snoozed_jobs_to_resurface, resurface_snoozed_job
+
+    while not _stop_event.is_set():
+        try:
+            expired = await get_snoozed_jobs_to_resurface(pool)
+            for item in expired:
+                await resurface_snoozed_job(pool, item['checkpoint_id'], item['job_id'])
+                logger.info(
+                    "snooze_resurfaced",
+                    job_id=item['job_id'],
+                    checkpoint_id=item['checkpoint_id'],
+                )
+        except Exception as exc:
+            logger.error("snooze_resurface_error", error=str(exc))
+        await asyncio.sleep(60)
+
+
 async def main() -> None:
     from agent.config import settings
     from agent.db import create_pool, close_pool, claim_pipeline_job
@@ -84,18 +127,24 @@ async def main() -> None:
     logger.info("daemon_starting", polling_interval_seconds=settings.polling_interval_seconds)
     pool = await create_pool(settings.database_url)
 
-    try:
-        while not _stop_event.is_set():
-            job = await claim_pipeline_job(pool)
-            if job:
-                logger.info("job_claimed", job_id=job['id'], job_type=job['job_type'])
-                await _dispatch_job(pool, job)
-            else:
-                logger.debug("poll_idle", message="No jobs queued")
-            await asyncio.sleep(settings.polling_interval_seconds)
-    finally:
-        await close_pool(pool)
-        logger.info("daemon_stopped")
+    async def _job_poll_loop():
+        try:
+            while not _stop_event.is_set():
+                job = await claim_pipeline_job(pool)
+                if job:
+                    logger.info("job_claimed", job_id=job['id'], job_type=job['job_type'])
+                    await _dispatch_job(pool, job)
+                else:
+                    logger.debug("poll_idle", message="No jobs queued")
+                await asyncio.sleep(settings.polling_interval_seconds)
+        finally:
+            await close_pool(pool)
+            logger.info("daemon_stopped")
+
+    await asyncio.gather(
+        _job_poll_loop(),
+        _snooze_resurface_loop(pool),
+    )
 
 
 if __name__ == "__main__":

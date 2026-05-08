@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getReadiness } from '@/lib/readiness-service'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const readiness = await getReadiness()
+    const { searchParams } = new URL(request.url)
+    const candidateId = searchParams.get('candidateId') ?? undefined
+    const readiness = await getReadiness(candidateId)
     return NextResponse.json(readiness, {
       headers: { 'Cache-Control': 'private, max-age=15, stale-while-revalidate=30' },
     })

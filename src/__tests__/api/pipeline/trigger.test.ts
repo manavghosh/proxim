@@ -16,6 +16,7 @@ vi.mock('@/db', () => ({
 }))
 vi.mock('@/lib/cv-service', () => ({
   getOrCreateCandidate: vi.fn(),
+  getCandidateById: vi.fn(),
 }))
 
 describe('POST /api/pipeline/trigger', () => {
@@ -65,6 +66,9 @@ describe('POST /api/pipeline/trigger', () => {
       headers: { 'Content-Type': 'application/json' },
     })
     const res = await POST(req)
-    expect(res.status).toBe(409)
+    // Conflict returns 200 with existing job ID (idempotent)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.jobId).toBe('existing-job-id')
   })
 })

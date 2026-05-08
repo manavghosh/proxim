@@ -2,14 +2,22 @@ import { NextResponse } from 'next/server'
 import { eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { jobs } from '@/db/schema'
-import { getOrCreateCandidate } from '@/lib/cv-service'
+import { getOrCreateCandidate, getCandidateById } from '@/lib/cv-service'
+
+const ALL_GRADES = ['A', 'B', 'C', 'D', 'F'] as const
+const EXCLUDED_STATUSES = new Set(['discovered', 'score_failed'])
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
-  const gradeFilter = searchParams.get('grade') ?? 'all'
+  const gradesParam = searchParams.get('grades')
+  const selectedGrades = gradesParam
+    ? new Set(gradesParam.split(',').filter((g) => ALL_GRADES.includes(g as typeof ALL_GRADES[number])))
+    : new Set(ALL_GRADES)
 
   try {
-    const candidate = await getOrCreateCandidate()
+    const candidateId = searchParams.get('candidateId')
+    const candidate = candidateId ? await getCandidateById(candidateId) : await getOrCreateCandidate()
+    if (!candidate) return NextResponse.json({ jobs: [] })
 
     const allJobs = await db
       .select({
@@ -31,14 +39,10 @@ export async function GET(request: Request) {
       .where(eq(jobs.candidateId, candidate.id))
       .orderBy(jobs.createdAt)
 
-    // Filter in application layer for SQLite + PG compatibility
-    const EXCLUDED_STATUSES = new Set(['discovered', 'score_failed'])
     const filtered = allJobs.filter((j) => {
-      if (!j.grade || j.grade === 'F') return false
+      if (!j.grade) return false
       if (EXCLUDED_STATUSES.has(j.status)) return false
-      if (gradeFilter === 'A') return j.grade === 'A'
-      if (gradeFilter === 'A+B') return j.grade === 'A' || j.grade === 'B'
-      return true
+      return selectedGrades.has(j.grade)
     })
 
     return NextResponse.json({ jobs: filtered })

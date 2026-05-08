@@ -7,6 +7,7 @@ import type { ParseStatus } from '@/types/candidate'
 
 interface ParseStatusBadgeProps {
   initialStatus: ParseStatus
+  candidateId?: string
 }
 
 const LABELS: Record<ParseStatus, string> = {
@@ -25,21 +26,21 @@ const VARIANTS: Record<ParseStatus, 'secondary' | 'default' | 'destructive' | 'o
 
 const POLL_MS = 3000
 
-export function ParseStatusBadge({ initialStatus }: ParseStatusBadgeProps) {
+export function ParseStatusBadge({ initialStatus, candidateId }: ParseStatusBadgeProps) {
   const [status, setStatus] = useState<ParseStatus>(initialStatus)
 
   useEffect(() => {
-    if (status === 'ready' || status === 'failed') return
+    if (!candidateId || status === 'ready' || status === 'failed') return
     const id = setInterval(async () => {
       try {
-        const candidate = await getCV()
+        const candidate = await getCV(candidateId)
         setStatus(candidate.parseStatus)
       } catch {
         // silent — keep polling
       }
     }, POLL_MS)
     return () => clearInterval(id)
-  }, [status])
+  }, [status, candidateId])
 
   return (
     <Badge variant={VARIANTS[status]} className="gap-1.5">

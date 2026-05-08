@@ -3,6 +3,7 @@ import type { PipelineReadiness } from '@/types/candidate'
 
 interface ReadinessRingProps {
   readiness: PipelineReadiness
+  candidateId: string
 }
 
 const CRITERIA = [
@@ -11,7 +12,7 @@ const CRITERIA = [
   'Set your geographic preference',
 ]
 
-export function ReadinessRing({ readiness }: ReadinessRingProps) {
+export function ReadinessRing({ readiness, candidateId }: ReadinessRingProps) {
   const total = CRITERIA.length
   const met = total - readiness.missing.length
   const pct = Math.round((met / total) * 100)
@@ -28,7 +29,7 @@ export function ReadinessRing({ readiness }: ReadinessRingProps) {
           Pipeline Readiness
         </h2>
         <Link
-          href="/settings"
+          href={`/candidates/${candidateId}/settings`}
           className="text-[11px] text-[#3b82f6] hover:text-[#60a5fa] transition-colors"
         >
           Go to Settings →
@@ -49,8 +50,9 @@ export function ReadinessRing({ readiness }: ReadinessRingProps) {
               stroke={ringColor}
               strokeWidth="8"
               strokeDasharray={`${filled} ${CIRC}`}
-              strokeDashoffset="57"
+              strokeDashoffset="0"
               strokeLinecap="round"
+              style={{ transform: 'rotate(-90deg)', transformOrigin: '45px 45px' }}
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
