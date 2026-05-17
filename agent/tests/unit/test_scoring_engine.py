@@ -25,8 +25,14 @@ def test_grade_d_score():
     assert score_to_grade(2.5, gate_failed=False) == "D"
 
 
-def test_grade_f_low_score():
-    assert score_to_grade(1.5, gate_failed=False) == "F"
+def test_grade_e_low_score():
+    # 1.0 ≤ score < 2.0 → E (gate-passing but weak across most dimensions)
+    assert score_to_grade(1.5, gate_failed=False) == "E"
+
+
+def test_grade_f_very_low_score():
+    # score < 1.0 → F even with gates passing
+    assert score_to_grade(0.7, gate_failed=False) == "F"
 
 
 def test_grade_f_gate_fail_overrides_high_score():
@@ -39,6 +45,16 @@ def test_grade_boundary_a_exactly_45():
 
 def test_grade_boundary_b_exactly_40():
     assert score_to_grade(4.0, gate_failed=False) == "B"
+
+
+def test_grade_boundary_e_exactly_10():
+    # exact lower bound of E
+    assert score_to_grade(1.0, gate_failed=False) == "E"
+
+
+def test_grade_boundary_d_exactly_20():
+    # 2.0 stays D (E is strictly below 2.0)
+    assert score_to_grade(2.0, gate_failed=False) == "D"
 
 
 def test_compute_weighted_score_all_fives():

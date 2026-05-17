@@ -61,12 +61,16 @@ export function CandidateSidebar({
     <aside className="w-[220px] bg-[#060d1f] border-r border-[#1e2d4a] flex flex-col flex-shrink-0 h-screen">
       {/* Logo + back */}
       <div className="px-4 py-5 border-b border-[#0d1829]">
-        <div className="flex items-center gap-2.5">
+        <Link
+          href="/"
+          aria-label="Proxim — back to all candidates"
+          className="flex items-center gap-2.5 rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+        >
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
             <span className="text-white text-xs font-bold">P</span>
           </div>
           <div className="text-[13px] font-bold text-[#f1f5f9] tracking-widest flex-1">PROXIM</div>
-        </div>
+        </Link>
         <Link
           href="/"
           className="mt-3 flex items-center gap-1 text-[10px] text-[#475569] hover:text-[#94a3b8] transition-colors"

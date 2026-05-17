@@ -54,14 +54,37 @@ export async function saveCVMarkdown(
   return { candidate: updated, hashChanged: true }
 }
 
+// Default placeholder used when a candidate is created without a name. We only
+// auto-promote the parsed CV name onto candidates.name when the current name
+// is still this placeholder — i.e. the user never typed one — so we don't
+// silently overwrite a name they chose deliberately.
+const PLACEHOLDER_NAME = 'New Candidate'
+
 export async function markParseReady(
   candidateId: string,
   parsedProfile: unknown
 ): Promise<void> {
-  await db
-    .update(candidates)
-    .set({ parseStatus: 'ready', parsedProfile: parsedProfile as never })
-    .where(eq(candidates.id, candidateId))
+  const updates: { parseStatus: 'ready'; parsedProfile: never; name?: string } = {
+    parseStatus: 'ready',
+    parsedProfile: parsedProfile as never,
+  }
+
+  // If the row still has the placeholder name and the parsed profile has a
+  // real name, promote it so the candidate card / sidebar / dashboard show
+  // the actual person rather than "New Candidate".
+  const profile = parsedProfile as { name?: unknown } | null
+  const parsedName = typeof profile?.name === 'string' ? profile.name.trim() : ''
+  if (parsedName) {
+    const [existing] = await db
+      .select({ name: candidates.name })
+      .from(candidates)
+      .where(eq(candidates.id, candidateId))
+    if (existing && existing.name === PLACEHOLDER_NAME) {
+      updates.name = parsedName
+    }
+  }
+
+  await db.update(candidates).set(updates).where(eq(candidates.id, candidateId))
 }
 
 export async function markParseFailed(candidateId: string): Promise<void> {

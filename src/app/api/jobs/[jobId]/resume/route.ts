@@ -20,11 +20,19 @@ export async function POST(
       .limit(1)
 
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
-    if (job.status !== 'approved') {
+
+    // Allow building from `approved` (initial) and `resume_failed` (retry).
+    // For a retry we flip the status back to `approved` so the rest of the
+    // pipeline / UI sees it as a normal in-flight build.
+    const RUNNABLE_STATUSES = new Set(['approved', 'resume_failed'])
+    if (!RUNNABLE_STATUSES.has(job.status)) {
       return NextResponse.json(
-        { error: "Job must be in 'approved' status to generate resume" },
+        { error: "Job must be in 'approved' or 'resume_failed' status to generate a resume" },
         { status: 422 }
       )
+    }
+    if (job.status === 'resume_failed') {
+      await db.update(jobs).set({ status: 'approved' }).where(eq(jobs.id, jobId))
     }
 
     // Check for existing active resume_builder job

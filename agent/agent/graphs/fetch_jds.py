@@ -34,7 +34,11 @@ async def _log(pool, job_id: str, level: str, step: str, message: str,
 # ── Node: load_jobs ───────────────────────────────────────────────────────────
 
 async def load_jobs(state: FetchJdsState) -> dict:
-    """Load all discovered jobs with empty jd_raw (capped at JD_FETCH_LIMIT)."""
+    """Load all discovered jobs with empty jd_raw (capped at JD_FETCH_LIMIT).
+
+    fetch_jds currently only fetches LinkedIn JDs — Naukri/IIMJobs populate
+    jd_raw inline during discovery — so the log message reflects that.
+    """
     pool = await _make_pool()
     try:
         from agent.db import get_jobs_with_empty_jd
@@ -42,9 +46,9 @@ async def load_jobs(state: FetchJdsState) -> dict:
             pool, state.candidate_id, limit=JD_FETCH_LIMIT
         )
         await _log(pool, state.pipeline_job_id, "info", "load_jobs",
-                   f"Found {len(jobs)} jobs needing JD fetch",
-                   {"count": len(jobs)})
-        logger.info("fetch_jds_load", count=len(jobs))
+                   f"Found {len(jobs)} LinkedIn jobs needing JD fetch",
+                   {"count": len(jobs), "source": "linkedin"})
+        logger.info("fetch_jds_load", count=len(jobs), source="linkedin")
     finally:
         await _close_pool(pool)
     return {"jobs_to_fetch": jobs}
@@ -69,7 +73,8 @@ async def fetch_jds_batch(state: FetchJdsState) -> dict:
 
     try:
         await _log(pool, state.pipeline_job_id, "info", "fetch_jds_batch",
-                   f"Fetching JDs for {total} jobs…", {"total": total})
+                   f"Fetching JDs from LinkedIn for {total} jobs…",
+                   {"total": total, "source": "linkedin"})
 
         async def on_fetched(job_id: str, jd_text: str) -> None:
             """Save each JD to the DB immediately after it is fetched."""
@@ -79,19 +84,19 @@ async def fetch_jds_batch(state: FetchJdsState) -> dict:
                 fetched += 1
                 words = len(jd_text.split())
                 await _log(pool, state.pipeline_job_id, "info", "fetch_jds_batch",
-                           f"Saved JD {fetched}/{total} — {words} words",
-                           {"fetched": fetched, "total": total, "words": words})
+                           f"LinkedIn JD {fetched}/{total} saved — {words} words",
+                           {"fetched": fetched, "total": total, "words": words, "source": "linkedin"})
             else:
                 failed += 1
                 await _log(pool, state.pipeline_job_id, "warning", "fetch_jds_batch",
-                           f"JD unavailable for job {fetched + failed}/{total} — will retry next run",
-                           {"fetched": fetched, "failed": failed, "total": total})
+                           f"LinkedIn JD unavailable for job {fetched + failed}/{total} — will retry next run",
+                           {"fetched": fetched, "failed": failed, "total": total, "source": "linkedin"})
 
         await scraper.fetch_jds(state.jobs_to_fetch, on_fetched=on_fetched)
 
         await _log(pool, state.pipeline_job_id, "info", "fetch_jds_batch",
-                   f"JD fetch complete — {fetched} saved, {failed} unavailable",
-                   {"fetched": fetched, "failed": failed})
+                   f"LinkedIn JD fetch complete — {fetched} saved, {failed} unavailable",
+                   {"fetched": fetched, "failed": failed, "source": "linkedin"})
         logger.info("fetch_jds_batch_done", fetched=fetched, failed=failed)
 
     finally:

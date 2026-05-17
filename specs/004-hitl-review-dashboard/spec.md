@@ -57,7 +57,7 @@ When the scoring pipeline finishes processing a batch, newly scored jobs appear 
 
 ### Edge Cases
 
-- What if a candidate approves a job and the resume generation queue write fails? → The approval is rolled back atomically; the job returns to `awaiting` status and the candidate sees an error message with a retry option.
+- What if a candidate approves a job and the resume generation queue write fails? → The approval is rolled back atomatically; the job returns to `awaiting` status and the candidate sees an error message with a retry option.
 - What if the score report markdown contains rendering issues? → The report is displayed as plain text fallback if markdown rendering fails, preserving all content.
 - What if the same job is approved in two browser tabs simultaneously? → Row-level locking on the job record prevents double-processing; the second approval receives a "already approved" response.
 

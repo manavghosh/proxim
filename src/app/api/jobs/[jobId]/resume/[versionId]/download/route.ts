@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { eq } from 'drizzle-orm'
 import { readFile } from 'fs/promises'
 import { existsSync } from 'fs'
+import path from 'path'
 import { db } from '@/db'
 import { resumeVersions } from '@/db/schema'
 
@@ -22,15 +23,27 @@ export async function GET(
 
     if (!version) return NextResponse.json({ error: 'Version not found' }, { status: 404 })
 
-    const filePath = type === 'cover-letter'
+    const filePath = (type === 'cover-letter'
       ? version.coverLetterPdfPath
-      : version.resumePdfPath
+      : version.resumePdfPath) ?? ''
 
-    if (!filePath || !existsSync(filePath)) {
-      return NextResponse.json({ error: 'PDF not yet generated' }, { status: 404 })
+    if (!filePath) {
+      return NextResponse.json({ error: 'PDF path not stored' }, { status: 404 })
     }
 
-    const fileBytes = await readFile(filePath)
+    // Try the stored path as-is, then prefix with agent/ for local dev.
+    const candidates = [
+      filePath,
+      path.join('agent', filePath),
+      path.join(process.cwd(), 'agent', filePath),
+      path.join(process.cwd(), filePath),
+    ]
+    const resolvedPath = candidates.find(existsSync)
+    if (!resolvedPath) {
+      return NextResponse.json({ error: 'PDF not found on disk' }, { status: 404 })
+    }
+
+    const fileBytes = await readFile(resolvedPath)
     const filename = type === 'cover-letter' ? 'cover_letter.pdf' : 'resume.pdf'
 
     return new NextResponse(fileBytes, {

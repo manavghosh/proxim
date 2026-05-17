@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     exa_api_key: str = ""
     hunter_api_key: str = ""
     tracking_host: str = "http://localhost:3000"
+    gmail_client_id: str = ""
+    gmail_client_secret: str = ""
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

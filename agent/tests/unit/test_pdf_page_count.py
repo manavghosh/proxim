@@ -17,8 +17,8 @@ def _mock_create_pdf(html, dest, **kwargs):
 FIXTURE_RESUME = {
     "summary": "AI architect with extensive enterprise experience.",
     "roles": [
-        {"title": "VP of AI", "company": "TechCorp", "start_date": "2020",
-         "end_date": "Present", "bullets": ["Led ML platform", "Scaled to 10M users"]},
+        {"title": "VP of AI", "company": "TechCorp", "dates": "2020 — Present",
+         "bullets": ["Led ML platform", "Scaled to 10M users"]},
     ],
     "skills": ["LangGraph", "Python"],
     "proof_points": ["Patent #US12345"],

@@ -17,6 +17,14 @@ function stepIcon(level: string, step: string): string {
   if (level === 'error') return '❌'
   if (level === 'warning') return '⚠️'
   if (step === 'review_required') return '🔍'
+  // Source-specific scraping steps — visually distinguish each portal so the
+  // user can see at a glance where jobs are coming from.
+  if (step === 'scrape_linkedin') return '🔵'
+  if (step === 'scrape_naukri') return '🟠'
+  if (step === 'scrape_iimjobs') return '🟣'
+  if (step === 'scrape_monster') return '🟡'
+  if (step === 'scrape_careers_page') return '🏢'
+  if (step === 'fetch_jds_batch') return '🔵'   // currently LinkedIn-only
   if (step.includes('persist')) return '💾'
   if (step.includes('dedup') || step.includes('normalise')) return '🔄'
   if (step === 'write_run_summary' || step === 'write_fetch_summary' || step === 'write_score_summary') return '🏁'
@@ -112,6 +120,7 @@ export function PipelineLogPane({ chainJobIds, onReviewRequired }: Props) {
       fetchingRef.current = false
       isAtBottomRef.current = true
       setShowScrollBtn(false)
+      hasScrolledToPaneRef.current = false
     } else if (isAppend) {
       // A follow-up job was added to the chain — keep existing logs,
       // reset polling cursor so we start fetching the new job from the beginning
@@ -119,6 +128,14 @@ export function PipelineLogPane({ chainJobIds, onReviewRequired }: Props) {
       fetchingRef.current = false
       setRunning(true)
       setConnectionStatus('polling')
+    }
+
+    // Scroll the pane into view immediately when a pipeline run starts — don't
+    // wait for the first log entry so the user sees activity the moment the
+    // job is queued rather than a few seconds later.
+    if ((isReset || isAppend) && typeof paneRef.current?.scrollIntoView === 'function') {
+      paneRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      hasScrolledToPaneRef.current = true
     }
 
     // Clear any running interval before starting a new one

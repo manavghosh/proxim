@@ -121,11 +121,13 @@ class ScoringState(BaseModel):
 # ── Resume Builder (F10) ──────────────────────────────────────────────────────
 
 class RoleSection(BaseModel):
-    title:      str
-    company:    str
-    start_date: str
-    end_date:   str
-    bullets:    list[str] = []
+    title:    str
+    company:  str
+    # Single string, e.g. "2020 — Present". Matches the CV parser's
+    # ParsedProfile.roles[].dates output and avoids forcing the LLM to
+    # synthesise start/end values that aren't in the source profile.
+    dates:    str
+    bullets:  list[str] = []
 
 
 class KeywordSet(BaseModel):

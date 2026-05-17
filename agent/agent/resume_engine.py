@@ -69,8 +69,7 @@ JD: {str(job.get('jd_raw', ''))[:2000]}
     {{
       "title": "<VERBATIM from profile>",
       "company": "<VERBATIM from profile>",
-      "start_date": "<VERBATIM from profile>",
-      "end_date": "<VERBATIM from profile>",
+      "dates": "<VERBATIM from profile — e.g. '2020 — Present'>",
       "bullets": ["<reframed bullet — keyword-aware, no new metrics>"]
     }}
   ],

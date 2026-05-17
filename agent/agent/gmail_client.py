@@ -22,12 +22,13 @@ class GmailAuthExpiredError(Exception):
 
 def build_service(access_token: str, refresh_token: str):
     """Build a Gmail API service resource from stored OAuth2 tokens."""
+    from agent.config import settings
     creds = Credentials(
         token=access_token,
         refresh_token=refresh_token,
         token_uri="https://oauth2.googleapis.com/token",
-        client_id="",
-        client_secret="",
+        client_id=settings.gmail_client_id,
+        client_secret=settings.gmail_client_secret,
     )
     return build("gmail", "v1", credentials=creds, cache_discovery=False)
 

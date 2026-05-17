@@ -61,7 +61,7 @@ def test_inject_keywords_does_not_alter_job_title_or_company():
     from agent.resume_engine import inject_keywords
     pr = PersonalisedResume(
         summary="AI architect",
-        roles=[RoleSection(title="VP of AI", company="TechCorp", start_date="2020", end_date="2025", bullets=["Led platform"])],
+        roles=[RoleSection(title="VP of AI", company="TechCorp", dates="2020 — 2025", bullets=["Led platform"])],
         skills=["Python"],
         proof_points=[],
     )

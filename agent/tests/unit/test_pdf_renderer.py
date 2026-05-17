@@ -21,8 +21,7 @@ FIXTURE_RESUME = {
         {
             "title": "VP of AI",
             "company": "TechCorp",
-            "start_date": "2020",
-            "end_date": "Present",
+            "dates": "2020 — Present",
             "bullets": ["Led ML platform", "Reduced latency 40%"],
         }
     ],

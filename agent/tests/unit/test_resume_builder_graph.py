@@ -20,7 +20,7 @@ FIXTURE_PROFILE = {
 
 VALID_RESUME = {
     "summary": "Test summary",
-    "roles": [{"title": "VP of AI", "company": "TechCorp", "start_date": "2020", "end_date": "2025", "bullets": ["Led AI"]}],
+    "roles": [{"title": "VP of AI", "company": "TechCorp", "dates": "2020 — 2025", "bullets": ["Led AI"]}],
     "skills": ["Python"],
     "proof_points": [],
     "coherence_ok": False,

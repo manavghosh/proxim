@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -108,6 +108,13 @@ export function ExportResumePanel({ jobId, candidateId, versions, currentCvHash,
   const [generating, setGenerating] = useState(false)
   const [localVersions, setLocalVersions] = useState(versions)
 
+  // Sync local state when the parent resolves the fetch — `versions` starts as
+  // [] until the async `getResumeVersions` call completes in the parent, so we
+  // must keep the two in sync (same pattern as ParseStatusBadge).
+  useEffect(() => {
+    setLocalVersions(versions)
+  }, [versions])
+
   async function handleSubmit(versionId: string) {
     setSubmitting(versionId)
     try {
@@ -141,7 +148,7 @@ export function ExportResumePanel({ jobId, candidateId, versions, currentCvHash,
         className="w-full max-w-xl bg-[#060d1f] border-l border-[#1e2d4a] overflow-y-auto">
         <SheetHeader>
           <SheetTitle className="text-[#e2e8f0] text-sm font-semibold flex items-center justify-between">
-            Resume Versions
+            Resume &amp; Cover Letter
             <Button size="sm" className="text-xs bg-blue-600 hover:bg-blue-500"
               onClick={handleGenerate} isLoading={generating}>
               + Generate New

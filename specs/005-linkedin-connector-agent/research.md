@@ -1,60 +1,97 @@
 # Research: LinkedIn Connector Agent (F5) — Phase 0
 
 **Branch**: `005-linkedin-connector-agent` | **Date**: 2026-05-06
+**Updated**: 2026-05-14 — Decisions 1 and 2 revised: Proxycurl replaced by Exa AI (Proxycurl shut down July 2026 due to LinkedIn lawsuit).
 
 ---
 
-## Decision 1: Hiring Manager Discovery — Proxycurl Employee Search
+## Decision 1: Hiring Manager Discovery — Exa AI People Search
 
-**Decision**: Use Proxycurl `GET /api/v2/linkedin/company/employees/` with sequential role priority lookups (CAIO → CTO → VP AI → Head of AI → Engineering Director → HR/Talent Acquisition)
+**Decision**: Use Exa's people search (`exa.search(query, category="person", num_results=1)`) with the query pattern `"{role} at {company_name}"`, iterating through roles in priority order (CAIO → CTO → VP AI → Head of AI → Engineering Director → HR/Talent Acquisition) and stopping at the first result.
 
-**Rationale**:
-Proxycurl's Company Employee Search endpoint allows filtering by job title for a given company. Because a single title search returns one best match, the discovery node executes one title query per role in priority order, stopping at the first result. If none of the technical titles yield a result, the system falls back to an HR/Talent Acquisition search. This sequential approach avoids unnecessary credits for companies where the first title matches.
+**Background**: Proxycurl was shut down in July 2026 following a lawsuit brought by LinkedIn. The `agent/agent/proxycurl.py` module was rewritten as a drop-in Exa replacement — same `search_employees` / `enrich_profile` function signatures, same return shapes, zero changes required in `linkedin_connector.py` or the daemon.
 
-**Key endpoint details**:
-- URL: `GET https://nubela.co/proxycurl/api/v2/linkedin/company/employees/`
-- Parameters: `company_name` (or `linkedin_company_url`), `role` (text filter), `enrich_profiles=enrich`
-- Credits: 10 per request + 6 per returned employee profile
-- Coverage: US, UK, Canada, Israel, Australia, Ireland, New Zealand, Singapore (limited for other geographies)
+**Key API details**:
+```python
+from exa_py import Exa
+exa = Exa(api_key=EXA_API_KEY)
+results = exa.search(
+    f"{role} at {company_name}",
+    category="person",
+    num_results=1,
+    use_autoprompt=False,
+)
+```
+- Install: `pip install exa_py`
+- Env var: `EXA_API_KEY` in `agent/.env`
+- Free tier: 1,000 requests/month
+- Returns: `result.url` (LinkedIn profile URL), `result.title` (name | role | LinkedIn)
+
+**Return shape** (normalised to match original Proxycurl contract):
+```python
+{
+    "name":        hit.title or "",   # parsed from "Name | Role at Company | LinkedIn"
+    "title":       role,              # the role string that matched
+    "profile_url": hit.url or "",     # LinkedIn public URL
+}
+```
 
 **Fallback handling**:
-- `no_contact_found` status if all searches (including HR) return no result
-- DNC check occurs before any Proxycurl request (saves credits)
+- `no_contact_found` status if all role searches (including HR/Recruiter) return no result
+- DNC check occurs before any Exa request (saves credits)
+- `ProxycurlRateLimitError` is re-used as the exception class name for backwards compatibility; raised on HTTP 429 from Exa
 
-**Alternatives considered**:
-- **Exa AI people search**: Rejected — returns unstructured web results; requires additional parsing; less reliable for LinkedIn profile URLs
-- **Hunter.io**: Rejected — email-focused; not designed for LinkedIn discovery by role seniority
+**Alternatives considered** (re-evaluated after Proxycurl shutdown):
+- **Hunter.io people search**: Rejected — email-focused, not designed for LinkedIn profile discovery by role seniority; used in F6 for email discovery instead
 - **LinkedIn direct search**: Rejected — no official read API; scraping violates ToS
+- **Apollo.io**: Rejected — SaaS credits model, ToS restricts automated use, higher per-lookup cost
+- **RocketReach**: Rejected — contact-data focus rather than LinkedIn profile discovery; no free tier
 
 ---
 
-## Decision 2: Profile Enrichment — Proxycurl Person API
+## Decision 2: Profile Enrichment — Exa Content Fetch
 
-**Decision**: Use Proxycurl `GET /api/v2/linkedin/person/` with the discovered profile URL; derive tenure from dates; use work history and education as personalisation hooks
+**Decision**: Use `exa.get_contents([linkedin_url], text=True)` to fetch the LinkedIn profile page text; parse structured signals (name, headline, experiences, education) from the raw text using `_parse_profile_text()` in `proxycurl.py`.
 
 **Rationale**:
-Proxycurl's Person enrichment API returns: current role with start date, work history, education records, skills, and bio summary. Current role tenure can be calculated as `(today - role.start_date).months`. Recent posts are NOT returned by Proxycurl — this is a known limitation. The note generation prompt compensates with: current role + tenure, education signals, and the candidate's most relevant proof point for the company's context (from the approved job's archetype data).
+Exa's content fetch returns the full text of a LinkedIn profile page. The `_parse_profile_text` function extracts best-effort signals by scanning the first 40 non-empty lines:
+- **Name / headline**: parsed from the page `title` field (format: `"Name | Role at Company | LinkedIn"`)
+- **Experience entries**: lines containing seniority keywords (`director`, `vp`, `head of`, `chief`, `manager`, ` at `, ` · `)
+- **Education entries**: lines containing institution keywords (`university`, `iit`, `iim`, `college`, `institute`, `school of`)
 
-**Available hooks for personalisation**:
-1. Current role tenure (calculated from `experiences[0].starts_at`)
-2. Most recent company stage (from enrichment work history)
-3. Education institution (alma mater hook)
-4. Headline/summary (short bio hook)
+**Return shape** (compatible with original `ProxycurlPersonEnrichment` TypeScript type):
+```python
+{
+    "full_name":   str,
+    "headline":    str,
+    "summary":     None,           # not available from page text
+    "experiences": list[dict],     # up to 5 entries: {title, company, starts_at, ends_at}
+    "education":   list[dict],     # up to 3 entries: {degree_name, school, ends_at}
+}
+```
 
-**Unavailable hooks** (noted in FR-004 as required but Proxycurl does not provide):
-- Recent posts (last 30 days): Not available via Proxycurl. Fallback: use tenure + education hooks only
-- Shared connections: Not available. Omit from personalisation
-- These limitations are documented and the LLM prompt instructs to generate notes with available signals only (per edge case spec: "if no hooks exist, notes rely on the candidate's most relevant proof point")
+**Known limitations** (same category as original Proxycurl limitations):
+- `starts_at` / `ends_at` dates are `None` — tenure cannot be calculated numerically; the note generation prompt falls back to role title as the tenure hook
+- `summary` is `None` — no bio hook available; prompt relies on headline + experience title
+- Parsing accuracy varies by profile structure; the note generation prompt is designed to degrade gracefully with partial signals
+
+**Available hooks for note personalisation**:
+1. Current role title (from `experiences[0].title`)
+2. Education institution (alma mater hook, from `education[0].school.name`)
+3. Headline (short bio hook, from `headline`)
 
 **Alternatives considered**:
-- **LinkedIn's own people search API**: Rejected — requires LinkedIn partner access (restricted); impractical for an MVP
+- **LinkedIn's own people API**: Rejected — requires LinkedIn partner access (restricted); impractical for MVP
 - **Manual enrichment via candidate input**: Rejected — defeats automation purpose
+- **Scraping LinkedIn directly (requests/Playwright)**: Rejected — violates ToS; high risk of IP bans
 
 ---
 
 ## Decision 3: LinkedIn Connection Request Sending — Official LinkedIn Invitations API
 
-**Decision**: Use LinkedIn's official REST API `POST https://api.linkedin.com/v2/invitations` via OAuth 2.0 access token; the spec explicitly states LinkedIn auth is out of scope and assumed pre-configured
+**Decision**: Use LinkedIn's official REST API `POST https://api.linkedin.com/v2/invitations` via OAuth 2.0 access token; the spec explicitly states LinkedIn auth is out of scope and assumed pre-configured.
+
+**Note**: This decision is unchanged by the Proxycurl shutdown — the LinkedIn Invitations API is a separate write endpoint, unrelated to the read/enrichment layer that Proxycurl provided.
 
 **Rationale**:
 The spec assumption: "The candidate has authorised Proxim to act on their LinkedIn account (OAuth or API token) — the mechanism for initial LinkedIn authorisation is out of scope for this feature spec and assumed to be handled in an onboarding step."
@@ -72,7 +109,7 @@ Given this, the implementation uses:
 **Alternatives considered**:
 - **tomquirk/linkedin-api Python library**: Rejected — uses credential-based scraping; violates LinkedIn ToS; high risk of account suspension; inappropriate for a production product
 - **PhantomBuster API**: Rejected — SaaS with per-action pricing; not suitable for per-candidate per-job fine-grained control; bulk-scheduling oriented
-- **Proxycurl write endpoints**: Confirmed unavailable — Proxycurl is read-only
+- **Proxycurl write endpoints**: Was read-only and is now shut down — not applicable
 
 ---
 
@@ -159,7 +196,7 @@ A new `outreachTarget` field is included in `GET /api/candidates/[id]/jobs` resp
 
 ## Decision 8: Do-Not-Contact Implementation
 
-**Decision**: Store DNC company list as `string[]` in `candidates.preferences.do_not_contact_companies`; check before any Proxycurl API call
+**Decision**: Store DNC company list as `string[]` in `candidates.preferences.do_not_contact_companies`; check before any Exa API call
 
 **Rationale**:
 Simplest viable approach for MVP. The DNC check is a string comparison: if `job.company.toLowerCase()` is in the candidate's `do_not_contact_companies` list (case-insensitive), skip the entire LinkedIn Connector pipeline for that job and mark `outreach_targets.status = 'skipped_dnc'`.

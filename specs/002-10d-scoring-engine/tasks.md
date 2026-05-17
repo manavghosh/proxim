@@ -299,7 +299,7 @@ Phase 1 (Schema)
 |---|---|---|
 | `superpowers:test-driven-development` | Before T010 (DB function tests) | Phase 2 |
 | `superpowers:test-driven-development` | Before T016 (scoring engine tests) | Phase 3 |
-| `superpowers:test-driven-development` | Before T030 (API route tests) | Phase 5 |
+| `superpowers:test-driven-development` | Before T030 (API route tests) | Phase 5 |=======================================================================================
 | `superpowers:test-driven-development` | Before T041 (JobCard component tests) | Phase 6 |
 | `superpowers:systematic-debugging` | On any test failure or unexpected behaviour | Any phase |
 | `superpowers:dispatching-parallel-agents` | T043+T044+T045 in parallel (Phase 6); T050+T051+T052 in parallel (Phase 7) | Phases 6, 7 |

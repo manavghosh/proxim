@@ -57,7 +57,16 @@ def compute_weighted_score(weighted_scores: dict[str, float]) -> float:
 
 
 def score_to_grade(numeric_score: float, gate_failed: bool) -> str:
-    """Map numeric score and gate result to letter grade A–F."""
+    """Map numeric score and gate result to letter grade A/B/C/D/E/F.
+
+    Bands:
+      A ≥ 4.5   excellent fit
+      B ≥ 4.0   good fit
+      C ≥ 3.0   moderate fit
+      D ≥ 2.0   weak but viable
+      E ≥ 1.0   poor — gates passed but most weighted dimensions scored low
+      F         either a hard gate failure OR weighted score below 1.0
+    """
     if gate_failed:
         return "F"
     if numeric_score >= 4.5:
@@ -68,6 +77,8 @@ def score_to_grade(numeric_score: float, gate_failed: bool) -> str:
         return "C"
     if numeric_score >= 2.0:
         return "D"
+    if numeric_score >= 1.0:
+        return "E"
     return "F"
 
 

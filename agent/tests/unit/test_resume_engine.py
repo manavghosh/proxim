@@ -30,7 +30,7 @@ FIXTURE_ARCHETYPE_CONFIG.keywords_emphasis = ["LangGraph", "agentic"]
 
 VALID_RESUME_JSON = {
     "summary": "Experienced AI architect with deep LangGraph expertise.",
-    "roles": [{"title": "VP of AI", "company": "TechCorp", "start_date": "2020", "end_date": "2025", "bullets": ["Led AI platform"]}],
+    "roles": [{"title": "VP of AI", "company": "TechCorp", "dates": "2020 — 2025", "bullets": ["Led AI platform"]}],
     "skills": ["Python", "LangGraph"],
     "proof_points": ["Open-sourced agentic framework"],
     "coherence_ok": False,

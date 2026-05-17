@@ -3,12 +3,31 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import structlog
 from langgraph.graph import StateGraph, END
 
 from agent.models import ResumeBuilderState
 
 logger = structlog.get_logger()
+
+
+def _candidate_slug(name: str) -> str:
+    """Filesystem-safe folder name for a candidate. Keeps it human-readable.
+
+    Examples:
+      "Arijit Bhattacharya"  -> "arijit_bhattacharya"
+      "Amélie O'Hara"        -> "amelie_ohara"
+      ""  / None             -> "unnamed"
+    """
+    s = (name or '').strip().lower()
+    # Decompose accented chars to ASCII so e.g. é → e.
+    import unicodedata
+    s = unicodedata.normalize('NFKD', s).encode('ascii', 'ignore').decode('ascii')
+    s = re.sub(r"[^\w\s-]", '', s)   # drop punctuation (apostrophes, commas, …)
+    s = re.sub(r"\s+", '_', s)        # collapse whitespace to underscores
+    s = s.strip('_')
+    return s or 'unnamed'
 
 
 async def _make_pool():
@@ -277,8 +296,16 @@ async def render_pdf(state: ResumeBuilderState) -> dict:
         pr_dict = pr.model_dump()
         pr_dict["profile"] = state.parsed_profile
 
+        # Resolve the candidate's name so we can group all of their resumes
+        # under one folder. Operators reviewing the output directory can then
+        # navigate by candidate first instead of scanning a flat list of
+        # job-id folders to find the right person.
+        from agent.db import get_candidate_name
+        candidate_name = await get_candidate_name(pool, state.candidate_id)
+        candidate_slug = _candidate_slug(candidate_name)
+
         # Determine version number
-        output_base = os.path.join(settings.resume_output_dir, state.job_id)
+        output_base = os.path.join(settings.resume_output_dir, candidate_slug, state.job_id)
         existing = [
             d for d in (os.listdir(output_base) if os.path.exists(output_base) else [])
             if d.startswith("v")

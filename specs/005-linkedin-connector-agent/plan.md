@@ -5,18 +5,20 @@
 
 ## Summary
 
-The LinkedIn Connector Agent runs automatically after a job is approved (F4 HITL gate). It uses Proxycurl to discover the most relevant hiring manager at the target company (CAIO → CTO → VP AI → Head of AI → Engineering Director → HR/Talent Acquisition fallback), enriches their profile, and uses LiteLLM to generate two distinct A/B connection note variants (each ≤300 chars, each personalised from enrichment data). Both variants are surfaced on the existing HITL dashboard card for the candidate to select and send. The actual LinkedIn connection request fires via the official LinkedIn Invitations API using the candidate's pre-authorised OAuth token. A daily 20/day cap is enforced; exceeding it queues the send for the next day. A Python daemon coroutine polls acceptance status every 24 hours. Do-not-contact companies are checked first — no API calls fire for DNC-listed companies.
+The LinkedIn Connector Agent runs automatically after a job is approved (F4 HITL gate). It uses Exa AI people search to discover the most relevant hiring manager at the target company (CAIO → CTO → VP AI → Head of AI → Engineering Director → HR/Talent Acquisition fallback), enriches their profile via Exa content fetch, and uses LiteLLM to generate two distinct A/B connection note variants (each ≤300 chars, each personalised from enrichment data). Both variants are surfaced on the existing HITL dashboard card for the candidate to select and send. The actual LinkedIn connection request fires via the official LinkedIn Invitations API using the candidate's pre-authorised OAuth token. A daily 20/day cap is enforced; exceeding it queues the send for the next day. A Python daemon coroutine polls acceptance status every 24 hours. Do-not-contact companies are checked first — no API calls fire for DNC-listed companies.
+
+**Note**: Originally designed with Proxycurl for discovery and enrichment. Proxycurl was shut down in July 2026 (LinkedIn lawsuit). `agent/agent/proxycurl.py` was rewritten as a drop-in Exa replacement with identical function signatures — no changes were required in `linkedin_connector.py` or the daemon.
 
 ## Technical Context
 
 **Language/Version**: TypeScript 5 + Node.js 22 (Next.js), Python 3.11+ (LangGraph agent daemon)
-**Primary Dependencies**: Next.js 15 App Router, Drizzle ORM, Tailwind CSS v4, shadcn/ui, Lucide React, Vitest + @testing-library/react (Next.js); LangGraph 0.4+, LiteLLM 1.40+, asyncpg/aiosqlite, Pydantic v2 (Python agent)
+**Primary Dependencies**: Next.js 15 App Router, Drizzle ORM, Tailwind CSS v4, shadcn/ui, Lucide React, Vitest + @testing-library/react (Next.js); LangGraph 0.4+, LiteLLM 1.40+, asyncpg/aiosqlite, Pydantic v2, `exa_py` (Python agent)
 **Storage**: Neon PostgreSQL (prod) / SQLite (dev) — new `outreach_targets` table; `candidates.preferences` extended with `linkedin_access_token`, `linkedin_paused`, `do_not_contact_companies`
 **Testing**: Vitest + @testing-library/react (Next.js route handlers + UI components), pytest + pytest-asyncio (Python agent nodes + DB functions)
 **Target Platform**: Next.js 15 App Router (UI extension + 4 new API routes) + Python polling daemon (LinkedIn discovery, enrichment, note gen, acceptance polling)
 **Project Type**: Dual-runtime web application (Next.js + Python daemon) — extends F4 architecture
 **Performance Goals**: Note variants generated within 30 seconds of enrichment completion (SC-002); zero unauthorised sends (SC-003, 100% HITL compliance); ≥90% of approved jobs have a contact identified or documented reason (SC-005)
-**Constraints**: 20 connection requests/day cap enforced via DB count check before every send (FR-009); LinkedIn OAuth token required — out of scope to obtain in this feature; Proxycurl does not provide recent posts or shared connections (workaround: use tenure + education hooks); connection note MUST NOT contain "I saw your job posting" or equivalent (FR-007)
+**Constraints**: 20 connection requests/day cap enforced via DB count check before every send (FR-009); LinkedIn OAuth token required — out of scope to obtain in this feature; Exa content fetch does not provide structured dates or shared connections (workaround: use role title + education hooks); connection note MUST NOT contain "I saw your job posting" or equivalent (FR-007)
 **Scale/Scope**: Single candidate, ~10–50 approved jobs per pipeline run; 20/day LinkedIn cap naturally limits volume
 
 ## Constitution Check
@@ -28,12 +30,12 @@ The LinkedIn Connector Agent runs automatically after a job is approved (F4 HITL
 | I. HITL-First | ✅ PASS | Two HITL gates: (1) job approval (F4, already built), (2) note selection + Send confirmation. No connection request fires without explicit candidate selection and click. Zero auto-send. |
 | II. Agent Modularity | ✅ PASS | `linkedin_connector` is a new, independent LangGraph sub-graph with clearly defined input (`job_id`, `candidate_id`, `company`, `archetype`) and output (`outreach_targets` row). No coupling to resume builder or scoring agents. |
 | III. Factual Integrity | ✅ PASS | No resume or factual data is generated. LLM only generates connection notes (free-form outreach text). The Pydantic validator rejects notes containing forbidden phrases. No CV facts are included in notes. |
-| IV. Observability | ✅ PASS | All Proxycurl calls logged via structlog with credits consumed. LiteLLM calls traced via LangSmith (dev). All outreach lifecycle transitions (pending → notes_ready → sent → accepted) recorded in `outreach_targets` with timestamps. |
+| IV. Observability | ✅ PASS | All Exa API calls logged via structlog with credits consumed. LiteLLM calls traced via LangSmith (dev). All outreach lifecycle transitions (pending → notes_ready → sent → accepted) recorded in `outreach_targets` with timestamps. |
 | V. Provider-Agnostic LLM | ✅ PASS | Note generation uses LiteLLM in the Python agent (consistent with existing scoring engine). Next.js routes do not make LLM calls. |
-| VI. Technology Standards | ✅ PASS | Drizzle migration for `outreach_targets`, shadcn/ui components for note selector, Tailwind v4. No new packages beyond `httpx` (for Proxycurl HTTP calls in Python). |
+| VI. Technology Standards | ✅ PASS | Drizzle migration for `outreach_targets`, shadcn/ui components for note selector, Tailwind v4. New Python package: `exa_py` (for Exa AI people search and content fetch). |
 | VII. Dual-Runtime | ✅ PASS | Next.js owns all UI + 4 new API route handlers. Python daemon owns discovery, enrichment, note generation, and acceptance polling. All state flows exclusively through DB — no HTTP between runtimes. |
 
-*Post-Phase-1 re-check: All gates remain green. Proxycurl read-only limitation (no recent posts/shared connections) is documented in research.md Decision 2. Note generation gracefully falls back to tenure + education hooks per FR-006 edge case.*
+*Post-Phase-1 re-check: All gates remain green. Exa content fetch limitation (no structured dates, no shared connections) is documented in research.md Decision 2. Note generation gracefully falls back to role title + education hooks when richer signals are unavailable.*
 
 ## Project Structure
 

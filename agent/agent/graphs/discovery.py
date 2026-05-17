@@ -252,10 +252,18 @@ async def persist_jobs(state: DiscoveryState) -> dict:
         from agent.db import bulk_insert_jobs, bulk_insert_scan_history, update_pipeline_run
 
         new_jobs = [j for j in state.deduplicated_jobs if not j.is_duplicate]
-        logger.info("pipeline_step", step="persist_jobs", status="started", jobs_to_save=len(new_jobs))
+        # Source breakdown — surface in the pipeline log so the user can see
+        # exactly which portal contributed each batch.
+        source_counts: dict[str, int] = {}
+        for j in new_jobs:
+            source_counts[j.source] = source_counts.get(j.source, 0) + 1
+        breakdown_str = ", ".join(f"{src}: {n}" for src, n in sorted(source_counts.items())) or "no sources"
+        logger.info("pipeline_step", step="persist_jobs", status="started",
+                    jobs_to_save=len(new_jobs), by_source=source_counts)
 
         await _log(pool, state.pipeline_job_id, "info", "persist_jobs",
-                   f"Saving {len(new_jobs)} jobs to database…", {"jobs_to_save": len(new_jobs)})
+                   f"Saving {len(new_jobs)} jobs to database — {breakdown_str}",
+                   {"jobs_to_save": len(new_jobs), "by_source": source_counts})
 
         job_dicts = [
             {
@@ -293,7 +301,8 @@ async def persist_jobs(state: DiscoveryState) -> dict:
         )
 
         await _log(pool, state.pipeline_job_id, "info", "persist_jobs",
-                   f"Saved {len(new_jobs)} jobs successfully", {"saved": len(new_jobs)})
+                   f"Saved {len(new_jobs)} jobs successfully — {breakdown_str}",
+                   {"saved": len(new_jobs), "by_source": source_counts})
     finally:
         await _close_pool(pool)
 

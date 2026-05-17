@@ -31,12 +31,16 @@ export function Sidebar() {
   return (
     <aside className="w-[220px] bg-[#060d1f] border-r border-[#1e2d4a] flex flex-col flex-shrink-0 h-screen">
       <div className="px-4 py-5 border-b border-[#0d1829]">
-        <div className="flex items-center gap-2.5">
+        <Link
+          href="/"
+          aria-label="Proxim — back to home"
+          className="flex items-center gap-2.5 rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+        >
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
             <span className="text-white text-xs font-bold">P</span>
           </div>
           <div className="text-[13px] font-bold text-[#f1f5f9] tracking-widest">PROXIM</div>
-        </div>
+        </Link>
       </div>
       <nav className="flex-1 px-2.5 py-3 space-y-0.5">
         <p className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase px-2 pb-1.5">Main</p>
