@@ -15,6 +15,8 @@ vi.mock('@/lib/api', () => ({
   getCandidates: vi.fn(),
   getPreferences: vi.fn().mockResolvedValue({ preferences: {} }),
   updatePreferences: vi.fn(),
+  getGmailStatus: vi.fn().mockResolvedValue({ connected: false, expired: false, email: null, expiry: null }),
+  revokeGmailAccess: vi.fn(),
 }))
 
 // Stub out heavy child components so this test stays focused on the reparse

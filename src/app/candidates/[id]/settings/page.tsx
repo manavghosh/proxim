@@ -18,6 +18,7 @@ export default function SettingsPage() {
   const { id: candidateId } = useParams<{ id: string }>()
   const searchParams = useSearchParams()
   const linkedinFlash = searchParams.get('linkedin')
+  const gmailFlash    = searchParams.get('gmail')
 
   const [candidate, setCandidate]                 = useState<CandidateState | null>(null)
   const [readiness, setReadiness]                 = useState<PipelineReadiness | null>(null)
@@ -138,7 +139,7 @@ export default function SettingsPage() {
             <section className="bg-[#0d1f3c] border border-[#1e3a5f] rounded-xl p-5">
               <EmailOutreachModeCard
                 candidateId={candidateId}
-                gmailConnected={!!candidate?.preferences?.gmail_access_token}
+                flash={gmailFlash}
               />
             </section>
           </div>

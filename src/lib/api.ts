@@ -430,6 +430,12 @@ export async function revokeGmailAccess(
   return request(`/api/gmail/revoke${qs(candidateId)}`, { method: 'POST' })
 }
 
+export async function getGmailStatus(
+  candidateId: string,
+): Promise<{ connected: boolean; expired: boolean; email: string | null; expiry: string | null }> {
+  return request(`/api/gmail/status${qs(candidateId)}`)
+}
+
 // ── Job Import ────────────────────────────────────────────────────────────────
 
 export async function importJobs(

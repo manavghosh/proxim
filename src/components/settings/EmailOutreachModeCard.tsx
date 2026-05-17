@@ -1,28 +1,41 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Mail, Zap, ShieldOff } from 'lucide-react'
+import { Mail, Zap, ShieldOff, CheckCircle2, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { getPreferences, updatePreferences, revokeGmailAccess } from '@/lib/api'
+import { getPreferences, updatePreferences, revokeGmailAccess, getGmailStatus } from '@/lib/api'
 import type { EmailOutreachMode } from '@/types/candidate'
+
+interface GmailStatus {
+  connected: boolean
+  expired:   boolean
+  email:     string | null
+  expiry:    string | null
+}
 
 interface Props {
   candidateId: string
-  gmailConnected?: boolean
+  /** flash=connected|error injected from OAuth redirect query param */
+  flash?: string | null
 }
 
-export function EmailOutreachModeCard({ candidateId, gmailConnected = false }: Props) {
-  const [currentMode, setCurrentMode] = useState<EmailOutreachMode>('manual')
-  const [selectedMode, setSelectedMode] = useState<EmailOutreachMode>('manual')
-  const [saving, setSaving]   = useState(false)
-  const [saved, setSaved]     = useState(false)
-  const [loading, setLoading] = useState(true)
+export function EmailOutreachModeCard({ candidateId, flash }: Props) {
+  const [currentMode,   setCurrentMode]   = useState<EmailOutreachMode>('manual')
+  const [selectedMode,  setSelectedMode]  = useState<EmailOutreachMode>('manual')
+  const [gmail,         setGmail]         = useState<GmailStatus | null>(null)
+  const [saving,        setSaving]        = useState(false)
+  const [saved,         setSaved]         = useState(false)
+  const [loading,       setLoading]       = useState(true)
 
   useEffect(() => {
-    getPreferences(candidateId).then(({ preferences }) => {
+    Promise.all([
+      getPreferences(candidateId),
+      getGmailStatus(candidateId),
+    ]).then(([{ preferences }, gmailStatus]) => {
       const m = preferences.email_outreach_mode ?? 'manual'
       setCurrentMode(m)
       setSelectedMode(m)
+      setGmail(gmailStatus)
       setLoading(false)
     })
   }, [candidateId])
@@ -31,11 +44,10 @@ export function EmailOutreachModeCard({ candidateId, gmailConnected = false }: P
     setSaving(true)
     setSaved(false)
     try {
-      // Switching Agentic → Manual: revoke Gmail tokens first
       if (currentMode === 'agentic' && selectedMode === 'manual') {
+        // Switching Agentic → Manual: revoke and clear all Gmail tokens
         await revokeGmailAccess(candidateId)
-        // revokeGmailAccess already sets mode=manual in DB, but we still
-        // call updatePreferences to keep the UI state consistent
+        setGmail({ connected: false, expired: false, email: null, expiry: null })
       } else {
         await updatePreferences({ email_outreach_mode: selectedMode }, candidateId)
       }
@@ -47,9 +59,11 @@ export function EmailOutreachModeCard({ candidateId, gmailConnected = false }: P
     }
   }
 
-  const isDirty = selectedMode !== currentMode
-  const switchingToManual = currentMode === 'agentic' && selectedMode === 'manual'
-  const agenticWarn = selectedMode === 'agentic' && !gmailConnected
+  const isDirty            = selectedMode !== currentMode
+  const switchingToManual  = currentMode === 'agentic' && selectedMode === 'manual'
+  const gmailConnected     = gmail?.connected ?? false
+  const agenticWarn        = selectedMode === 'agentic' && !gmailConnected
+  const connectHref        = `/api/gmail/connect?candidateId=${encodeURIComponent(candidateId)}`
 
   return (
     <div className="space-y-3">
@@ -59,6 +73,20 @@ export function EmailOutreachModeCard({ candidateId, gmailConnected = false }: P
           Email Outreach
         </p>
       </div>
+
+      {/* Flash messages from OAuth redirect */}
+      {flash === 'connected' && (
+        <div className="flex items-center gap-2 rounded-lg bg-emerald-950/40 border border-emerald-800/40 px-3 py-2 text-xs text-emerald-400">
+          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+          Gmail connected successfully.
+        </div>
+      )}
+      {flash === 'error' && (
+        <div className="flex items-center gap-2 rounded-lg bg-red-950/40 border border-red-800/40 px-3 py-2 text-xs text-red-400">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+          Gmail authorisation failed. Please try again.
+        </div>
+      )}
 
       {loading ? (
         <p className="text-xs text-[#475569]">Loading…</p>
@@ -104,26 +132,56 @@ export function EmailOutreachModeCard({ candidateId, gmailConnected = false }: P
               data-testid="mode-agentic"
               className="mt-0.5 accent-blue-500"
             />
-            <div>
+            <div className="flex-1">
               <div className="flex items-center gap-2">
                 <Zap className="w-3 h-3 text-amber-400" />
                 <span className="text-xs font-medium text-[#e2e8f0]">Agentic</span>
               </div>
               <p className="text-[10px] text-[#64748b] mt-0.5">
                 Proxim sends automatically via Gmail API.
-                Requires Gmail authorisation in settings.
               </p>
+
+              {/* Gmail connected state */}
+              {gmailConnected && gmail?.email && (
+                <div className="flex items-center gap-1.5 mt-2">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                  <span className="text-[10px] text-emerald-400">
+                    Connected as {gmail.email}
+                  </span>
+                </div>
+              )}
+
+              {/* Gmail expired */}
+              {gmail?.expired && (
+                <div className="flex items-center gap-1.5 mt-2">
+                  <AlertCircle className="w-3 h-3 text-amber-400 shrink-0" />
+                  <span className="text-[10px] text-amber-400">
+                    Session expired —
+                  </span>
+                  <a href={connectHref} className="text-[10px] text-blue-400 hover:underline">
+                    reconnect Gmail
+                  </a>
+                </div>
+              )}
+
+              {/* Connect Gmail button — shown when not connected */}
+              {!gmailConnected && !gmail?.expired && (
+                <Button
+                  asChild
+                  size="sm"
+                  className="mt-2 text-[10px] h-7 bg-[#0A66C2] hover:bg-[#004182] text-white gap-1.5"
+                  data-testid="connect-gmail-btn"
+                >
+                  <a href={connectHref}>
+                    <Mail className="w-3 h-3" />
+                    Connect Gmail to enable
+                  </a>
+                </Button>
+              )}
             </div>
           </label>
 
-          {/* Gmail not connected warning */}
-          {agenticWarn && (
-            <p className="text-[10px] text-amber-400 flex items-center gap-1" data-testid="gmail-not-connected-warning">
-              ⚠ Connect Gmail above before enabling agentic mode.
-            </p>
-          )}
-
-          {/* Switching to manual warning — tokens will be revoked */}
+          {/* Revoke warning when switching Agentic → Manual */}
           {switchingToManual && (
             <div
               className="flex items-start gap-2 rounded-lg border border-red-800/40 bg-red-950/20 p-3"
@@ -140,13 +198,14 @@ export function EmailOutreachModeCard({ candidateId, gmailConnected = false }: P
 
           {selectedMode === 'agentic' && gmailConnected && !switchingToManual && (
             <p className="text-[10px] text-[#475569]">
-              Proxim will resume auto-sending any pending Day 3/7 emails.
+              Proxim will auto-send Day 1 emails and schedule Day 3/7 for approved cadences.
             </p>
           )}
 
           <Button
             size="sm"
             onClick={handleSave}
+            disabled={!isDirty || (selectedMode === 'agentic' && !gmailConnected)}
             isLoading={saving}
             data-testid="save-mode-btn"
             className={`text-xs ${switchingToManual ? 'bg-red-700 hover:bg-red-800 text-white' : ''}`}
@@ -157,6 +216,12 @@ export function EmailOutreachModeCard({ candidateId, gmailConnected = false }: P
               ? 'Revoke Gmail & Switch to Manual'
               : 'Save'}
           </Button>
+
+          {selectedMode === 'agentic' && !gmailConnected && (
+            <p className="text-[10px] text-[#475569]">
+              Connect Gmail above to enable Agentic mode.
+            </p>
+          )}
         </div>
       )}
     </div>
