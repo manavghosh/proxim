@@ -34,6 +34,7 @@ export async function GET(
       const nextTypes =
         job.jobType === 'discovery_only' ? ['fetch_jds', 'score_jobs']
         : job.jobType === 'fetch_jds'    ? ['score_jobs']
+        : job.jobType === 'import_jobs'  ? ['score_jobs']
         : []
 
       for (const nextType of nextTypes) {
