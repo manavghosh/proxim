@@ -45,6 +45,17 @@ export default function SettingsPage() {
     refresh().finally(() => setLoading(false))
   }, [candidateId])
 
+  // Auto-retry once after 3s when load fails (handles cold-start after OAuth redirect)
+  useEffect(() => {
+    if (!loadError) return
+    const t = setTimeout(() => {
+      setLoading(true)
+      setLoadError(false)
+      refresh().finally(() => setLoading(false))
+    }, 3000)
+    return () => clearTimeout(t)
+  }, [loadError])
+
   async function handleReparse() {
     setReparseError(null)
     setReparsing(true)
@@ -87,14 +98,14 @@ export default function SettingsPage() {
         <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-[#0d1829]">
           {loadError ? (
             <>
-              <p className="text-[#475569] text-sm">Failed to load settings.</p>
+              <p className="text-[#475569] text-sm">Retrying…</p>
               <Button
                 size="sm"
                 variant="outline"
                 className="text-xs"
-                onClick={() => { setLoading(true); refresh().finally(() => setLoading(false)) }}
+                onClick={() => { setLoading(true); setLoadError(false); refresh().finally(() => setLoading(false)) }}
               >
-                Retry
+                Retry now
               </Button>
             </>
           ) : (
