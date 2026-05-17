@@ -101,45 +101,70 @@ class SelfReviewResult(BaseModel):
 
 # ── LiteLLM helpers (patched in tests) ────────────────────────────────────────
 
+def _model_string(settings) -> str:
+    """Build the LiteLLM model string: 'provider/model' (matches scoring_engine pattern)."""
+    return f"{settings.llm_provider}/{settings.llm_model}"
+
+
+def _strip_markdown(text: str) -> str:
+    """Strip ```json ... ``` fencing that some models add despite response_format."""
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[-1]
+        if text.endswith("```"):
+            text = text[: text.rfind("```")]
+    return text.strip()
+
+
 async def litellm_generate(state: OutreachMailerState, settings) -> EmailDraftOutput:
+    import json
+
     prompt = (
-        f"Write a personalised 3-email outreach cadence from a job seeker to a hiring manager.\n"
-        f"Company: {state['company']}\n"
-        f"Job title: {state['job_title']}\n"
-        f"Candidate archetype: {state['archetype']}\n"
-        f"Hiring manager: {state.get('hiring_manager_name') or 'Unknown'}\n\n"
-        "Return JSON with keys: subject, day1_body (≤150 words), "
-        "day3_body (≤100 words, no 'following up'/'checking in'), "
-        "day7_body (≤80 words, no pressure phrases)."
+        f"You are a professional career coach writing outreach emails for a job seeker.\n"
+        f"Write a 3-email cadence to a hiring manager at {state['company']}.\n"
+        f"Role applied for: {state['job_title']}\n"
+        f"Candidate profile: {state['archetype']}\n"
+        f"Hiring manager name: {state.get('hiring_manager_name') or 'the hiring manager'}\n\n"
+        "Rules:\n"
+        "- day1_body: introduce the candidate, mention something specific about the company, max 150 words\n"
+        "- day3_body: add a specific value insight relevant to their work, max 100 words, "
+        "do NOT use phrases: 'following up', 'checking in', 'just following', 'just checking'\n"
+        "- day7_body: gentle close, leave door open, max 80 words, "
+        "no pressure phrases like 'last chance', 'urgent', 'final'\n"
+        "- subject: one concise subject line for all three emails\n\n"
+        'Return ONLY valid JSON: {"subject": "...", "day1_body": "...", "day3_body": "...", "day7_body": "..."}'
     )
+
     resp = await litellm.acompletion(
-        model=settings.llm_model,
+        model=_model_string(settings),
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
     )
-    raw = resp.choices[0].message.content
-    import json
+    raw = _strip_markdown(resp.choices[0].message.content or "")
     data = json.loads(raw)
     return EmailDraftOutput(**data)
 
 
 async def litellm_self_review(draft: EmailDraftOutput, settings) -> SelfReviewResult:
+    import json
+
     prompt = (
-        "Would a senior human professional send these three emails to a hiring manager? "
+        "You are a professional recruiter reviewing outreach emails.\n"
+        "Would a senior human professional send these emails to a hiring manager?\n"
         "Check: personalisation, tone, value-proposition clarity, absence of spam signals.\n\n"
         f"Subject: {draft.subject}\n"
-        f"Day 1: {draft.day1_body}\n"
-        f"Day 3: {draft.day3_body}\n"
-        f"Day 7: {draft.day7_body}\n\n"
-        'Reply JSON: {"passes": true|false, "feedback": "..."}'
+        f"Day 1 ({_word_count(draft.day1_body)} words): {draft.day1_body}\n"
+        f"Day 3 ({_word_count(draft.day3_body)} words): {draft.day3_body}\n"
+        f"Day 7 ({_word_count(draft.day7_body)} words): {draft.day7_body}\n\n"
+        'Return ONLY valid JSON: {"passes": true, "feedback": "brief comment"}'
     )
+
     resp = await litellm.acompletion(
-        model=settings.llm_model,
+        model=_model_string(settings),
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
     )
-    raw = resp.choices[0].message.content
-    import json
+    raw = _strip_markdown(resp.choices[0].message.content or "")
     data = json.loads(raw)
     return SelfReviewResult(**data)
 
@@ -248,9 +273,19 @@ async def generate_emails_node(state: OutreachMailerState, config) -> OutreachMa
                     "generation_attempts": attempts,
                 }
         except Exception as exc:
-            logger.warning("outreach_mailer.generation_error", attempt=attempts, error=str(exc))
+            import traceback
+            err_detail = traceback.format_exc()
+            logger.warning("outreach_mailer.generation_error", attempt=attempts,
+                           error=str(exc), traceback=err_detail[:500])
+            # Write error to DB so it's visible without daemon logs
+            try:
+                await update_email_cadence(pool, cadence_id,
+                                           error_message=f"Attempt {attempts}: {type(exc).__name__}: {str(exc)[:200]}")
+            except Exception:
+                pass
 
-    await update_email_cadence(pool, cadence_id, status="failed", error_message="Generation failed after 3 attempts")
+    last_err = f"Generation failed after {max_attempts} attempts"
+    await update_email_cadence(pool, cadence_id, status="failed", error_message=last_err)
     return {**state, "status": "failed", "generation_attempts": attempts}
 
 
