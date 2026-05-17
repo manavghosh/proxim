@@ -1,29 +1,23 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
-import { getCV, getReadiness, reparseCV, getCandidates } from '@/lib/api'
-import type { CandidateSummary } from '@/lib/api'
+import { useParams, useSearchParams } from 'next/navigation'
+import { getCV, getReadiness, reparseCV } from '@/lib/api'
 import { Topbar } from '@/components/layout/Topbar'
+import { CandidateSwitcher } from '@/components/layout/CandidateSwitcher'
 import { CVUploader } from '@/components/cv/CVUploader'
 import { MarkdownEditor } from '@/components/cv/MarkdownEditor'
 import { ParseStatusBadge } from '@/components/cv/ParseStatusBadge'
 import { PreferencesForm } from '@/components/preferences/PreferencesForm'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu'
-import { ChevronDownIcon, UsersIcon } from 'lucide-react'
 import type { CandidateState, Preferences, PipelineReadiness } from '@/types/candidate'
+import { LinkedInConnectCard } from '@/components/settings/LinkedInConnectCard'
+import { EmailOutreachModeCard } from '@/components/settings/EmailOutreachModeCard'
 
 export default function SettingsPage() {
   const { id: candidateId } = useParams<{ id: string }>()
-  const router = useRouter()
+  const searchParams = useSearchParams()
+  const linkedinFlash = searchParams.get('linkedin')
 
   const [candidate, setCandidate]                 = useState<CandidateState | null>(null)
   const [readiness, setReadiness]                 = useState<PipelineReadiness | null>(null)
@@ -31,7 +25,6 @@ export default function SettingsPage() {
   const [loading, setLoading]                     = useState(true)
   const [reparsing, setReparsing]                 = useState(false)
   const [reparseError, setReparseError]           = useState<string | null>(null)
-  const [allCandidates, setAllCandidates]         = useState<CandidateSummary[]>([])
 
   async function refresh() {
     const [cv, r] = await Promise.all([getCV(candidateId), getReadiness(candidateId)])
@@ -45,18 +38,25 @@ export default function SettingsPage() {
     refresh().finally(() => setLoading(false))
   }, [candidateId])
 
-  useEffect(() => {
-    getCandidates().then(({ candidates }) => setAllCandidates(candidates)).catch(() => {})
-  }, [])
-
   async function handleReparse() {
     setReparseError(null)
     setReparsing(true)
+    // Optimistically flip the badge to "Parsing CV…" so the user gets
+    // immediate feedback instead of staring at the previous Parse failed/
+    // Profile ready state during the round-trip.
+    setCandidate((prev) => (prev ? { ...prev, parseStatus: 'parsing' } : prev))
     try {
       const updated = await reparseCV(candidateId)
       setCandidate(updated)
     } catch (e) {
       setReparseError(e instanceof Error ? e.message : 'Re-parse failed. Try again.')
+      // Roll back the optimistic 'parsing' state on a transport-level failure.
+      try {
+        const fresh = await getCV(candidateId)
+        setCandidate(fresh)
+      } catch {
+        setCandidate((prev) => (prev ? { ...prev, parseStatus: 'failed' } : prev))
+      }
     } finally {
       setReparsing(false)
     }
@@ -76,7 +76,7 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <div className="flex flex-col flex-1 overflow-hidden">
-        <Topbar title="Settings" />
+        <Topbar title="Settings" actions={<CandidateSwitcher candidateId={candidateId} />} />
         <div className="flex-1 flex items-center justify-center bg-[#0d1829]">
           <p className="text-[#475569] text-sm">Loading…</p>
         </div>
@@ -86,37 +86,9 @@ export default function SettingsPage() {
 
   const markdownToEdit = convertedMarkdown ?? candidate?.baseCvMd
 
-  const currentName = candidate?.name ?? allCandidates.find(c => c.id === candidateId)?.name ?? 'Candidate'
-
-  const switcher = allCandidates.length > 1 ? (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button className="flex items-center gap-2 rounded-lg border border-[#1e2d4a] bg-[#0d1f3c] px-3 py-1.5 text-xs font-medium text-[#94a3b8] hover:border-[#2d4a6e] hover:text-[#e2e8f0] transition-colors focus:outline-none">
-          <UsersIcon className="size-3.5 text-[#475569]" />
-          <span className="text-[#e2e8f0] max-w-[140px] truncate">{currentName}</span>
-          <ChevronDownIcon className="size-3 text-[#475569]" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56" align="end">
-        <DropdownMenuLabel>Switch Candidate</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {allCandidates.map((c) => (
-          <DropdownMenuItem
-            key={c.id}
-            onClick={() => router.push(`/candidates/${c.id}/settings`)}
-            className={c.id === candidateId ? 'text-[#93c5fd]' : ''}
-          >
-            <span className="flex-1 truncate">{c.name}</span>
-            {c.id === candidateId && <span className="text-[10px] text-[#475569] ml-2">current</span>}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  ) : null
-
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      <Topbar title="Settings" actions={switcher} />
+      <Topbar title="Settings" actions={<CandidateSwitcher candidateId={candidateId} />} />
       <main className="flex-1 overflow-y-auto p-6 bg-[#0d1829]">
         <div className="grid grid-cols-[2fr_1fr] gap-6 max-w-6xl">
           <section className="bg-[#0d1f3c] border border-[#1e3a5f] rounded-xl p-5 space-y-4">
@@ -149,14 +121,27 @@ export default function SettingsPage() {
             )}
           </section>
 
-          <section className="bg-[#0d1f3c] border border-[#1e3a5f] rounded-xl p-5 space-y-4">
-            <p className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase">Preferences</p>
-            <PreferencesForm
-              initialPreferences={candidate?.preferences ?? {}}
-              onSaved={handlePreferencesSaved}
-              candidateId={candidateId}
-            />
-          </section>
+          <div className="flex flex-col gap-6">
+            <section className="bg-[#0d1f3c] border border-[#1e3a5f] rounded-xl p-5 space-y-4">
+              <p className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase">Preferences</p>
+              <PreferencesForm
+                initialPreferences={candidate?.preferences ?? {}}
+                onSaved={handlePreferencesSaved}
+                candidateId={candidateId}
+              />
+            </section>
+
+            <section className="bg-[#0d1f3c] border border-[#1e3a5f] rounded-xl p-5">
+              <LinkedInConnectCard candidateId={candidateId} flash={linkedinFlash} />
+            </section>
+
+            <section className="bg-[#0d1f3c] border border-[#1e3a5f] rounded-xl p-5">
+              <EmailOutreachModeCard
+                candidateId={candidateId}
+                gmailConnected={!!candidate?.preferences?.gmail_access_token}
+              />
+            </section>
+          </div>
         </div>
       </main>
     </div>
