@@ -62,7 +62,7 @@ async def test_send_loop_sends_day1_when_scheduled_and_pdf_available():
          patch("agent.db.get_daily_email_send_count", new=AsyncMock(return_value=0)), \
          patch("agent.db.get_resume_version_for_send", new=AsyncMock(return_value=_make_resume_version())), \
          patch("agent.db.get_candidate_preferences",
-               new=AsyncMock(return_value={"gmail_access_token": "tok", "gmail_refresh_token": "ref"})), \
+               new=AsyncMock(return_value={"gmail_access_token": "tok", "gmail_refresh_token": "ref", "email_outreach_mode": "agentic"})), \
          patch("agent.gmail_client.build_service", return_value=mock_service), \
          patch("agent.gmail_client.send_email", return_value={"id": "gmail-msg-001", "threadId": "thread-001"}), \
          patch("agent.db.update_email_draft", new=AsyncMock()) as mock_update_draft, \
@@ -85,7 +85,7 @@ async def test_send_loop_sets_attachment_missing_when_no_pdf_in_resume_versions(
          patch("agent.db.get_daily_email_send_count", new=AsyncMock(return_value=0)), \
          patch("agent.db.get_resume_version_for_send", new=AsyncMock(return_value=None)), \
          patch("agent.db.get_candidate_preferences",
-               new=AsyncMock(return_value={"gmail_access_token": "tok", "gmail_refresh_token": "ref"})), \
+               new=AsyncMock(return_value={"gmail_access_token": "tok", "gmail_refresh_token": "ref", "email_outreach_mode": "agentic"})), \
          patch("agent.db.update_email_cadence", new=AsyncMock()) as mock_update_cadence:
 
         from agent.daemon import _outreach_send_once
@@ -113,7 +113,7 @@ async def test_send_loop_sets_day3_and_day7_scheduled_send_at_after_day1_sent():
          patch("agent.db.get_daily_email_send_count", new=AsyncMock(return_value=0)), \
          patch("agent.db.get_resume_version_for_send", new=AsyncMock(return_value=_make_resume_version())), \
          patch("agent.db.get_candidate_preferences",
-               new=AsyncMock(return_value={"gmail_access_token": "tok", "gmail_refresh_token": "ref"})), \
+               new=AsyncMock(return_value={"gmail_access_token": "tok", "gmail_refresh_token": "ref", "email_outreach_mode": "agentic"})), \
          patch("agent.gmail_client.send_email", return_value={"id": "gm-001", "threadId": "th-001"}), \
          patch("agent.db.get_cadence_drafts", new=AsyncMock(return_value=[draft3, draft7])), \
          patch("agent.db.update_email_draft", new=AsyncMock(side_effect=mock_update_draft)), \
@@ -174,7 +174,7 @@ async def test_send_loop_sets_cadence_auth_expired_on_gmail_auth_error():
          patch("agent.db.get_daily_email_send_count", new=AsyncMock(return_value=0)), \
          patch("agent.db.get_resume_version_for_send", new=AsyncMock(return_value=_make_resume_version())), \
          patch("agent.db.get_candidate_preferences",
-               new=AsyncMock(return_value={"gmail_access_token": "tok", "gmail_refresh_token": "ref"})), \
+               new=AsyncMock(return_value={"gmail_access_token": "tok", "gmail_refresh_token": "ref", "email_outreach_mode": "agentic"})), \
          patch("agent.gmail_client.send_email", side_effect=GmailAuthExpiredError("expired")), \
          patch("agent.db.update_email_cadence", new=AsyncMock()) as mock_update_cadence:
 
@@ -206,7 +206,7 @@ async def test_send_loop_threads_day3_day7_using_day1_message_id_and_thread_id()
     with patch("agent.db.get_scheduled_drafts", new=AsyncMock(return_value=[draft])), \
          patch("agent.db.get_daily_email_send_count", new=AsyncMock(return_value=0)), \
          patch("agent.db.get_candidate_preferences",
-               new=AsyncMock(return_value={"gmail_access_token": "tok", "gmail_refresh_token": "ref"})), \
+               new=AsyncMock(return_value={"gmail_access_token": "tok", "gmail_refresh_token": "ref", "email_outreach_mode": "agentic"})), \
          patch("agent.gmail_client.send_email", side_effect=lambda *a, **kw: capture_send(**kw) or {"id": "gm-003", "threadId": "th-001"}), \
          patch("agent.db.update_email_draft", new=AsyncMock()), \
          patch("agent.db.update_email_cadence", new=AsyncMock()):
@@ -230,7 +230,7 @@ async def test_reply_detection_sets_cadence_replied_and_cancels_pending_drafts()
 
     with patch("agent.db.get_active_cadences_for_polling", new=AsyncMock(return_value=[cadence])), \
          patch("agent.db.get_candidate_preferences",
-               new=AsyncMock(return_value={"gmail_access_token": "tok", "gmail_refresh_token": "ref"})), \
+               new=AsyncMock(return_value={"gmail_access_token": "tok", "gmail_refresh_token": "ref", "email_outreach_mode": "agentic"})), \
          patch("agent.gmail_client.build_service", return_value=MagicMock()), \
          patch("agent.gmail_client.check_reply", return_value=True), \
          patch("agent.gmail_client.check_bounce", return_value=False), \
@@ -273,7 +273,7 @@ async def test_bounce_detection_sets_cadence_bounced_sets_day1_bounced_and_cance
 
     with patch("agent.db.get_active_cadences_for_polling", new=AsyncMock(return_value=[cadence])), \
          patch("agent.db.get_candidate_preferences",
-               new=AsyncMock(return_value={"gmail_access_token": "tok", "gmail_refresh_token": "ref"})), \
+               new=AsyncMock(return_value={"gmail_access_token": "tok", "gmail_refresh_token": "ref", "email_outreach_mode": "agentic"})), \
          patch("agent.gmail_client.build_service", return_value=MagicMock()), \
          patch("agent.gmail_client.check_reply", return_value=False), \
          patch("agent.gmail_client.check_bounce", return_value=True), \
@@ -301,7 +301,7 @@ async def test_detection_loop_handles_gmail_auth_expired_gracefully():
 
     with patch("agent.db.get_active_cadences_for_polling", new=AsyncMock(return_value=[cadence])), \
          patch("agent.db.get_candidate_preferences",
-               new=AsyncMock(return_value={"gmail_access_token": "tok", "gmail_refresh_token": "ref"})), \
+               new=AsyncMock(return_value={"gmail_access_token": "tok", "gmail_refresh_token": "ref", "email_outreach_mode": "agentic"})), \
          patch("agent.gmail_client.build_service", side_effect=GmailAuthExpiredError("expired")), \
          patch("agent.db.update_email_cadence", new=AsyncMock()) as mock_update:
 
@@ -325,3 +325,44 @@ async def test_detection_loop_does_not_overwrite_existing_reply_detected_at():
         await _reply_bounce_detection_once(pool)
 
     mock_check.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_send_loop_skips_draft_when_mode_is_manual():
+    """Daemon must not auto-send when candidate has email_outreach_mode=manual."""
+    pool = MagicMock()
+    draft = _make_draft(day_number=1)
+
+    with patch("agent.db.get_scheduled_drafts", new=AsyncMock(return_value=[draft])), \
+         patch("agent.db.get_daily_email_send_count", new=AsyncMock(return_value=0)), \
+         patch("agent.db.get_candidate_preferences",
+               new=AsyncMock(return_value={"email_outreach_mode": "manual"})), \
+         patch("agent.gmail_client.send_email") as mock_send:
+
+        from agent.daemon import _outreach_send_once
+        await _outreach_send_once(pool)
+
+    mock_send.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_send_loop_sends_when_mode_is_agentic():
+    """Daemon must auto-send when candidate has email_outreach_mode=agentic."""
+    pool = MagicMock()
+    draft = _make_draft(day_number=1)
+
+    with patch("agent.db.get_scheduled_drafts", new=AsyncMock(return_value=[draft])), \
+         patch("agent.db.get_daily_email_send_count", new=AsyncMock(return_value=0)), \
+         patch("agent.db.get_resume_version_for_send", new=AsyncMock(return_value=_make_resume_version())), \
+         patch("agent.db.get_candidate_preferences",
+               new=AsyncMock(return_value={"gmail_access_token": "tok", "gmail_refresh_token": "ref",
+                                           "email_outreach_mode": "agentic"})), \
+         patch("agent.gmail_client.send_email", return_value={"id": "gm-001", "threadId": "th-001"}), \
+         patch("agent.db.update_email_draft", new=AsyncMock()) as mock_update_draft, \
+         patch("agent.db.update_email_cadence", new=AsyncMock()), \
+         patch("agent.db.get_cadence_drafts", new=AsyncMock(return_value=[])):
+
+        from agent.daemon import _outreach_send_once
+        await _outreach_send_once(pool)
+
+    mock_update_draft.assert_called()

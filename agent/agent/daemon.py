@@ -552,8 +552,15 @@ async def _outreach_send_once(pool) -> None:
             pdf_path = resume.get("resume_pdf_path")
             attachments = [{"path": pdf_path, "filename": "resume.pdf"}] if pdf_path else []
 
-        # Load Gmail credentials
+        # Load candidate preferences
         prefs = await _db.get_candidate_preferences(pool, candidate_id)
+
+        # Skip auto-send if candidate is using manual mode (default)
+        email_mode = (prefs or {}).get("email_outreach_mode", "manual")
+        if email_mode == "manual":
+            logger.debug("outreach.manual_mode_skip", draft_id=draft_id, candidate_id=candidate_id)
+            continue
+
         access_token = prefs.get("gmail_access_token", "") if prefs else ""
         refresh_token = prefs.get("gmail_refresh_token", "") if prefs else ""
 
