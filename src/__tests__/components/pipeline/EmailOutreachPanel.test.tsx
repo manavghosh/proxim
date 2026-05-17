@@ -7,6 +7,9 @@ vi.mock('@/lib/api', () => ({
   approveCadence: vi.fn(),
   updateDraft: vi.fn(),
   overrideEmail: vi.fn(),
+  startCountdown: vi.fn(),
+  cancelCadence: vi.fn(),
+  markDraftSent: vi.fn(),
 }))
 
 const makeDraft = (day: 1 | 3 | 7): EmailDraftSummary => ({
@@ -41,11 +44,12 @@ describe('EmailOutreachPanel', () => {
     vi.clearAllMocks()
   })
 
-  it('renders three draft cards when status pending_approval', () => {
+  it('renders three draft cards when status pending_approval (agentic mode)', () => {
     render(
       <EmailOutreachPanel
         cadence={makeCadence()}
         candidateId="cand-001"
+        mode="agentic"
         onCadenceUpdated={vi.fn()}
       />
     )
@@ -53,6 +57,21 @@ describe('EmailOutreachPanel', () => {
     expect(screen.getByTestId('email-draft-card-day-1')).toBeDefined()
     expect(screen.getByTestId('email-draft-card-day-3')).toBeDefined()
     expect(screen.getByTestId('email-draft-card-day-7')).toBeDefined()
+  })
+
+  it('renders manual draft cards when status pending_approval (manual mode)', () => {
+    render(
+      <EmailOutreachPanel
+        cadence={makeCadence()}
+        candidateId="cand-001"
+        mode="manual"
+        onCadenceUpdated={vi.fn()}
+      />
+    )
+    expect(screen.getByTestId('email-outreach-panel')).toBeDefined()
+    expect(screen.getByTestId('manual-draft-day-1')).toBeDefined()
+    expect(screen.getByTestId('manual-draft-day-3')).toBeDefined()
+    expect(screen.getByTestId('manual-draft-day-7')).toBeDefined()
   })
 
   it('approve button present when pending_approval', () => {
