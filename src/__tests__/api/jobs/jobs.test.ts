@@ -15,6 +15,17 @@ vi.mock('@/lib/cv-service', () => ({
 
 vi.mock('@/db/schema', () => ({
   jobs: { id: 'id', candidateId: 'candidateId', grade: 'grade', status: 'status', reportMd: 'reportMd' },
+  emailCadences: {
+    id: 'id', jobId: 'jobId', candidateId: 'candidateId', status: 'status',
+    hiringManagerEmail: 'hiringManagerEmail', emailConfidence: 'emailConfidence',
+    approvedAt: 'approvedAt', replyDetectedAt: 'replyDetectedAt', bounceDetectedAt: 'bounceDetectedAt',
+  },
+  emailDrafts: {
+    id: 'id', cadenceId: 'cadenceId', dayNumber: 'dayNumber', status: 'status',
+    subject: 'subject', bodyHtml: 'bodyHtml', originalBodyHtml: 'originalBodyHtml',
+    isApproved: 'isApproved', scheduledSendAt: 'scheduledSendAt',
+    sentAt: 'sentAt', openDetectedAt: 'openDetectedAt', clickDetectedAt: 'clickDetectedAt',
+  },
 }))
 
 describe('GET /api/jobs', () => {
@@ -27,6 +38,7 @@ describe('GET /api/jobs', () => {
     const { db } = await import('@/db')
     const mockChain = {
       from: vi.fn().mockReturnThis(),
+      leftJoin: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
       orderBy: vi.fn().mockResolvedValue([]),
     }
@@ -47,9 +59,10 @@ describe('GET /api/jobs', () => {
     const { db } = await import('@/db')
     const mockChain = {
       from: vi.fn().mockReturnThis(),
+      leftJoin: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
       orderBy: vi.fn().mockResolvedValue([
-        { id: '1', grade: 'F', status: 'scored', title: 'Test', company: 'Co',
+        { id: '1', grade: 'F', status: 'approved', title: 'Test', company: 'Co',
           location: null, source: 'linkedin', sourceUrl: 'http://x.com',
           postedAt: null, score10d: null, archetype: null, archetypeConfidence: null, createdAt: '2026-01-01' },
       ]),
@@ -69,12 +82,13 @@ describe('GET /api/jobs', () => {
     const { db } = await import('@/db')
     const mockChain = {
       from: vi.fn().mockReturnThis(),
+      leftJoin: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
       orderBy: vi.fn().mockResolvedValue([
-        { id: '1', grade: 'A', status: 'scored', title: 'Test', company: 'Co',
+        { id: '1', grade: 'A', status: 'approved', title: 'Test', company: 'Co',
           location: null, source: 'linkedin', sourceUrl: 'http://x.com',
           postedAt: null, score10d: null, archetype: null, archetypeConfidence: null, createdAt: '2026-01-01' },
-        { id: '2', grade: 'B', status: 'scored', title: 'Test2', company: 'Co2',
+        { id: '2', grade: 'B', status: 'approved', title: 'Test2', company: 'Co2',
           location: null, source: 'linkedin', sourceUrl: 'http://y.com',
           postedAt: null, score10d: null, archetype: null, archetypeConfidence: null, createdAt: '2026-01-02' },
       ]),
@@ -92,32 +106,69 @@ describe('GET /api/jobs', () => {
   })
 })
 
-describe('POST /api/jobs/[jobId]/decision', () => {
+describe('POST /api/jobs/[jobId]/mark-submitted', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.resetModules()
   })
 
-  it('returns 400 for invalid decision', async () => {
-    const { POST } = await import('@/app/api/jobs/[jobId]/decision/route')
-    const req = new Request('http://localhost/api/jobs/job-1/decision', {
-      method: 'POST',
-      body: JSON.stringify({ decision: 'invalid_decision' }),
-      headers: { 'Content-Type': 'application/json' },
-    })
+  it('returns 200 when transitioning resume_ready → submitted', async () => {
+    const { db } = await import('@/db')
+    const updateChain = {
+      set: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      returning: vi.fn().mockResolvedValue([{ id: 'job-1', status: 'submitted' }]),
+    }
+    vi.mocked(db.update).mockReturnValue(updateChain as never)
+
+    const { POST } = await import('@/app/api/jobs/[jobId]/mark-submitted/route')
+    const req = new Request('http://localhost/api/jobs/job-1/mark-submitted', { method: 'POST' })
     const res = await POST(req, { params: Promise.resolve({ jobId: 'job-1' }) })
-    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(res.status).toBe(200)
+    expect(body).toEqual({ jobId: 'job-1', status: 'submitted' })
   })
 
-  it('returns 400 for missing decision', async () => {
-    const { POST } = await import('@/app/api/jobs/[jobId]/decision/route')
-    const req = new Request('http://localhost/api/jobs/job-1/decision', {
-      method: 'POST',
-      body: JSON.stringify({}),
-      headers: { 'Content-Type': 'application/json' },
-    })
+  it('returns 422 when the job is not in resume_ready status', async () => {
+    const { db } = await import('@/db')
+    const updateChain = {
+      set: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      returning: vi.fn().mockResolvedValue([]),
+    }
+    vi.mocked(db.update).mockReturnValue(updateChain as never)
+    const selectChain = {
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([{ status: 'approved' }]),
+    }
+    vi.mocked(db.select).mockReturnValue(selectChain as never)
+
+    const { POST } = await import('@/app/api/jobs/[jobId]/mark-submitted/route')
+    const req = new Request('http://localhost/api/jobs/job-1/mark-submitted', { method: 'POST' })
     const res = await POST(req, { params: Promise.resolve({ jobId: 'job-1' }) })
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(422)
+  })
+
+  it('returns 409 when already submitted', async () => {
+    const { db } = await import('@/db')
+    const updateChain = {
+      set: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      returning: vi.fn().mockResolvedValue([]),
+    }
+    vi.mocked(db.update).mockReturnValue(updateChain as never)
+    const selectChain = {
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([{ status: 'submitted' }]),
+    }
+    vi.mocked(db.select).mockReturnValue(selectChain as never)
+
+    const { POST } = await import('@/app/api/jobs/[jobId]/mark-submitted/route')
+    const req = new Request('http://localhost/api/jobs/job-1/mark-submitted', { method: 'POST' })
+    const res = await POST(req, { params: Promise.resolve({ jobId: 'job-1' }) })
+    expect(res.status).toBe(409)
   })
 })
 

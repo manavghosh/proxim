@@ -2,14 +2,15 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
-import { getJobs, submitDecision, getResumeVersions } from '@/lib/api'
+import { getJobs, markSubmitted, rejectJob, getResumeVersions, triggerResumeGeneration } from '@/lib/api'
 import type { ScoredJob, ResumeVersion } from '@/lib/api'
 import { Topbar } from '@/components/layout/Topbar'
+import { CandidateSwitcher } from '@/components/layout/CandidateSwitcher'
 import { JobCard } from '@/components/applications/JobCard'
 import { GradeFilterDropdown, ALL_GRADES } from '@/components/applications/GradeFilterDropdown'
 import type { Grade } from '@/components/applications/GradeFilterDropdown'
-import { ReportDrawer } from '@/components/applications/ReportDrawer'
 import { ExportResumePanel } from '@/components/applications/ExportResumePanel'
+import { PdfPreviewSheet } from '@/components/applications/PdfPreviewSheet'
 import { Skeleton } from '@/components/ui/skeleton'
 
 export default function ApplicationsPage() {
@@ -18,9 +19,11 @@ export default function ApplicationsPage() {
   const [jobs, setJobs]                     = useState<ScoredJob[]>([])
   const [loading, setLoading]               = useState(true)
   const [selectedGrades, setSelectedGrades] = useState<Grade[]>([...ALL_GRADES])
-  const [pendingId, setPendingId]           = useState<string | null>(null)
-  const [reportJobId, setReportJobId]       = useState<string | null>(null)
-  const [resumeJobId, setResumeJobId]       = useState<string | null>(null)
+  const [pendingId, setPendingId]               = useState<string | null>(null)
+  // PDF preview sheet state — which job + which type is currently previewing
+  const [pdfPreview, setPdfPreview]             = useState<{ jobId: string; type: 'resume' | 'cover-letter' } | null>(null)
+  // Legacy ExportResumePanel (version management, generate new) — kept for the overflow flow
+  const [resumeJobId, setResumeJobId]           = useState<string | null>(null)
   const [resumeVersions, setResumeVersions] = useState<ResumeVersion[]>([])
   const [resumeCvHash, setResumeCvHash]     = useState<string | null>(null)
   const [error, setError]                   = useState<string | null>(null)
@@ -40,19 +43,62 @@ export default function ApplicationsPage() {
 
   useEffect(() => { loadJobs(selectedGrades) }, [selectedGrades, loadJobs])
 
-  const handleDecision = async (jobId: string, decision: 'approved' | 'rejected' | 'snoozed' | 'scored') => {
+  const handleMarkSubmitted = async (jobId: string) => {
     setPendingId(jobId)
+    setError(null)
     try {
-      await submitDecision(jobId, decision)
-      setJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, status: decision } : j))
-    } catch {
-      setError('Failed to save decision. Please try again.')
+      await markSubmitted(jobId)
+      setJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, status: 'submitted' } : j))
+    } catch (e) {
+      setError(e instanceof Error && e.message.startsWith('422')
+        ? 'Job is not in resume_ready state — refresh and try again.'
+        : 'Failed to mark as submitted. Please try again.')
     } finally {
       setPendingId(null)
     }
   }
 
-  const handleViewResume = async (jobId: string) => {
+  const handleMoveToRejected = async (jobId: string) => {
+    setPendingId(jobId)
+    setError(null)
+    try {
+      // Reuses the HITL reject endpoint — writes a checkpoint + status='rejected'.
+      await rejectJob(jobId, candidateId)
+      setJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, status: 'rejected' } : j))
+    } catch {
+      setError('Failed to move to rejected. Please try again.')
+    } finally {
+      setPendingId(null)
+    }
+  }
+
+  const handleRetryResume = async (jobId: string) => {
+    setPendingId(jobId)
+    setError(null)
+    try {
+      // /api/jobs/{id}/resume re-enqueues a resume_builder pipeline_job. The
+      // existing endpoint requires status='approved'; resume_failed jobs get
+      // flipped back to 'approved' first so the route accepts them.
+      setJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, status: 'approved' } : j))
+      await triggerResumeGeneration(jobId, candidateId)
+    } catch {
+      setError('Failed to re-trigger resume build. Please try again.')
+      setJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, status: 'resume_failed' } : j))
+    } finally {
+      setPendingId(null)
+    }
+  }
+
+  const handleViewResume = (jobId: string) => {
+    setPdfPreview({ jobId, type: 'resume' })
+  }
+
+  const handleViewCoverLetter = (jobId: string) => {
+    setPdfPreview({ jobId, type: 'cover-letter' })
+  }
+
+  // Legacy: open the full version-management panel (version history, generate new).
+  const handleManageVersions = async (jobId: string) => {
     setResumeJobId(jobId)
     try {
       const { versions, currentCvHash } = await getResumeVersions(jobId, candidateId)
@@ -75,7 +121,7 @@ export default function ApplicationsPage() {
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      <Topbar title="Applications" />
+      <Topbar title="Applications" actions={<CandidateSwitcher candidateId={candidateId} />} />
       <main className="flex-1 overflow-y-auto p-6 bg-[#0d1829]">
         {error && (
           <div className="mb-4 px-4 py-3 bg-[#450a0a] border border-[#7f1d1d] rounded-lg text-[12px] text-[#fca5a5]">{error}</div>
@@ -98,16 +144,26 @@ export default function ApplicationsPage() {
                 key={job.id}
                 job={job}
                 candidateId={candidateId}
-                onDecision={handleDecision}
-                onViewReport={setReportJobId}
+                onMarkSubmitted={handleMarkSubmitted}
+                onMoveToRejected={handleMoveToRejected}
+                onRetryResume={handleRetryResume}
                 onViewResume={handleViewResume}
+                onViewCoverLetter={handleViewCoverLetter}
                 isPending={pendingId === job.id}
               />
             ))}
           </div>
         )}
       </main>
-      <ReportDrawer jobId={reportJobId} onClose={() => setReportJobId(null)} />
+      {/* Inline PDF preview — one sheet per type, swapped on each open */}
+      <PdfPreviewSheet
+        open={!!pdfPreview}
+        jobId={pdfPreview?.jobId ?? ''}
+        type={pdfPreview?.type ?? 'resume'}
+        onOpenChange={(open) => { if (!open) setPdfPreview(null) }}
+      />
+
+      {/* Legacy version-management panel — available for future "Manage Versions" flow */}
       {resumeJobId && (
         <ExportResumePanel
           jobId={resumeJobId}

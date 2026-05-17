@@ -141,6 +141,7 @@ export interface ScoredJob {
   archetype: string | null
   archetypeConfidence: string | null
   createdAt: string
+  emailCadence: EmailCadenceSummary | null
 }
 
 export async function getJobs(
