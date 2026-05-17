@@ -126,19 +126,21 @@ def _api_key(settings) -> str:
 async def litellm_generate(state: OutreachMailerState, settings) -> EmailDraftOutput:
     import json
 
+    hm_name = state.get("hiring_manager_name") or "the hiring manager"
     prompt = (
-        f"You are a professional career coach writing outreach emails for a job seeker.\n"
-        f"Write a 3-email cadence to a hiring manager at {state['company']}.\n"
-        f"Role applied for: {state['job_title']}\n"
-        f"Candidate profile: {state['archetype']}\n"
-        f"Hiring manager name: {state.get('hiring_manager_name') or 'the hiring manager'}\n\n"
-        "Rules:\n"
-        "- day1_body: introduce the candidate, mention something specific about the company, max 150 words\n"
-        "- day3_body: add a specific value insight relevant to their work, max 100 words, "
-        "do NOT use phrases: 'following up', 'checking in', 'just following', 'just checking'\n"
-        "- day7_body: gentle close, leave door open, max 80 words, "
-        "no pressure phrases like 'last chance', 'urgent', 'final'\n"
-        "- subject: one concise subject line for all three emails\n\n"
+        f"You are the job seeker writing directly to a hiring manager. "
+        f"Write in FIRST PERSON as the candidate — use 'I', 'my', 'I've', never 'the candidate' or 'they'.\n\n"
+        f"You are applying for: {state['job_title']} at {state['company']}\n"
+        f"Your professional profile: {state['archetype']}\n"
+        f"You are writing to: {hm_name}\n\n"
+        "Write 3 emails in first person from the candidate directly to the hiring manager:\n"
+        "- day1_body: Introduce yourself (not 'a candidate'), mention something specific about "
+        f"{state['company']}, why you applied, max 150 words. Start with 'Hi {hm_name.split()[0]},' or 'Dear {hm_name.split()[0]},'.\n"
+        "- day3_body: Share a specific insight or proof point from YOUR experience relevant to their work, "
+        "max 100 words. Do NOT use: 'following up', 'checking in', 'just following', 'just checking'.\n"
+        "- day7_body: Gentle, low-pressure close from YOU to them, max 80 words. "
+        "No pressure phrases like 'last chance', 'urgent', 'final follow-up'.\n"
+        "- subject: one concise subject line\n\n"
         'Return ONLY valid JSON: {"subject": "...", "day1_body": "...", "day3_body": "...", "day7_body": "..."}'
     )
 
@@ -157,9 +159,10 @@ async def litellm_self_review(draft: EmailDraftOutput, settings) -> SelfReviewRe
     import json
 
     prompt = (
-        "You are a professional recruiter reviewing outreach emails.\n"
-        "Would a senior human professional send these emails to a hiring manager?\n"
-        "Check: personalisation, tone, value-proposition clarity, absence of spam signals.\n\n"
+        "You are reviewing cold outreach emails written by a job seeker directly to a hiring manager.\n"
+        "CRITICAL CHECK: Are the emails written in first person (I, my, I've) from the candidate? "
+        "Reject any email that uses third-person language like 'the candidate', 'this individual', 'they'.\n"
+        "Also check: personalisation, tone, value-proposition clarity, absence of spam signals.\n\n"
         f"Subject: {draft.subject}\n"
         f"Day 1 ({_word_count(draft.day1_body)} words): {draft.day1_body}\n"
         f"Day 3 ({_word_count(draft.day3_body)} words): {draft.day3_body}\n"
