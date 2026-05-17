@@ -187,6 +187,54 @@ async def _dispatch_job(pool, job: dict) -> None:
             await update_outreach_target(pool, target_id, status="failed",
                                          error_message=str(exc))
 
+    elif job['job_type'] == 'import_jobs':
+        from agent.db import get_jobs_by_ids, update_job_meta, queue_pipeline_job
+        from agent.config import settings as _settings
+
+        payload  = job.get('payload') or {}
+        job_ids  = payload.get('job_ids', [])
+        cand_id  = str(job['candidate_id'])
+
+        logger.info("job_dispatching", job_id=job['id'], job_type='import_jobs',
+                    count=len(job_ids))
+
+        if not job_ids:
+            return
+
+        jobs_to_fetch = await get_jobs_by_ids(pool, job_ids)
+
+        # LinkedIn — use LinkedInJdScraper (extracts title, company, JD)
+        linkedin_jobs = [j for j in jobs_to_fetch if j['source'] == 'linkedin']
+        other_jobs    = [j for j in jobs_to_fetch if j['source'] != 'linkedin']
+
+        if linkedin_jobs:
+            from agent.scrapers.linkedin_jd import LinkedInJdScraper
+            scraper = LinkedInJdScraper()
+
+            async def on_fetched(job_id: str, jd_text: str, title: str = "", company: str = "") -> None:
+                if jd_text or title:
+                    await update_job_meta(
+                        pool, job_id,
+                        title=title or "Imported Job",
+                        company=company or "Unknown",
+                        jd_raw=jd_text,
+                    )
+                    logger.info("import_jobs.linkedin_fetched", job_id=job_id,
+                                title=title[:60] if title else "")
+
+            await scraper.fetch_jds(linkedin_jobs, on_fetched=on_fetched)
+
+        # Other URLs — store source_url as placeholder JD so scoring can proceed
+        for j in other_jobs:
+            await update_job_meta(pool, j['id'],
+                                  title=j.get('title') or "Imported Job",
+                                  company=j.get('company') or "Unknown",
+                                  jd_raw=j['source_url'])
+
+        # Queue score_jobs for the imported batch
+        await queue_pipeline_job(pool, cand_id, 'score_jobs')
+        logger.info("import_jobs.complete", count=len(job_ids), queued_scoring=True)
+
     elif job['job_type'] in ('outreach_mailer', 'outreach_mailer_generate'):
         from agent.nodes.outreach_mailer import (
             OutreachMailerState, discover_email_node, generate_emails_node,

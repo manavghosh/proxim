@@ -23,6 +23,19 @@ JD_SELECTORS = [
     ".jobs-box__html-content",
 ]
 
+TITLE_SELECTORS = [
+    "h1.top-card-layout__title",
+    "h1.jobs-unified-top-card__job-title",
+    "h1",
+]
+
+COMPANY_SELECTORS = [
+    ".topcard__org-name-link",
+    ".jobs-unified-top-card__company-name a",
+    ".jobs-unified-top-card__company-name",
+    ".top-card-layout__card a[data-tracking-control-name='public_jobs_topcard-org-name']",
+]
+
 # Callback type: called immediately after each page is processed
 OnFetchedCallback = Callable[[str, str], Awaitable[None]]
 
@@ -87,14 +100,34 @@ class LinkedInJdScraper:
                                     jd_text = text
                                     break
 
+                        # Extract title and company (used by import_jobs flow)
+                        title = ""
+                        for sel in TITLE_SELECTORS:
+                            el = await page.query_selector(sel)
+                            if el:
+                                text = (await el.inner_text()).strip()
+                                if text:
+                                    title = text
+                                    break
+
+                        company = ""
+                        for sel in COMPANY_SELECTORS:
+                            el = await page.query_selector(sel)
+                            if el:
+                                text = (await el.inner_text()).strip()
+                                if text:
+                                    company = text
+                                    break
+
                         results.append((job_id, jd_text))
                         words = len(jd_text.split()) if jd_text else 0
                         logger.debug("linkedin_jd_fetched",
-                                     job_id=job_id, words=words, found=bool(jd_text))
+                                     job_id=job_id, words=words, found=bool(jd_text),
+                                     title=title[:60] if title else "")
 
                         # Persist immediately — do not wait for full batch
                         if on_fetched is not None:
-                            await on_fetched(job_id, jd_text)
+                            await on_fetched(job_id, jd_text, title=title, company=company)
 
                         await asyncio.sleep(random.uniform(1.5, 3.0))
 
@@ -103,7 +136,7 @@ class LinkedInJdScraper:
                                        job_id=job_id, url=url, error=str(e))
                         results.append((job_id, ""))
                         if on_fetched is not None:
-                            await on_fetched(job_id, "")
+                            await on_fetched(job_id, "", title="", company="")
 
             finally:
                 await context.close()

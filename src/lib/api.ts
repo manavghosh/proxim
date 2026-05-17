@@ -421,6 +421,19 @@ export async function resumeLinkedIn(candidateId: string): Promise<{ paused: boo
   return request(`/api/linkedin/resume${qs(candidateId)}`, { method: 'POST' })
 }
 
+// ── Job Import ────────────────────────────────────────────────────────────────
+
+export async function importJobs(
+  urls: string,
+  candidateId: string,
+): Promise<{ imported: number; skipped: number; pipelineJobId?: string; message?: string }> {
+  return request(`/api/jobs/import${qs(candidateId)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ urls }),
+  })
+}
+
 // ── Outreach Mailer (F6) ──────────────────────────────────────────────────────
 
 export { type EmailCadenceSummary, type EmailCadenceStatus, type EmailDraftSummary }

@@ -5,8 +5,11 @@ import { useParams, useRouter } from 'next/navigation'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { JobReviewCard } from '@/components/pipeline/JobReviewCard'
-import { PipelineFilterBar } from '@/components/pipeline/PipelineFilterBar'
+import { CandidateSwitcher } from '@/components/layout/CandidateSwitcher'
+import { GradeFilterDropdown, ALL_GRADES } from '@/components/applications/GradeFilterDropdown'
+import type { Grade } from '@/components/applications/GradeFilterDropdown'
 import { PipelineSortControl } from '@/components/pipeline/PipelineSortControl'
+import { PipelineLogPane } from '@/components/dashboard/PipelineLogPane'
 import {
   getCandidateJobs,
   approveJob,
@@ -19,8 +22,11 @@ import {
   type HitlJob,
 } from '@/lib/api'
 import { Workflow } from 'lucide-react'
+import { ImportJobsSheet } from '@/components/pipeline/ImportJobsSheet'
 
-type FilterOption = 'A' | 'A+B' | 'all'
+// Pipeline review never includes F-grade jobs (route enforces it), so the
+// available choices are A/B/C/D only.
+const PIPELINE_GRADES: Grade[] = ALL_GRADES.filter((g) => g !== 'F')
 type SortOption = 'score' | 'date' | 'company'
 
 function Toast({ message, type = 'info', onDismiss }: { message: string; type?: 'info' | 'success' | 'error'; onDismiss: () => void }) {
@@ -43,20 +49,25 @@ export default function PipelinePage() {
 
   const [jobs, setJobs] = useState<HitlJob[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<FilterOption>('all')
+  const [selectedGrades, setSelectedGrades] = useState<Grade[]>([...PIPELINE_GRADES])
   const [sort, setSort] = useState<SortOption>('score')
   const [pendingJobIds, setPendingJobIds] = useState<Set<string>>(new Set())
   const [toast, setToast] = useState<{ message: string; type: 'info' | 'success' | 'error' } | null>(null)
   const [streamConnected, setStreamConnected] = useState(false)
   const streamCleanupRef = useRef<(() => void) | null>(null)
+  // resume_builder pipeline_jobs queued from this page's Approve clicks. Each
+  // approve pushes its returned `pipelineJobId` so the log pane streams every
+  // build that's currently in flight.
+  const [resumeBuilderJobIds, setResumeBuilderJobIds] = useState<string[]>([])
+  const logPaneRef = useRef<HTMLDivElement>(null)
 
   const showToast = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
     setToast({ message, type })
   }
 
-  const loadJobs = useCallback(async (f: FilterOption, s: SortOption) => {
+  const loadJobs = useCallback(async (g: Grade[], s: SortOption) => {
     try {
-      const data = await getCandidateJobs(candidateId, f, s)
+      const data = await getCandidateJobs(candidateId, g, s)
       setJobs(data.jobs)
     } catch {
       showToast('Failed to load jobs', 'error')
@@ -65,18 +76,20 @@ export default function PipelinePage() {
     }
   }, [candidateId])
 
-  // Load preferences and jobs on mount
+  // Always start the Pipeline page with no grade filter applied — the user
+  // sees every A/B/C/D row on landing. Sort preference is still restored
+  // because it's a "how to view" choice, not a "what to view" one.
   useEffect(() => {
     const init = async () => {
+      const defaultGrades: Grade[] = [...PIPELINE_GRADES]
       try {
         const { preferences } = await getPreferences(candidateId)
-        const savedFilter = (preferences.hitl_grade_filter as FilterOption) ?? 'all'
         const savedSort = (preferences.hitl_sort as SortOption) ?? 'score'
-        setFilter(savedFilter)
+        setSelectedGrades(defaultGrades)
         setSort(savedSort)
-        await loadJobs(savedFilter, savedSort)
+        await loadJobs(defaultGrades, savedSort)
       } catch {
-        await loadJobs('all', 'score')
+        await loadJobs(defaultGrades, 'score')
       }
     }
     init()
@@ -93,7 +106,7 @@ export default function PipelinePage() {
       candidateId,
       (jobIds) => {
         showToast(`${jobIds.length} new job${jobIds.length > 1 ? 's' : ''} arrived!`, 'info')
-        loadJobs(filter, sort)
+        loadJobs(selectedGrades, sort)
       },
       () => {
         setStreamConnected(false)
@@ -102,7 +115,7 @@ export default function PipelinePage() {
     )
     streamCleanupRef.current = cleanup
     setStreamConnected(true)
-  }, [candidateId, filter, sort, loadJobs])
+  }, [candidateId, selectedGrades, sort, loadJobs])
 
   useEffect(() => {
     reconnectStream()
@@ -111,16 +124,17 @@ export default function PipelinePage() {
     }
   }, [reconnectStream])
 
-  const handleFilterChange = async (newFilter: FilterOption) => {
-    setFilter(newFilter)
-    await updatePreferences({ hitl_grade_filter: newFilter }, candidateId)
-    loadJobs(newFilter, sort)
+  const handleGradesChange = (next: Grade[]) => {
+    // Filter is session-only on the Pipeline page — every navigation back here
+    // resets to "all grades" so the user always sees every reviewable row.
+    setSelectedGrades(next)
+    loadJobs(next, sort)
   }
 
   const handleSortChange = async (newSort: SortOption) => {
     setSort(newSort)
     await updatePreferences({ hitl_sort: newSort }, candidateId)
-    loadJobs(filter, newSort)
+    loadJobs(selectedGrades, newSort)
   }
 
   const setPending = (jobId: string, val: boolean) => {
@@ -135,13 +149,25 @@ export default function PipelinePage() {
   const handleApprove = async (jobId: string) => {
     setPending(jobId, true)
     try {
-      await approveJob(jobId, candidateId)
+      const res = await approveJob(jobId, candidateId)
       setJobs(prev => prev.map(j => j.id === jobId ? { ...j, status: 'approved' } : j))
+      // Push the returned pipelineJobId so the log pane below streams the
+      // resume_builder graph for this approval. The pane keeps the most
+      // recent build active and auto-scrolls.
+      if (res.pipelineJobId) {
+        setResumeBuilderJobIds((prev) => [...prev, res.pipelineJobId])
+        // Scroll to the log pane immediately — don't wait for the first log entry.
+        setTimeout(() => {
+          if (typeof logPaneRef.current?.scrollIntoView === 'function') {
+            logPaneRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }
+        }, 100)
+      }
       showToast('Job approved — resume generation queued', 'success')
     } catch (e: unknown) {
       if (e instanceof Error && e.message.startsWith('409')) {
         showToast('Already decided — refreshing…', 'info')
-        loadJobs(filter, sort)
+        loadJobs(selectedGrades, sort)
       } else {
         showToast('Failed to approve job', 'error')
       }
@@ -159,7 +185,7 @@ export default function PipelinePage() {
     } catch (e: unknown) {
       if (e instanceof Error && e.message.startsWith('409')) {
         showToast('Already decided — refreshing…', 'info')
-        loadJobs(filter, sort)
+        loadJobs(selectedGrades, sort)
       } else {
         showToast('Failed to reject job', 'error')
       }
@@ -181,7 +207,7 @@ export default function PipelinePage() {
     } catch (e: unknown) {
       if (e instanceof Error && e.message.startsWith('409')) {
         showToast('Already decided — refreshing…', 'info')
-        loadJobs(filter, sort)
+        loadJobs(selectedGrades, sort)
       } else {
         showToast('Failed to snooze job', 'error')
       }
@@ -205,6 +231,13 @@ export default function PipelinePage() {
     }
   }
 
+  // Per-grade counts feed the dropdown's count column and the inline badges,
+  // matching the Applications page exactly.
+  const counts = PIPELINE_GRADES.reduce((acc, g) => {
+    acc[g] = jobs.filter((j) => j.grade === g).length
+    return acc
+  }, {} as Partial<Record<Grade, number>>)
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -219,8 +252,14 @@ export default function PipelinePage() {
             {streamConnected && <span className="ml-2 text-emerald-500">● live</span>}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <PipelineFilterBar value={filter} onChange={handleFilterChange} />
+        <div className="flex items-center gap-3">
+          <CandidateSwitcher candidateId={candidateId} />
+          <ImportJobsSheet candidateId={candidateId} onImported={() => loadJobs(selectedGrades, sort)} />
+          <GradeFilterDropdown
+            selected={selectedGrades}
+            onChange={handleGradesChange}
+            counts={counts}
+          />
           <PipelineSortControl value={sort} onChange={handleSortChange} />
         </div>
       </div>
@@ -262,6 +301,16 @@ export default function PipelinePage() {
                 isPending={pendingJobIds.has(job.id)}
               />
             ))}
+          </div>
+        )}
+
+        {/* Live log pane for resume_builder runs queued from this page's
+            Approve clicks. Hidden until the first approval; stays visible for
+            the rest of the session so the user can watch each tailored
+            resume build in sequence. */}
+        {resumeBuilderJobIds.length > 0 && (
+          <div ref={logPaneRef} className="max-w-3xl mt-6">
+            <PipelineLogPane chainJobIds={resumeBuilderJobIds} />
           </div>
         )}
       </div>

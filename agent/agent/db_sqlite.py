@@ -900,3 +900,37 @@ async def bounce_day1_cancel_day3_day7(
     )
     await pool.commit()
 
+
+# ── Job Import (import_jobs pipeline type) ────────────────────────────────────
+
+async def get_jobs_by_ids(
+    pool: aiosqlite.Connection,
+    job_ids: list[str],
+) -> list[dict]:
+    """Return jobs matching the given IDs."""
+    if not job_ids:
+        return []
+    placeholders = ",".join("?" * len(job_ids))
+    async with pool.execute(
+        f"SELECT id, source_url, source, title, company FROM jobs WHERE id IN ({placeholders})",
+        job_ids,
+    ) as cursor:
+        rows = await cursor.fetchall()
+    cols = ["id", "source_url", "source", "title", "company"]
+    return [dict(zip(cols, row)) for row in rows]
+
+
+async def update_job_meta(
+    pool: aiosqlite.Connection,
+    job_id: str,
+    title: str,
+    company: str,
+    jd_raw: str,
+) -> None:
+    """Update title, company, and jd_raw for an imported job."""
+    await pool.execute(
+        "UPDATE jobs SET title = ?, company = ?, jd_raw = ?, updated_at = ? WHERE id = ?",
+        (title, company, jd_raw, _now(), job_id),
+    )
+    await pool.commit()
+

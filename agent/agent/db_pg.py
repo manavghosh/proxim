@@ -680,6 +680,33 @@ async def cancel_pending_drafts(pool: asyncpg.Pool, cadence_id: str) -> None:
         )
 
 
+async def get_jobs_by_ids(pool: asyncpg.Pool, job_ids: list[str]) -> list[dict]:
+    """Return jobs matching the given IDs."""
+    if not job_ids:
+        return []
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT id, source_url, source, title, company FROM jobs WHERE id = ANY($1)",
+            job_ids,
+        )
+    return [dict(r) for r in rows]
+
+
+async def update_job_meta(
+    pool: asyncpg.Pool,
+    job_id: str,
+    title: str,
+    company: str,
+    jd_raw: str,
+) -> None:
+    """Update title, company, and jd_raw for an imported job."""
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE jobs SET title = $1, company = $2, jd_raw = $3, updated_at = NOW() WHERE id = $4",
+            title, company, jd_raw, job_id,
+        )
+
+
 async def bounce_day1_cancel_day3_day7(pool: asyncpg.Pool, cadence_id: str) -> None:
     """Mark Day 1 as bounced; cancel Day 3 and Day 7 (bounce detected)."""
     async with pool.acquire() as conn:
