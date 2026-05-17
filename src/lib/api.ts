@@ -492,6 +492,13 @@ export async function overrideEmail(
   })
 }
 
+export async function startEmailOutreach(
+  jobId: string,
+  candidateId: string,
+): Promise<{ pipelineJobId: string; status: string }> {
+  return request(`/api/jobs/${jobId}/start-email-outreach${qs(candidateId)}`, { method: 'POST' })
+}
+
 export async function retryLinkedIn(
   jobId: string,
   candidateId: string,

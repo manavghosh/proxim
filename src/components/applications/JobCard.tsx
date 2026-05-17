@@ -17,6 +17,7 @@ import { EmailOutreachPanel } from '@/components/pipeline/EmailOutreachPanel'
 import { OutreachNoteSelector } from '@/components/pipeline/OutreachNoteSelector'
 import { OutreachStatusBadge } from '@/components/pipeline/OutreachStatusBadge'
 import type { ScoredJob, EmailCadenceSummary } from '@/lib/api'
+import { retryLinkedIn, startEmailOutreach } from '@/lib/api'
 import type { OutreachTargetSummary, OutreachStatus, EmailOutreachMode } from '@/types/candidate'
 
 const GRADE_STYLES: Record<string, { badge: string }> = {
@@ -51,10 +52,12 @@ export function JobCard({
   candidateId,
   emailOutreachMode = 'manual',
 }: Props) {
-  const [emailCadence, setEmailCadence] = useState<EmailCadenceSummary | null>(job.emailCadence)
+  const [emailCadence, setEmailCadence]     = useState<EmailCadenceSummary | null>(job.emailCadence)
   const [outreachStatus, setOutreachStatus] = useState<OutreachStatus | null>(
     job.outreachTarget?.status as OutreachStatus ?? null
   )
+  const [liStarting,  setLiStarting]  = useState(false)
+  const [emStarting,  setEmStarting]  = useState(false)
   const score = (job.score10d as Record<string, unknown> | null)?.numeric_score as number | undefined
   const isSnoozed   = job.status === 'snoozed'
   const isApproved  = job.status === 'approved'
@@ -217,6 +220,28 @@ export function JobCard({
         <BuildProgressPane jobId={job.id} autoOpen={isApproved || isResumeFailed} />
       )}
 
+      {/* F5 LinkedIn — start button when outreach never ran */}
+      {!job.outreachTarget && (isApproved || isResumeReady || isSubmitted) && (
+        <div className="border-t border-[#1e2d4a] pt-3 mt-1 flex items-center gap-2">
+          <span className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase">
+            LinkedIn Outreach
+          </span>
+          <Button size="sm" variant="outline"
+            className="h-6 text-[10px] border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c] gap-1"
+            isLoading={liStarting}
+            onClick={async () => {
+              setLiStarting(true)
+              try {
+                await retryLinkedIn(job.id, candidateId)
+                setOutreachStatus('discovering')
+              } finally { setLiStarting(false) }
+            }}
+          >
+            Start
+          </Button>
+        </div>
+      )}
+
       {/* F5 LinkedIn Outreach — note selector + send button */}
       {job.outreachTarget && (
         <div className="border-t border-[#1e2d4a] pt-3 mt-1">
@@ -236,6 +261,29 @@ export function JobCard({
               onStatusChange={(s) => setOutreachStatus(s)}
             />
           )}
+        </div>
+      )}
+
+      {/* F6 Email — start button when outreach never ran */}
+      {!emailCadence && (isApproved || isResumeReady || isSubmitted) && (
+        <div className="border-t border-[#1e2d4a] pt-3 mt-1 flex items-center gap-2">
+          <span className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase">
+            Email
+          </span>
+          <Button size="sm" variant="outline"
+            className="h-6 text-[10px] border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c] gap-1"
+            isLoading={emStarting}
+            onClick={async () => {
+              setEmStarting(true)
+              try {
+                await startEmailOutreach(job.id, candidateId)
+                setEmailCadence({ id: '', status: 'pending_discovery', hiringManagerEmail: null,
+                  emailConfidence: null, approvedAt: null, replyDetectedAt: null, bounceDetectedAt: null, drafts: [] })
+              } finally { setEmStarting(false) }
+            }}
+          >
+            Start
+          </Button>
         </div>
       )}
 
