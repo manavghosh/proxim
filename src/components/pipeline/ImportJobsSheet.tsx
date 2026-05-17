@@ -1,7 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { PlusCircle, ExternalLink, CheckCircle2, AlertCircle } from 'lucide-react'
+import { useParams } from 'next/navigation'
+import Link from 'next/link'
+import { PlusCircle, ExternalLink, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet'
 import { Textarea } from '@/components/ui/textarea'
@@ -9,7 +11,7 @@ import { importJobs } from '@/lib/api'
 
 interface Props {
   candidateId: string
-  onImported?: () => void
+  onImported?: (pipelineJobId: string) => void
   label?: string
 }
 
@@ -19,7 +21,7 @@ export function ImportJobsSheet({ candidateId, onImported, label = '+ Add Jobs' 
   const [open, setOpen]     = useState(false)
   const [urls, setUrls]     = useState('')
   const [status, setStatus] = useState<Status>('idle')
-  const [result, setResult] = useState<{ imported: number; skipped: number; message?: string } | null>(null)
+  const [result, setResult] = useState<{ imported: number; skipped: number; pipelineJobId?: string; message?: string } | null>(null)
   const [error, setError]   = useState('')
 
   const lineCount = urls.split('\n').filter(l => l.trim().startsWith('http')).length
@@ -33,7 +35,7 @@ export function ImportJobsSheet({ candidateId, onImported, label = '+ Add Jobs' 
       const res = await importJobs(urls, candidateId)
       setResult(res)
       setStatus('success')
-      if (res.imported > 0) onImported?.()
+      if (res.imported > 0) onImported?.(res.pipelineJobId ?? '')
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Import failed')
       setStatus('error')
@@ -127,26 +129,55 @@ export function ImportJobsSheet({ candidateId, onImported, label = '+ Add Jobs' 
                     </p>
                   )}
                   {(result?.imported ?? 0) > 0 && (
-                    <p className="text-xs text-[#64748b] mt-2">
-                      The daemon will scrape each job, extract the description, and score it.
-                      Jobs will appear in the Pipeline review queue once scored — usually within a minute.
-                    </p>
+                    <>
+                      <p className="text-xs text-[#64748b] mt-2">
+                        The daemon is scraping each URL, extracting the job description, and scoring it against your CV.
+                        This usually takes 1–2 minutes per job.
+                      </p>
+                      <div className="mt-3 flex flex-col gap-2 text-[11px] text-[#475569]">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-4 h-4 rounded-full bg-[#1e2d4a] flex items-center justify-center text-[9px] text-[#64748b]">1</span>
+                          Scraping job pages — extracting title, company &amp; description
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-4 h-4 rounded-full bg-[#1e2d4a] flex items-center justify-center text-[9px] text-[#64748b]">2</span>
+                          Scoring against your CV — 10-dimension analysis
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-4 h-4 rounded-full bg-[#1e2d4a] flex items-center justify-center text-[9px] text-[#64748b]">3</span>
+                          Jobs appear in Pipeline for your review
+                        </div>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
 
-              <div className="flex gap-2 justify-end">
+              <div className="flex gap-2 justify-between mt-2">
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  className="text-[11px] border-[#1e2d4a]"
+                  className="text-[11px] text-[#475569]"
                   onClick={() => { setStatus('idle'); setResult(null); setUrls('') }}
                 >
-                  Import More
+                  + Add More
                 </Button>
-                <Button size="sm" className="text-[11px]" onClick={handleClose}>
-                  Done
-                </Button>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" className="text-[11px] border-[#1e2d4a]" onClick={handleClose}>
+                    Stay here
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="text-[11px] bg-blue-600 hover:bg-blue-700 text-white gap-1.5"
+                    asChild
+                    onClick={handleClose}
+                  >
+                    <Link href={`/candidates/${candidateId}/pipeline`}>
+                      Go to Pipeline
+                      <ArrowRight className="w-3 h-3" />
+                    </Link>
+                  </Button>
+                </div>
               </div>
             </div>
           )}

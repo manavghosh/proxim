@@ -58,6 +58,7 @@ export default function DashboardPage() {
   const [rescoreLoading, setRescoreLoading] = useState(false)
   const [readyToScore, setReadyToScore]   = useState(0)
   const [batchSheetOpen, setBatchSheetOpen] = useState(false)
+  const [importJobId, setImportJobId]       = useState<string | null>(null)
 
   const refreshReadyToScore = useCallback(async () => {
     try {
@@ -204,7 +205,11 @@ export default function DashboardPage() {
                 ⚠ Rescore Failed ({scoreFailed})
               </Button>
             )}
-            <ImportJobsSheet candidateId={candidateId} label="+ Add Jobs" />
+            <ImportJobsSheet
+              candidateId={candidateId}
+              label="+ Add Jobs"
+              onImported={(pjId) => { if (pjId) setImportJobId(pjId) }}
+            />
             <div className="relative flex items-center gap-0" ref={phaseMenuRef}>
               <Button size="sm" className="text-xs rounded-r-none border-r border-r-white/20"
                 onClick={() => startPipeline(selectedPhase)} isLoading={pipelineLoading}>
@@ -276,7 +281,7 @@ export default function DashboardPage() {
               <ProfileCard candidate={candidate} candidateId={candidateId} />
             </div>
             <PipelineLogPane
-              chainJobIds={chainJobIds}
+              chainJobIds={[...chainJobIds, ...(importJobId ? [importJobId] : [])]}
               onReviewRequired={() => setBatchSheetOpen(true)}
             />
           </>
