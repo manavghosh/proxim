@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { and, eq, ne, notInArray } from 'drizzle-orm'
+import { and, eq, ne, notInArray, inArray } from 'drizzle-orm'
 import { db } from '@/db'
 import { jobs, hitlCheckpoints, outreachTargets, emailCadences, emailDrafts } from '@/db/schema'
 import type { OutreachTargetSummary, OutreachStatus, EmailCadenceSummary, EmailCadenceStatus, EmailDraftSummary, EmailDraftStatus } from '@/types/candidate'
@@ -121,7 +121,7 @@ export async function GET(
       const allDrafts = await db
         .select()
         .from(emailDrafts)
-        .where(and(...cadenceIds.map(cid => eq(emailDrafts.cadenceId, cid))))
+        .where(inArray(emailDrafts.cadenceId, cadenceIds))
         .orderBy(emailDrafts.dayNumber)
       for (const d of allDrafts) {
         const list = draftsByC[d.cadenceId] ?? []

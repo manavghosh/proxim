@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, inArray } from 'drizzle-orm'
 import { db } from '@/db'
 import { jobs, emailCadences, emailDrafts } from '@/db/schema'
 import { getOrCreateCandidate, getCandidateById } from '@/lib/cv-service'
@@ -64,7 +64,7 @@ export async function GET(request: Request) {
       const allDrafts = await db
         .select()
         .from(emailDrafts)
-        .where(and(...cadenceIds.map(cid => eq(emailDrafts.cadenceId, cid))))
+        .where(inArray(emailDrafts.cadenceId, cadenceIds))
         .orderBy(emailDrafts.dayNumber)
       for (const d of allDrafts) {
         const list = draftsByC[d.cadenceId] ?? []
