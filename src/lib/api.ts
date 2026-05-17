@@ -422,6 +422,14 @@ export async function resumeLinkedIn(candidateId: string): Promise<{ paused: boo
   return request(`/api/linkedin/resume${qs(candidateId)}`, { method: 'POST' })
 }
 
+// ── Gmail OAuth ───────────────────────────────────────────────────────────────
+
+export async function revokeGmailAccess(
+  candidateId: string,
+): Promise<{ revoked: boolean; mode: string }> {
+  return request(`/api/gmail/revoke${qs(candidateId)}`, { method: 'POST' })
+}
+
 // ── Job Import ────────────────────────────────────────────────────────────────
 
 export async function importJobs(

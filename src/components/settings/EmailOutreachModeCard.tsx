@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Mail, Zap } from 'lucide-react'
+import { Mail, Zap, ShieldOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { getPreferences, updatePreferences } from '@/lib/api'
+import { getPreferences, updatePreferences, revokeGmailAccess } from '@/lib/api'
 import type { EmailOutreachMode } from '@/types/candidate'
 
 interface Props {
@@ -12,14 +12,17 @@ interface Props {
 }
 
 export function EmailOutreachModeCard({ candidateId, gmailConnected = false }: Props) {
-  const [mode, setMode]       = useState<EmailOutreachMode>('manual')
+  const [currentMode, setCurrentMode] = useState<EmailOutreachMode>('manual')
+  const [selectedMode, setSelectedMode] = useState<EmailOutreachMode>('manual')
   const [saving, setSaving]   = useState(false)
   const [saved, setSaved]     = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     getPreferences(candidateId).then(({ preferences }) => {
-      setMode(preferences.email_outreach_mode ?? 'manual')
+      const m = preferences.email_outreach_mode ?? 'manual'
+      setCurrentMode(m)
+      setSelectedMode(m)
       setLoading(false)
     })
   }, [candidateId])
@@ -28,7 +31,15 @@ export function EmailOutreachModeCard({ candidateId, gmailConnected = false }: P
     setSaving(true)
     setSaved(false)
     try {
-      await updatePreferences({ email_outreach_mode: mode }, candidateId)
+      // Switching Agentic → Manual: revoke Gmail tokens first
+      if (currentMode === 'agentic' && selectedMode === 'manual') {
+        await revokeGmailAccess(candidateId)
+        // revokeGmailAccess already sets mode=manual in DB, but we still
+        // call updatePreferences to keep the UI state consistent
+      } else {
+        await updatePreferences({ email_outreach_mode: selectedMode }, candidateId)
+      }
+      setCurrentMode(selectedMode)
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
     } finally {
@@ -36,7 +47,9 @@ export function EmailOutreachModeCard({ candidateId, gmailConnected = false }: P
     }
   }
 
-  const agenticWarn = mode === 'agentic' && !gmailConnected
+  const isDirty = selectedMode !== currentMode
+  const switchingToManual = currentMode === 'agentic' && selectedMode === 'manual'
+  const agenticWarn = selectedMode === 'agentic' && !gmailConnected
 
   return (
     <div className="space-y-3">
@@ -51,15 +64,16 @@ export function EmailOutreachModeCard({ candidateId, gmailConnected = false }: P
         <p className="text-xs text-[#475569]">Loading…</p>
       ) : (
         <div className="space-y-2">
+          {/* Manual option */}
           <label className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-all ${
-            mode === 'manual' ? 'border-blue-500 bg-blue-950/20' : 'border-[#1e2d4a] hover:border-[#2d4a6f]'
+            selectedMode === 'manual' ? 'border-blue-500 bg-blue-950/20' : 'border-[#1e2d4a] hover:border-[#2d4a6f]'
           }`}>
             <input
               type="radio"
               name="outreach-mode"
               value="manual"
-              checked={mode === 'manual'}
-              onChange={() => setMode('manual')}
+              checked={selectedMode === 'manual'}
+              onChange={() => setSelectedMode('manual')}
               data-testid="mode-manual"
               className="mt-0.5 accent-blue-500"
             />
@@ -77,15 +91,16 @@ export function EmailOutreachModeCard({ candidateId, gmailConnected = false }: P
             </div>
           </label>
 
+          {/* Agentic option */}
           <label className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-all ${
-            mode === 'agentic' ? 'border-blue-500 bg-blue-950/20' : 'border-[#1e2d4a] hover:border-[#2d4a6f]'
+            selectedMode === 'agentic' ? 'border-blue-500 bg-blue-950/20' : 'border-[#1e2d4a] hover:border-[#2d4a6f]'
           }`}>
             <input
               type="radio"
               name="outreach-mode"
               value="agentic"
-              checked={mode === 'agentic'}
-              onChange={() => setMode('agentic')}
+              checked={selectedMode === 'agentic'}
+              onChange={() => setSelectedMode('agentic')}
               data-testid="mode-agentic"
               className="mt-0.5 accent-blue-500"
             />
@@ -101,20 +116,46 @@ export function EmailOutreachModeCard({ candidateId, gmailConnected = false }: P
             </div>
           </label>
 
+          {/* Gmail not connected warning */}
           {agenticWarn && (
             <p className="text-[10px] text-amber-400 flex items-center gap-1" data-testid="gmail-not-connected-warning">
               ⚠ Connect Gmail above before enabling agentic mode.
             </p>
           )}
 
-          {mode === 'agentic' && gmailConnected && (
+          {/* Switching to manual warning — tokens will be revoked */}
+          {switchingToManual && (
+            <div
+              className="flex items-start gap-2 rounded-lg border border-red-800/40 bg-red-950/20 p-3"
+              data-testid="revoke-warning"
+            >
+              <ShieldOff className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
+              <p className="text-[10px] text-red-300">
+                Switching to Manual will revoke Gmail access and permanently delete
+                your stored Gmail credentials. You will need to reconnect Gmail if
+                you switch back to Agentic.
+              </p>
+            </div>
+          )}
+
+          {selectedMode === 'agentic' && gmailConnected && !switchingToManual && (
             <p className="text-[10px] text-[#475569]">
               Proxim will resume auto-sending any pending Day 3/7 emails.
             </p>
           )}
 
-          <Button size="sm" onClick={handleSave} isLoading={saving} data-testid="save-mode-btn" className="text-xs">
-            {saved ? 'Saved ✓' : 'Save'}
+          <Button
+            size="sm"
+            onClick={handleSave}
+            isLoading={saving}
+            data-testid="save-mode-btn"
+            className={`text-xs ${switchingToManual ? 'bg-red-700 hover:bg-red-800 text-white' : ''}`}
+          >
+            {saved
+              ? 'Saved ✓'
+              : switchingToManual
+              ? 'Revoke Gmail & Switch to Manual'
+              : 'Save'}
           </Button>
         </div>
       )}
