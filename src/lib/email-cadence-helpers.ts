@@ -39,13 +39,14 @@ export const EMAIL_CADENCE_BADGE_VARIANT: Record<EmailCadenceStatus, string> = {
 }
 
 export const EMAIL_DRAFT_STATUS_LABELS: Record<EmailDraftStatus, string> = {
-  draft:        'Draft',
-  approved:     'Approved',
-  superseded:   'Superseded',
-  scheduled:    'Scheduled',
-  sending:      'Sending…',
-  sent:         'Sent',
-  bounced:      'Bounced',
-  rate_limited: 'Rate limited',
-  cancelled:    'Cancelled',
+  draft:         'Draft',
+  approved:      'Approved',
+  superseded:    'Superseded',
+  scheduled:     'Scheduled',
+  sending:       'Sending…',
+  sent:          'Sent',
+  manually_sent: 'Sent',
+  bounced:       'Bounced',
+  rate_limited:  'Rate limited',
+  cancelled:     'Cancelled',
 }

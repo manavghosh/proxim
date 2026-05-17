@@ -14,6 +14,7 @@ const makeDraft = (day: 1 | 3 | 7): EmailDraftSummary => ({
   dayNumber: day,
   subject: 'Re: Head of AI @ Acme',
   bodyHtml: `<p>Day ${day}</p>`,
+  bodyText: `Day ${day}`,
   originalBodyHtml: `<p>Day ${day} original</p>`,
   isApproved: false,
   status: 'draft',

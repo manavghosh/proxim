@@ -88,6 +88,7 @@ export async function GET(request: Request) {
           dayNumber: d.dayNumber as 1 | 3 | 7,
           subject: d.subject,
           bodyHtml: d.bodyHtml,
+          bodyText: d.bodyText,
           originalBodyHtml: d.originalBodyHtml,
           isApproved: d.isApproved,
           status: d.status as EmailDraftStatus,

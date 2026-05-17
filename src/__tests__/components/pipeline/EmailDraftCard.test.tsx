@@ -12,6 +12,7 @@ const makeDraft = (overrides: Partial<EmailDraftSummary> = {}): EmailDraftSummar
   dayNumber: 1,
   subject: 'Re: Head of AI @ Acme',
   bodyHtml: '<p>Hello Sarah</p>',
+  bodyText: 'Hello Sarah',
   originalBodyHtml: '<p>Original Hello Sarah</p>',
   isApproved: false,
   status: 'draft',

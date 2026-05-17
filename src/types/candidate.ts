@@ -48,6 +48,8 @@ export interface Preferences {
   gmail_refresh_token?: string
   gmail_email?: string
   gmail_token_expiry?: string
+  // Email outreach mode (F6)
+  email_outreach_mode?: 'agentic' | 'manual'
 }
 
 export type OutreachStatus =
@@ -81,13 +83,14 @@ export type EmailCadenceStatus =
 
 export type EmailDraftStatus =
   | 'draft' | 'approved' | 'superseded' | 'scheduled'
-  | 'sending' | 'sent' | 'bounced' | 'rate_limited' | 'cancelled'
+  | 'sending' | 'sent' | 'manually_sent' | 'bounced' | 'rate_limited' | 'cancelled'
 
 export interface EmailDraftSummary {
   id: string
   dayNumber: 1 | 3 | 7
   subject: string
   bodyHtml: string
+  bodyText: string
   originalBodyHtml: string
   isApproved: boolean
   status: EmailDraftStatus
@@ -123,3 +126,5 @@ export interface PipelineReadiness {
   missing: string[]
   parseStatus: ParseStatus
 }
+
+export type EmailOutreachMode = 'agentic' | 'manual'
