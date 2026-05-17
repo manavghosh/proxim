@@ -349,6 +349,7 @@ export const emailDraftStatusEnum = pgEnum('email_draft_status', [
   'scheduled',
   'sending',
   'sent',
+  'manually_sent',
   'bounced',
   'rate_limited',
   'cancelled',

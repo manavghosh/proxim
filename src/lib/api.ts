@@ -477,3 +477,29 @@ export async function overrideEmail(
     body: JSON.stringify({ confirmedEmail }),
   })
 }
+
+export async function startCountdown(
+  cadenceId: string,
+  candidateId: string,
+): Promise<{ cadenceId: string; status: string; day3Due: string; day7Due: string }> {
+  return request(`/api/email-cadence/${cadenceId}/start-countdown${qs(candidateId)}`, { method: 'POST' })
+}
+
+export async function markDraftSent(
+  cadenceId: string,
+  draftId: string,
+  candidateId: string,
+): Promise<{ draftId: string; dayNumber: number; status: string; sentAt: string }> {
+  return request(`/api/email-cadence/${cadenceId}/mark-sent${qs(candidateId)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ draftId }),
+  })
+}
+
+export async function cancelCadence(
+  cadenceId: string,
+  candidateId: string,
+): Promise<{ cadenceId: string; status: string }> {
+  return request(`/api/email-cadence/${cadenceId}/cancel${qs(candidateId)}`, { method: 'POST' })
+}

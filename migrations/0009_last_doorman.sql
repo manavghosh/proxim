@@ -1,0 +1,1 @@
+ALTER TYPE "public"."email_draft_status" ADD VALUE 'manually_sent' BEFORE 'bounced';

@@ -64,6 +64,13 @@
       "when": 1778985812619,
       "tag": "0008_heavy_daimon_hellstrom",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1779022222054,
+      "tag": "0009_last_doorman",
+      "breakpoints": true
     }
   ]
 }

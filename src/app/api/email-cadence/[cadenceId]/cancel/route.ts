@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server'
-import { eq, and, inArray } from 'drizzle-orm'
+import { eq, and, or } from 'drizzle-orm'
 import { db } from '@/db'
 import { emailCadences, emailDrafts } from '@/db/schema'
 
 const TERMINAL = ['replied', 'bounced', 'cancelled', 'cadence_complete', 'failed']
-const CANCELLABLE_DRAFTS = ['draft', 'approved', 'scheduled']
 
 export async function POST(
   request: Request,
@@ -25,7 +24,10 @@ export async function POST(
     const now = new Date()
     await db.update(emailDrafts)
       .set({ status: 'cancelled', updatedAt: now })
-      .where(and(eq(emailDrafts.cadenceId, cadenceId), inArray(emailDrafts.status, CANCELLABLE_DRAFTS)))
+      .where(and(
+        eq(emailDrafts.cadenceId, cadenceId),
+        or(eq(emailDrafts.status, 'draft'), eq(emailDrafts.status, 'approved'), eq(emailDrafts.status, 'scheduled'))
+      ))
 
     await db.update(emailCadences)
       .set({ status: 'cancelled', updatedAt: now })
