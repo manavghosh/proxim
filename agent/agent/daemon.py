@@ -188,52 +188,91 @@ async def _dispatch_job(pool, job: dict) -> None:
                                          error_message=str(exc))
 
     elif job['job_type'] == 'import_jobs':
-        from agent.db import get_jobs_by_ids, update_job_meta, queue_pipeline_job
-        from agent.config import settings as _settings
+        from agent.db import (
+            get_jobs_by_ids, update_job_meta, queue_pipeline_job,
+            update_pipeline_job_status, insert_pipeline_log,
+        )
 
         payload  = job.get('payload') or {}
         job_ids  = payload.get('job_ids', [])
         cand_id  = str(job['candidate_id'])
+        pj_id    = job['id']
 
-        logger.info("job_dispatching", job_id=job['id'], job_type='import_jobs',
-                    count=len(job_ids))
+        logger.info("job_dispatching", job_id=pj_id, job_type='import_jobs', count=len(job_ids))
 
-        if not job_ids:
-            return
+        async def _log(step: str, message: str, data: dict | None = None) -> None:
+            try:
+                await insert_pipeline_log(pool, pj_id, level="info", step=step,
+                                          message=message, data=data)
+            except Exception:
+                pass
 
-        jobs_to_fetch = await get_jobs_by_ids(pool, job_ids)
+        try:
+            if not job_ids:
+                await update_pipeline_job_status(pool, pj_id, 'completed')
+                return
 
-        # LinkedIn — use LinkedInJdScraper (extracts title, company, JD)
-        linkedin_jobs = [j for j in jobs_to_fetch if j['source'] == 'linkedin']
-        other_jobs    = [j for j in jobs_to_fetch if j['source'] != 'linkedin']
+            await _log("import_jobs", f"Starting import of {len(job_ids)} job(s)",
+                       {"count": len(job_ids)})
 
-        if linkedin_jobs:
-            from agent.scrapers.linkedin_jd import LinkedInJdScraper
-            scraper = LinkedInJdScraper()
+            jobs_to_fetch = await get_jobs_by_ids(pool, job_ids)
+            linkedin_jobs = [j for j in jobs_to_fetch if j['source'] == 'linkedin']
+            other_jobs    = [j for j in jobs_to_fetch if j['source'] != 'linkedin']
 
-            async def on_fetched(job_id: str, jd_text: str, title: str = "", company: str = "") -> None:
-                if jd_text or title:
-                    await update_job_meta(
-                        pool, job_id,
-                        title=title or "Imported Job",
-                        company=company or "Unknown",
-                        jd_raw=jd_text,
-                    )
-                    logger.info("import_jobs.linkedin_fetched", job_id=job_id,
-                                title=title[:60] if title else "")
+            fetched = 0
+            if linkedin_jobs:
+                from agent.scrapers.linkedin_jd import LinkedInJdScraper
+                scraper = LinkedInJdScraper()
+                total = len(linkedin_jobs)
 
-            await scraper.fetch_jds(linkedin_jobs, on_fetched=on_fetched)
+                await _log("import_jobs", f"Fetching job descriptions from LinkedIn for {total} job(s)",
+                           {"total": total})
 
-        # Other URLs — store source_url as placeholder JD so scoring can proceed
-        for j in other_jobs:
-            await update_job_meta(pool, j['id'],
-                                  title=j.get('title') or "Imported Job",
-                                  company=j.get('company') or "Unknown",
-                                  jd_raw=j['source_url'])
+                async def on_fetched(job_id: str, jd_text: str, title: str = "", company: str = "") -> None:
+                    nonlocal fetched
+                    fetched += 1
+                    if jd_text or title:
+                        await update_job_meta(
+                            pool, job_id,
+                            title=title or "Imported Job",
+                            company=company or "Unknown",
+                            jd_raw=jd_text,
+                        )
+                        words = len(jd_text.split()) if jd_text else 0
+                        await _log("import_jobs",
+                                   f"Job {fetched}/{total} fetched: {(title or 'Unknown')[:50]} — {words} words",
+                                   {"fetched": fetched, "total": total, "words": words})
+                        logger.info("import_jobs.fetched", job_id=job_id, title=(title or "")[:60])
+                    else:
+                        await _log("import_jobs",
+                                   f"Job {fetched}/{total} — no content found (URL may be expired or private)",
+                                   {"fetched": fetched, "total": total})
 
-        # Queue score_jobs for the imported batch
-        await queue_pipeline_job(pool, cand_id, 'score_jobs')
-        logger.info("import_jobs.complete", count=len(job_ids), queued_scoring=True)
+                await scraper.fetch_jds(linkedin_jobs, on_fetched=on_fetched)
+
+            # Non-LinkedIn: store source URL as JD so scoring can proceed
+            for j in other_jobs:
+                await update_job_meta(pool, j['id'],
+                                      title=j.get('title') or "Imported Job",
+                                      company=j.get('company') or "Unknown",
+                                      jd_raw=j['source_url'])
+
+            await _log("import_jobs",
+                       f"Fetch complete — {fetched} LinkedIn job(s) processed. Queuing scoring.",
+                       {"fetched": fetched})
+
+            await queue_pipeline_job(pool, cand_id, 'score_jobs')
+            await _log("import_jobs",
+                       f"Score jobs queued — jobs will appear in the Pipeline review queue once scored.",
+                       {"queued": True})
+
+            await update_pipeline_job_status(pool, pj_id, 'completed')
+            logger.info("import_jobs.complete", count=len(job_ids), fetched=fetched)
+
+        except Exception as exc:
+            logger.error("import_jobs.error", job_id=pj_id, error=str(exc))
+            await _log("import_jobs", f"Import failed: {exc}", {"error": str(exc)})
+            await update_pipeline_job_status(pool, pj_id, 'failed', error=str(exc))
 
     elif job['job_type'] in ('outreach_mailer', 'outreach_mailer_generate'):
         from agent.nodes.outreach_mailer import (
