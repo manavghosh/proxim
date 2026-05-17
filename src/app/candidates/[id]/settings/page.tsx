@@ -24,13 +24,19 @@ export default function SettingsPage() {
   const [readiness, setReadiness]                 = useState<PipelineReadiness | null>(null)
   const [convertedMarkdown, setConvertedMarkdown] = useState<string | null>(null)
   const [loading, setLoading]                     = useState(true)
+  const [loadError, setLoadError]                 = useState(false)
   const [reparsing, setReparsing]                 = useState(false)
   const [reparseError, setReparseError]           = useState<string | null>(null)
 
   async function refresh() {
-    const [cv, r] = await Promise.all([getCV(candidateId), getReadiness(candidateId)])
-    setCandidate(cv)
-    setReadiness(r)
+    setLoadError(false)
+    try {
+      const [cv, r] = await Promise.all([getCV(candidateId), getReadiness(candidateId)])
+      setCandidate(cv)
+      setReadiness(r)
+    } catch {
+      setLoadError(true)
+    }
   }
 
   useEffect(() => {
@@ -74,12 +80,26 @@ export default function SettingsPage() {
     void refresh()
   }
 
-  if (loading) {
+  if (loading || loadError) {
     return (
       <div className="flex flex-col flex-1 overflow-hidden">
         <Topbar title="Settings" actions={<CandidateSwitcher candidateId={candidateId} />} />
-        <div className="flex-1 flex items-center justify-center bg-[#0d1829]">
-          <p className="text-[#475569] text-sm">Loading…</p>
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-[#0d1829]">
+          {loadError ? (
+            <>
+              <p className="text-[#475569] text-sm">Failed to load settings.</p>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs"
+                onClick={() => { setLoading(true); refresh().finally(() => setLoading(false)) }}
+              >
+                Retry
+              </Button>
+            </>
+          ) : (
+            <p className="text-[#475569] text-sm">Loading…</p>
+          )}
         </div>
       </div>
     )
