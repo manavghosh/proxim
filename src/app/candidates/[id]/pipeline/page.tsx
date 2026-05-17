@@ -22,7 +22,6 @@ import {
   type HitlJob,
 } from '@/lib/api'
 import { Workflow } from 'lucide-react'
-import { ImportJobsSheet } from '@/components/pipeline/ImportJobsSheet'
 
 // Pipeline review never includes F-grade jobs (route enforces it), so the
 // available choices are A/B/C/D only.
@@ -254,7 +253,6 @@ export default function PipelinePage() {
         </div>
         <div className="flex items-center gap-3">
           <CandidateSwitcher candidateId={candidateId} />
-          <ImportJobsSheet candidateId={candidateId} onImported={() => loadJobs(selectedGrades, sort)} />
           <GradeFilterDropdown
             selected={selectedGrades}
             onChange={handleGradesChange}

@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import { getCV, getReadiness, triggerPipeline, getPipelineStatus, getJobStats, resetFailedJobs, getReadyToScoreGroups } from '@/lib/api'
 import type { PipelineJobType } from '@/lib/api'
 import { Topbar } from '@/components/layout/Topbar'
+import { CandidateSwitcher } from '@/components/layout/CandidateSwitcher'
 import { StatCard } from '@/components/dashboard/StatCard'
 import { ReadinessRing } from '@/components/dashboard/ReadinessRing'
 import { ActivityFeed } from '@/components/dashboard/ActivityFeed'
@@ -13,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { PipelineLogPane } from '@/components/dashboard/PipelineLogPane'
 import { ScoringBatchSheet } from '@/components/dashboard/ScoringBatchSheet'
+import { ImportJobsSheet } from '@/components/pipeline/ImportJobsSheet'
 import type { CandidateState, PipelineReadiness } from '@/types/candidate'
 
 const PHASE_OPTIONS: Array<{ value: PipelineJobType; label: string; description: string }> = [
@@ -184,6 +186,7 @@ export default function DashboardPage() {
         title="Dashboard"
         actions={
           <div className="flex items-center gap-2">
+            <CandidateSwitcher candidateId={candidateId} />
             {readyToScore > 0 && (
               <Button
                 size="sm"
@@ -201,6 +204,7 @@ export default function DashboardPage() {
                 ⚠ Rescore Failed ({scoreFailed})
               </Button>
             )}
+            <ImportJobsSheet candidateId={candidateId} label="+ Add Jobs" />
             <div className="relative flex items-center gap-0" ref={phaseMenuRef}>
               <Button size="sm" className="text-xs rounded-r-none border-r border-r-white/20"
                 onClick={() => startPipeline(selectedPhase)} isLoading={pipelineLoading}>

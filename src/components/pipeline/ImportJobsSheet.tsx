@@ -10,11 +10,12 @@ import { importJobs } from '@/lib/api'
 interface Props {
   candidateId: string
   onImported?: () => void
+  label?: string
 }
 
 type Status = 'idle' | 'loading' | 'success' | 'error'
 
-export function ImportJobsSheet({ candidateId, onImported }: Props) {
+export function ImportJobsSheet({ candidateId, onImported, label = '+ Add Jobs' }: Props) {
   const [open, setOpen]     = useState(false)
   const [urls, setUrls]     = useState('')
   const [status, setStatus] = useState<Status>('idle')
@@ -58,7 +59,7 @@ export function ImportJobsSheet({ candidateId, onImported }: Props) {
         onClick={() => setOpen(true)}
       >
         <PlusCircle className="w-3.5 h-3.5" />
-        Import Jobs
+        {label}
       </Button>
 
       <Sheet open={open} onOpenChange={handleClose}>
