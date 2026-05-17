@@ -236,6 +236,19 @@ async def get_candidate_preferences(
     return json.loads(prefs) if isinstance(prefs, str) else dict(prefs)
 
 
+async def get_candidate_name(
+    pool: aiosqlite.Connection,
+    candidate_id: str,
+) -> str:
+    """Return the candidate's display name (empty string if unknown)."""
+    async with pool.execute(
+        'SELECT name FROM candidates WHERE id = ?',
+        (candidate_id,),
+    ) as cursor:
+        row = await cursor.fetchone()
+    return row[0] if row and row[0] else ''
+
+
 async def get_jobs_with_empty_jd(
     pool: aiosqlite.Connection,
     candidate_id: str,
@@ -519,6 +532,371 @@ async def resurface_snoozed_job(
     await pool.execute(
         "UPDATE jobs SET status = 'awaiting', updated_at = ? WHERE id = ?",
         (_now(), job_id),
+    )
+    await pool.commit()
+
+
+# ── LinkedIn Connector DB functions (F5) ──────────────────────────────────────
+
+async def get_outreach_target(
+    pool: aiosqlite.Connection,
+    target_id: str,
+) -> dict | None:
+    """Return a single outreach_target row as a dict, or None if not found."""
+    async with pool.execute(
+        "SELECT id, job_id, candidate_id, company, linkedin_url, title, seniority, "
+        "enrichment_json, note_a, note_b, selected_note, edited_note, status "
+        "FROM outreach_targets WHERE id = ?",
+        (target_id,),
+    ) as cursor:
+        row = await cursor.fetchone()
+    if row is None:
+        return None
+    cols = ["id", "job_id", "candidate_id", "company", "linkedin_url", "title",
+            "seniority", "enrichment_json", "note_a", "note_b",
+            "selected_note", "edited_note", "status"]
+    result = dict(zip(cols, row))
+    if isinstance(result.get("enrichment_json"), str):
+        import json as _json
+        try:
+            result["enrichment_json"] = _json.loads(result["enrichment_json"])
+        except Exception:
+            pass
+    return result
+
+
+async def insert_outreach_target(
+    pool: aiosqlite.Connection,
+    job_id: str,
+    candidate_id: str,
+    company: str,
+) -> str:
+    """Insert a new outreach_targets row with status='pending'. Returns the new id."""
+    target_id = _new_id()
+    now = _now()
+    await pool.execute(
+        "INSERT INTO outreach_targets "
+        "(id, job_id, candidate_id, company, status, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, 'pending', ?, ?)",
+        (target_id, job_id, candidate_id, company, now, now),
+    )
+    await pool.commit()
+    return target_id
+
+
+async def update_outreach_target(
+    pool: aiosqlite.Connection,
+    target_id: str,
+    **kwargs: object,
+) -> None:
+    """Dynamically UPDATE outreach_targets columns for the given target_id."""
+    if not kwargs:
+        return
+    cols: list[str] = []
+    values: list[object] = []
+    for key, val in kwargs.items():
+        cols.append(f"{_to_snake(key)} = ?")
+        if isinstance(val, (dict, list)):
+            values.append(json.dumps(val))
+        else:
+            values.append(val)
+    cols.append("updated_at = ?")
+    values.append(_now())
+    values.append(target_id)
+    await pool.execute(
+        f"UPDATE outreach_targets SET {', '.join(cols)} WHERE id = ?",
+        values,
+    )
+    await pool.commit()
+
+
+async def get_queued_outreach_targets(
+    pool: aiosqlite.Connection,
+    candidate_id: str = "",
+) -> list[dict]:
+    """Return outreach targets with status='queued'.
+
+    When candidate_id is empty, returns queued targets across ALL candidates.
+    """
+    if candidate_id:
+        sql    = ("SELECT id, job_id, candidate_id, company, note_a, note_b, "
+                  "selected_note, edited_note, linkedin_url "
+                  "FROM outreach_targets WHERE candidate_id = ? AND status = 'queued' "
+                  "ORDER BY created_at")
+        params: tuple = (candidate_id,)
+    else:
+        sql    = ("SELECT id, job_id, candidate_id, company, note_a, note_b, "
+                  "selected_note, edited_note, linkedin_url "
+                  "FROM outreach_targets WHERE status = 'queued' "
+                  "ORDER BY created_at")
+        params = ()
+    async with pool.execute(sql, params) as cursor:
+        rows = await cursor.fetchall()
+    cols = ["id", "job_id", "candidate_id", "company", "note_a", "note_b",
+            "selected_note", "edited_note", "linkedin_url"]
+    return [dict(zip(cols, row)) for row in rows]
+
+
+async def get_sent_outreach_targets_for_polling(
+    pool: aiosqlite.Connection,
+) -> list[dict]:
+    """Return sent targets due for acceptance polling (>24 h since last poll)."""
+    async with pool.execute(
+        "SELECT id, candidate_id, linkedin_invitation_id "
+        "FROM outreach_targets "
+        "WHERE status = 'sent' "
+        "AND (last_polled_at IS NULL "
+        "     OR last_polled_at < datetime('now', '-24 hours')) "
+        "ORDER BY sent_at",
+    ) as cursor:
+        rows = await cursor.fetchall()
+    cols = ["id", "candidate_id", "linkedin_invitation_id"]
+    return [dict(zip(cols, row)) for row in rows]
+
+
+async def get_daily_send_count(
+    pool: aiosqlite.Connection,
+    candidate_id: str,
+) -> int:
+    """Count connection requests sent today (UTC) for this candidate."""
+    async with pool.execute(
+        "SELECT COUNT(*) FROM outreach_targets "
+        "WHERE candidate_id = ? AND status = 'sent' "
+        "AND date(sent_at) = date('now')",
+        (candidate_id,),
+    ) as cursor:
+        row = await cursor.fetchone()
+    return row[0] if row else 0
+
+
+# ── Outreach Mailer Agent (F6) ────────────────────────────────────────────────
+
+async def insert_email_cadence(
+    pool: aiosqlite.Connection,
+    job_id: str,
+    candidate_id: str,
+) -> str:
+    """Insert a new email_cadences row with status=pending_discovery. Returns cadence id."""
+    cadence_id = _new_id()
+    now = _now()
+    await pool.execute(
+        "INSERT INTO email_cadences (id, job_id, candidate_id, status, created_at, updated_at) "
+        "VALUES (?, ?, ?, 'pending_discovery', ?, ?)",
+        (cadence_id, job_id, candidate_id, now, now),
+    )
+    await pool.commit()
+    return cadence_id
+
+
+async def update_email_cadence(
+    pool: aiosqlite.Connection,
+    cadence_id: str,
+    **kwargs,
+) -> None:
+    """Dynamically update email_cadences columns by keyword argument."""
+    if not kwargs:
+        return
+    col_map = {
+        "status": "status",
+        "hiring_manager_email": "hiring_manager_email",
+        "email_confidence": "email_confidence",
+        "email_source": "email_source",
+        "gmail_thread_id": "gmail_thread_id",
+        "day1_message_id": "day1_message_id",
+        "approved_at": "approved_at",
+        "reply_detected_at": "reply_detected_at",
+        "bounce_detected_at": "bounce_detected_at",
+        "error_message": "error_message",
+    }
+    sets, values = [], []
+    for k, v in kwargs.items():
+        col = col_map.get(k, k)
+        sets.append(f"{col} = ?")
+        values.append(v)
+    sets.append("updated_at = ?")
+    values.append(_now())
+    values.append(cadence_id)
+    await pool.execute(
+        f"UPDATE email_cadences SET {', '.join(sets)} WHERE id = ?",
+        values,
+    )
+    await pool.commit()
+
+
+async def insert_email_drafts(
+    pool: aiosqlite.Connection,
+    cadence_id: str,
+    candidate_id: str,
+    drafts: list[dict],
+) -> None:
+    """Batch insert email_drafts rows (one per day)."""
+    now = _now()
+    for d in drafts:
+        draft_id = _new_id()
+        await pool.execute(
+            "INSERT INTO email_drafts "
+            "(id, cadence_id, candidate_id, day_number, subject, body_html, body_text, "
+            "original_body_html, is_approved, status, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'draft', ?, ?)",
+            (
+                draft_id, cadence_id, candidate_id,
+                d["day_number"], d["subject"],
+                d["body_html"], d["body_text"], d["original_body_html"],
+                now, now,
+            ),
+        )
+    await pool.commit()
+
+
+async def update_email_draft(
+    pool: aiosqlite.Connection,
+    draft_id: str,
+    **kwargs,
+) -> None:
+    """Dynamically update email_drafts columns by keyword argument."""
+    if not kwargs:
+        return
+    col_map = {
+        "status": "status",
+        "is_approved": "is_approved",
+        "scheduled_send_at": "scheduled_send_at",
+        "sent_at": "sent_at",
+        "gmail_message_id": "gmail_message_id",
+        "open_detected_at": "open_detected_at",
+        "click_detected_at": "click_detected_at",
+        "bounce_detected_at": "bounce_detected_at",
+        "body_html": "body_html",
+        "body_text": "body_text",
+    }
+    sets, values = [], []
+    for k, v in kwargs.items():
+        col = col_map.get(k, k)
+        sets.append(f"{col} = ?")
+        values.append(v)
+    sets.append("updated_at = ?")
+    values.append(_now())
+    values.append(draft_id)
+    await pool.execute(
+        f"UPDATE email_drafts SET {', '.join(sets)} WHERE id = ?",
+        values,
+    )
+    await pool.commit()
+
+
+async def get_scheduled_drafts(pool: aiosqlite.Connection) -> list[dict]:
+    """Return email drafts ready to send (scheduled_send_at elapsed, no reply/bounce)."""
+    async with pool.execute(
+        "SELECT ed.id, ed.cadence_id, ed.candidate_id, ed.day_number, "
+        "ed.subject, ed.body_html, ed.body_text, ed.scheduled_send_at, "
+        "ec.gmail_thread_id, ec.day1_message_id, ec.hiring_manager_email, ec.status AS cadence_status "
+        "FROM email_drafts ed "
+        "JOIN email_cadences ec ON ec.id = ed.cadence_id "
+        "WHERE ed.status IN ('scheduled', 'approved') "
+        "AND datetime(replace(replace(ed.scheduled_send_at, 'T', ' '), '+00:00', '')) <= datetime('now') "
+        "AND ec.status IN ('approved', 'active') "
+        "AND ec.reply_detected_at IS NULL "
+        "AND ec.bounce_detected_at IS NULL "
+        "ORDER BY ed.scheduled_send_at "
+        "LIMIT 10"
+    ) as cursor:
+        rows = await cursor.fetchall()
+    cols = [
+        "id", "cadence_id", "candidate_id", "day_number",
+        "subject", "body_html", "body_text", "scheduled_send_at",
+        "gmail_thread_id", "day1_message_id", "hiring_manager_email", "cadence_status",
+    ]
+    return [dict(zip(cols, row)) for row in rows]
+
+
+async def get_active_cadences_for_polling(pool: aiosqlite.Connection) -> list[dict]:
+    """Return active cadences with a day1 message ID set (for reply/bounce detection)."""
+    async with pool.execute(
+        "SELECT id, candidate_id, day1_message_id, gmail_thread_id "
+        "FROM email_cadences "
+        "WHERE status = 'active' AND day1_message_id IS NOT NULL"
+    ) as cursor:
+        rows = await cursor.fetchall()
+    cols = ["id", "candidate_id", "day1_message_id", "gmail_thread_id"]
+    return [dict(zip(cols, row)) for row in rows]
+
+
+async def get_daily_email_send_count(
+    pool: aiosqlite.Connection,
+    candidate_id: str,
+) -> int:
+    """Count emails sent today (UTC) for this candidate across all cadences."""
+    async with pool.execute(
+        "SELECT COUNT(*) FROM email_drafts "
+        "WHERE candidate_id = ? AND status = 'sent' "
+        "AND date(sent_at) = date('now')",
+        (candidate_id,),
+    ) as cursor:
+        row = await cursor.fetchone()
+    return row[0] if row else 0
+
+
+async def get_resume_version_for_send(
+    pool: aiosqlite.Connection,
+    candidate_id: str,
+    job_id: str,
+) -> dict | None:
+    """Return the latest resume version with a PDF path for Day 1 attachment."""
+    async with pool.execute(
+        "SELECT id, resume_pdf_path, cover_letter_pdf_path FROM resume_versions "
+        "WHERE candidate_id = ? AND job_id = ? "
+        "AND resume_pdf_path IS NOT NULL "
+        "ORDER BY created_at DESC LIMIT 1",
+        (candidate_id, job_id),
+    ) as cursor:
+        row = await cursor.fetchone()
+    if row is None:
+        return None
+    return {"id": row[0], "resume_pdf_path": row[1], "cover_letter_pdf_path": row[2]}
+
+
+async def get_cadence_drafts(
+    pool: aiosqlite.Connection,
+    cadence_id: str,
+) -> list[dict]:
+    """Return all email drafts for a cadence."""
+    async with pool.execute(
+        "SELECT id, day_number, status, scheduled_send_at FROM email_drafts "
+        "WHERE cadence_id = ? ORDER BY day_number",
+        (cadence_id,),
+    ) as cursor:
+        rows = await cursor.fetchall()
+    cols = ["id", "day_number", "status", "scheduled_send_at"]
+    return [dict(zip(cols, row)) for row in rows]
+
+
+async def cancel_pending_drafts(
+    pool: aiosqlite.Connection,
+    cadence_id: str,
+) -> None:
+    """Cancel all scheduled/approved drafts for a cadence (reply detected)."""
+    await pool.execute(
+        "UPDATE email_drafts SET status = 'cancelled', updated_at = ? "
+        "WHERE cadence_id = ? AND status IN ('scheduled', 'approved')",
+        (_now(), cadence_id),
+    )
+    await pool.commit()
+
+
+async def bounce_day1_cancel_day3_day7(
+    pool: aiosqlite.Connection,
+    cadence_id: str,
+) -> None:
+    """Mark Day 1 as bounced; cancel Day 3 and Day 7 (bounce detected)."""
+    now = _now()
+    await pool.execute(
+        "UPDATE email_drafts SET status = 'bounced', bounce_detected_at = ?, updated_at = ? "
+        "WHERE cadence_id = ? AND day_number = 1",
+        (now, now, cadence_id),
+    )
+    await pool.execute(
+        "UPDATE email_drafts SET status = 'cancelled', updated_at = ? "
+        "WHERE cadence_id = ? AND day_number IN (3, 7)",
+        (now, cadence_id),
     )
     await pool.commit()
 

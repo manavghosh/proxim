@@ -73,6 +73,182 @@ async def _dispatch_job(pool, job: dict) -> None:
         )
         await scoring_graph.ainvoke(state)
 
+    elif job['job_type'] == 'linkedin_note_regen':
+        import agent.db as _db_regen
+        from agent.nodes.linkedin_connector import (
+            LinkedInConnectorState, enrich_profile_node, generate_notes_node,
+        )
+        from agent.config import settings as _settings_regen
+        from langchain_core.runnables import RunnableConfig as _RC
+
+        payload   = job.get('payload') or {}
+        target_id = payload.get('target_id', '')
+        job_id    = payload.get('job_id', '')
+        cand_id   = str(job['candidate_id'])
+
+        logger.info("job_dispatching", job_id=job['id'], job_type='linkedin_note_regen',
+                    target_id=target_id)
+
+        target = await _db_regen.get_outreach_target(pool, target_id)
+        if not target:
+            logger.warning("linkedin_note_regen.target_not_found", target_id=target_id)
+            return
+
+        config = _RC(configurable={
+            "pool": pool,
+            "proxycurl_api_key": getattr(_settings_regen, 'exa_api_key', ''),
+        })
+
+        state: LinkedInConnectorState = {
+            "job_id":               job_id,
+            "candidate_id":         cand_id,
+            "company":              target.get("company", ""),
+            "job_title":            "",
+            "archetype":            "",
+            "archetype_confidence": 0.0,
+            "contact":              {"profile_url": target.get("linkedin_url", "")},
+            "enrichment":           target.get("enrichment_json"),
+            "note_a":               None,
+            "note_b":               None,
+            "generation_attempts":  0,
+            "outreach_target_id":   target_id,
+            "status":               "generating",
+            "error":                None,
+        }
+        try:
+            state = {**state, **(await enrich_profile_node(state, config))}
+            state = {**state, **(await generate_notes_node(state, config))}
+            logger.info("linkedin_note_regen.complete", target_id=target_id,
+                        status=state["status"])
+        except Exception as exc:
+            logger.error("linkedin_note_regen.error", target_id=target_id, error=str(exc))
+            await _db_regen.update_outreach_target(
+                pool, target_id, status="failed", error_message=str(exc)
+            )
+
+    elif job['job_type'] == 'linkedin_connector':
+        from agent.nodes.linkedin_connector import LinkedInConnectorState, check_dnc_node, discover_contact_node, enrich_profile_node, generate_notes_node
+        from agent.db import insert_outreach_target
+        from agent.config import settings
+        from langchain_core.runnables import RunnableConfig
+
+        payload    = job.get('payload') or {}
+        job_id     = payload.get('job_id', '')
+        company    = payload.get('company', '')
+        job_title  = payload.get('job_title', '')
+        archetype  = payload.get('archetype', '')
+        arch_conf  = float(payload.get('archetype_confidence', 0))
+        cand_id    = str(job['candidate_id'])
+
+        logger.info("job_dispatching", job_id=job['id'], job_type='linkedin_connector',
+                    target_job_id=job_id, company=company)
+
+        target_id = await insert_outreach_target(pool, job_id, cand_id, company)
+        config    = RunnableConfig(configurable={
+            "pool": pool,
+            "proxycurl_api_key": getattr(settings, 'exa_api_key', ''),
+        })
+
+        state: LinkedInConnectorState = {
+            "job_id":               job_id,
+            "candidate_id":         cand_id,
+            "company":              company,
+            "job_title":            job_title,
+            "archetype":            archetype,
+            "archetype_confidence": arch_conf,
+            "contact":              None,
+            "enrichment":           None,
+            "note_a":               None,
+            "note_b":               None,
+            "generation_attempts":  0,
+            "outreach_target_id":   target_id,
+            "status":               "pending",
+            "error":                None,
+        }
+
+        try:
+            state = {**state, **(await check_dnc_node(state, config))}
+            if state["status"] == "skipped_dnc":
+                logger.info("linkedin.dnc_skip_complete", target_id=target_id)
+                return
+
+            state = {**state, **(await discover_contact_node(state, config))}
+            if state["status"] == "no_contact_found":
+                logger.info("linkedin.no_contact_complete", target_id=target_id)
+                return
+
+            state = {**state, **(await enrich_profile_node(state, config))}
+            state = {**state, **(await generate_notes_node(state, config))}
+            logger.info("linkedin.connector_complete", target_id=target_id,
+                        status=state["status"])
+        except Exception as exc:
+            from agent.db import update_outreach_target
+            logger.error("linkedin.connector_error", target_id=target_id, error=str(exc))
+            await update_outreach_target(pool, target_id, status="failed",
+                                         error_message=str(exc))
+
+    elif job['job_type'] in ('outreach_mailer', 'outreach_mailer_generate'):
+        from agent.nodes.outreach_mailer import (
+            OutreachMailerState, discover_email_node, generate_emails_node,
+            write_cadence_checkpoint_node,
+        )
+        from agent.db import insert_email_cadence
+        from agent.config import settings as _settings
+        from langchain_core.runnables import RunnableConfig
+
+        payload    = job.get('payload') or {}
+        job_id     = payload.get('job_id', '')
+        company    = payload.get('company', '')
+        job_title  = payload.get('job_title', '')
+        archetype  = payload.get('archetype', '')
+        arch_conf  = float(payload.get('archetype_confidence', 0))
+        cand_id    = str(job['candidate_id'])
+
+        logger.info("job_dispatching", job_id=job['id'], job_type=job['job_type'],
+                    target_job_id=job_id, company=company)
+
+        if job['job_type'] == 'outreach_mailer':
+            cadence_id = await insert_email_cadence(pool, job_id, cand_id)
+        else:
+            cadence_id = str(payload.get('cadence_id', ''))
+
+        config = RunnableConfig(configurable={"pool": pool, "settings": _settings})
+
+        state: OutreachMailerState = {
+            "job_id": job_id,
+            "candidate_id": cand_id,
+            "company": company,
+            "job_title": job_title,
+            "archetype": archetype,
+            "archetype_confidence": arch_conf,
+            "hiring_manager_name": None,
+            "cadence_id": cadence_id,
+            "discovered_email": None,
+            "email_confidence": None,
+            "email_source": None,
+            "subject": None,
+            "day1_body": None,
+            "day3_body": None,
+            "day7_body": None,
+            "generation_attempts": 0,
+            "status": "discovering",
+            "error": None,
+        }
+
+        try:
+            if job['job_type'] == 'outreach_mailer':
+                state = {**state, **(await discover_email_node(state, config))}
+                if state["status"] in ("email_not_found", "low_confidence"):
+                    return
+            state = {**state, **(await generate_emails_node(state, config))}
+            if state["status"] == "failed":
+                return
+            await write_cadence_checkpoint_node(state, config)
+        except Exception as exc:
+            from agent.db import update_email_cadence
+            logger.error("outreach_mailer.error", cadence_id=cadence_id, error=str(exc))
+            await update_email_cadence(pool, cadence_id, status="failed", error_message=str(exc))
+
     else:
         from agent.graphs.discovery import discovery_graph
         from agent.models import DiscoveryState
@@ -98,6 +274,144 @@ async def _dispatch_job(pool, job: dict) -> None:
         logger.info("graph_complete", graph="discovery", job_id=job['id'])
 
 
+async def _linkedin_acceptance_poll_once(pool) -> None:
+    """Single poll pass — update accepted/expired status for sent outreach targets."""
+    import agent.db as _db
+    import agent.linkedin_api as linkedin_api
+    from datetime import datetime, timezone, timedelta
+    get_sent_outreach_targets_for_polling = _db.get_sent_outreach_targets_for_polling
+    get_candidate_preferences             = _db.get_candidate_preferences
+    update_outreach_target                = _db.update_outreach_target
+
+    targets = await get_sent_outreach_targets_for_polling(pool)
+    for t in targets:
+        try:
+            prefs        = await get_candidate_preferences(pool, t["candidate_id"])
+            access_token = prefs.get("linkedin_access_token", "")
+            inv_id       = t.get("linkedin_invitation_id", "")
+            if not access_token or not inv_id:
+                continue
+
+            status = await linkedin_api.get_invitation_status(access_token, inv_id)
+
+            sent_at_raw = t.get("sent_at") or ""
+            sent_at: datetime | None = None
+            try:
+                sent_at = datetime.fromisoformat(sent_at_raw.replace("Z", "+00:00"))
+            except Exception:
+                pass
+
+            now = datetime.now(timezone.utc)
+            is_old = sent_at is not None and (now - sent_at) > timedelta(days=30)
+
+            if status == "ACCEPTED":
+                await update_outreach_target(
+                    pool, t["id"],
+                    status="accepted",
+                    accepted_at=now.isoformat(),
+                    last_polled_at=now.isoformat(),
+                )
+                logger.info("linkedin.accepted", target_id=t["id"])
+            elif is_old and status == "PENDING":
+                await update_outreach_target(
+                    pool, t["id"],
+                    status="expired",
+                    last_polled_at=now.isoformat(),
+                )
+                logger.info("linkedin.expired", target_id=t["id"])
+            else:
+                await update_outreach_target(
+                    pool, t["id"],
+                    last_polled_at=now.isoformat(),
+                )
+        except Exception as exc:
+            logger.warning("linkedin.poll_error", target_id=t.get("id"), error=str(exc))
+
+
+async def _linkedin_acceptance_poll_loop(pool) -> None:
+    """Poll acceptance status every 24 hours."""
+    while not _stop_event.is_set():
+        try:
+            await _linkedin_acceptance_poll_once(pool)
+        except Exception as exc:
+            logger.error("linkedin.poll_loop_error", error=str(exc))
+        await asyncio.sleep(86400)
+
+
+async def _linkedin_queued_send_once(pool) -> None:
+    """Single pass — process queued outreach targets when under the daily limit."""
+    import agent.db as _db
+    import agent.linkedin_api as linkedin_api
+    from datetime import datetime, timezone
+    get_queued_outreach_targets = _db.get_queued_outreach_targets
+    get_daily_send_count        = _db.get_daily_send_count
+    get_candidate_preferences   = _db.get_candidate_preferences
+    update_outreach_target      = _db.update_outreach_target
+
+    # candidate_id="" → db_sqlite returns all queued across candidates
+    all_queued = await get_queued_outreach_targets(pool, "")
+    if not all_queued:
+        return
+
+    # Group by candidate
+    by_cand: dict[str, list[dict]] = {}
+    for t in all_queued:
+        by_cand.setdefault(t["candidate_id"], []).append(t)
+
+    now = datetime.now(timezone.utc)
+
+    for cand_id, targets in by_cand.items():
+        try:
+            prefs = await get_candidate_preferences(pool, cand_id)
+            if prefs.get("linkedin_paused"):
+                continue
+
+            access_token = prefs.get("linkedin_access_token", "")
+            if not access_token:
+                continue
+
+            daily_count  = await get_daily_send_count(pool, cand_id)
+            remaining    = max(0, 20 - daily_count)
+
+            for target in targets[:remaining]:
+                try:
+                    note = (
+                        target.get("edited_note")
+                        or (target.get("note_a") if target.get("selected_note") == "A" else target.get("note_b"))
+                        or target.get("note_a")
+                        or ""
+                    )
+                    profile_id = (target.get("linkedin_url") or "").rstrip("/").split("/")[-1]
+                    inv_id = await linkedin_api.send_connection_request(
+                        access_token, profile_id, note
+                    )
+                    await update_outreach_target(
+                        pool, target["id"],
+                        status="sent",
+                        sent_at=now.isoformat(),
+                        linkedin_invitation_id=inv_id,
+                    )
+                    logger.info("linkedin.queued_sent", target_id=target["id"])
+                except linkedin_api.LinkedInRateLimitError:
+                    await update_outreach_target(pool, target["id"], status="paused")
+                    logger.warning("linkedin.rate_limit_on_queued_send", target_id=target["id"])
+                    break
+                except Exception as exc:
+                    logger.error("linkedin.queued_send_error", target_id=target["id"], error=str(exc))
+        except Exception as exc:
+            logger.error("linkedin.queued_loop_cand_error", candidate_id=cand_id, error=str(exc))
+
+
+async def _linkedin_queued_send_loop(pool) -> None:
+    """Process queued sends every hour."""
+    while not _stop_event.is_set():
+        try:
+            await _linkedin_queued_send_once(pool)
+        except Exception as exc:
+            logger.error("linkedin.queued_loop_error", error=str(exc))
+        await asyncio.sleep(3600)
+
+
 async def _snooze_resurface_loop(pool) -> None:
     """Poll every 60 seconds for expired snoozed jobs and resurface them."""
     from agent.db import get_snoozed_jobs_to_resurface, resurface_snoozed_job
@@ -115,6 +429,150 @@ async def _snooze_resurface_loop(pool) -> None:
         except Exception as exc:
             logger.error("snooze_resurface_error", error=str(exc))
         await asyncio.sleep(60)
+
+
+async def _outreach_send_once(pool) -> None:
+    """Single pass of the cadence send loop."""
+    import agent.db as _db
+    import agent.gmail_client as gmail_client
+    from agent.gmail_client import GmailAuthExpiredError
+    from datetime import datetime, timezone, timedelta
+
+    drafts = await _db.get_scheduled_drafts(pool)
+    for draft in drafts:
+        candidate_id = draft["candidate_id"]
+        cadence_id = draft["cadence_id"]
+        draft_id = draft["id"]
+        day_number = draft["day_number"]
+
+        # Daily cap check
+        count = await _db.get_daily_email_send_count(pool, candidate_id)
+        if count >= 20:
+            next_send = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+            await _db.update_email_draft(pool, draft_id, status="rate_limited", scheduled_send_at=next_send)
+            logger.warning("outreach.rate_limited", candidate_id=candidate_id, draft_id=draft_id)
+            continue
+
+        # Day 1 attachment check
+        attachments = None
+        if day_number == 1:
+            # Extract job_id from cadence
+            resume = await _db.get_resume_version_for_send(pool, candidate_id, draft.get("job_id", ""))
+            if resume is None:
+                await _db.update_email_cadence(pool, cadence_id, status="attachment_missing")
+                logger.info("outreach.attachment_missing", cadence_id=cadence_id)
+                continue
+            pdf_path = resume.get("resume_pdf_path")
+            attachments = [{"path": pdf_path, "filename": "resume.pdf"}] if pdf_path else []
+
+        # Load Gmail credentials
+        prefs = await _db.get_candidate_preferences(pool, candidate_id)
+        access_token = prefs.get("gmail_access_token", "") if prefs else ""
+        refresh_token = prefs.get("gmail_refresh_token", "") if prefs else ""
+
+        try:
+            result = gmail_client.send_email(
+                service=None,
+                to=draft["hiring_manager_email"],
+                subject=draft["subject"],
+                body_html=draft["body_html"],
+                body_text=draft["body_text"],
+                thread_id=draft.get("gmail_thread_id"),
+                in_reply_to=draft.get("day1_message_id"),
+                references=draft.get("day1_message_id"),
+                attachments=attachments,
+            )
+            now = datetime.now(timezone.utc).isoformat()
+            await _db.update_email_draft(pool, draft_id, status="sent", sent_at=now,
+                                          gmail_message_id=result["id"])
+            logger.info("outreach.sent", draft_id=draft_id, day=day_number)
+
+            if day_number == 1:
+                await _db.update_email_cadence(pool, cadence_id,
+                                                gmail_thread_id=result["threadId"],
+                                                day1_message_id=result["id"],
+                                                status="active")
+                # Schedule Day 3 and Day 7
+                day3_at = (datetime.now(timezone.utc) + timedelta(hours=72)).isoformat()
+                day7_at = (datetime.now(timezone.utc) + timedelta(hours=168)).isoformat()
+                other_drafts = await _db.get_cadence_drafts(pool, cadence_id)
+                for od in other_drafts:
+                    if od["day_number"] == 3:
+                        await _db.update_email_draft(pool, od["id"], status="scheduled",
+                                                      scheduled_send_at=day3_at)
+                    elif od["day_number"] == 7:
+                        await _db.update_email_draft(pool, od["id"], status="scheduled",
+                                                      scheduled_send_at=day7_at)
+
+        except GmailAuthExpiredError:
+            await _db.update_email_cadence(pool, cadence_id, status="auth_expired")
+            logger.warning("outreach.auth_expired", cadence_id=cadence_id)
+
+
+async def _outreach_send_loop(pool) -> None:
+    """Cadence send loop — polls every 3 minutes for scheduled drafts."""
+    while not _stop_event.is_set():
+        try:
+            await _outreach_send_once(pool)
+        except Exception as exc:
+            logger.error("outreach_send_loop.error", error=str(exc))
+        await asyncio.sleep(180)
+
+
+async def _reply_bounce_detection_once(pool) -> None:
+    """Single pass of reply/bounce detection."""
+    import agent.db as _db
+    import agent.gmail_client as gmail_client
+    from agent.gmail_client import GmailAuthExpiredError
+
+    cadences = await _db.get_active_cadences_for_polling(pool)
+    for cadence in cadences:
+        cadence_id = cadence["id"]
+        day1_message_id = cadence.get("day1_message_id")
+
+        if not day1_message_id:
+            continue
+
+        candidate_id = cadence["candidate_id"]
+        prefs = await _db.get_candidate_preferences(pool, candidate_id)
+        access_token = prefs.get("gmail_access_token", "") if prefs else ""
+        refresh_token = prefs.get("gmail_refresh_token", "") if prefs else ""
+
+        try:
+            service = gmail_client.build_service(access_token, refresh_token)
+
+            if gmail_client.check_reply(service, day1_message_id):
+                from datetime import datetime, timezone
+                await _db.update_email_cadence(pool, cadence_id,
+                                                status="replied",
+                                                reply_detected_at=datetime.now(timezone.utc).isoformat())
+                await _db.cancel_pending_drafts(pool, cadence_id)
+                logger.info("outreach.reply_detected", cadence_id=cadence_id)
+                continue
+
+            if gmail_client.check_bounce(service, day1_message_id):
+                from datetime import datetime, timezone
+                await _db.update_email_cadence(pool, cadence_id,
+                                                status="bounced",
+                                                bounce_detected_at=datetime.now(timezone.utc).isoformat())
+                await _db.bounce_day1_cancel_day3_day7(pool, cadence_id)
+                logger.info("outreach.bounce_detected", cadence_id=cadence_id)
+
+        except GmailAuthExpiredError:
+            await _db.update_email_cadence(pool, cadence_id, status="auth_expired")
+            logger.warning("outreach.detection_auth_expired", cadence_id=cadence_id)
+        except Exception as exc:
+            logger.warning("outreach.detection_error", cadence_id=cadence_id, error=str(exc))
+
+
+async def _reply_bounce_detection_loop(pool) -> None:
+    """Reply/bounce detection loop — polls every 60 minutes."""
+    while not _stop_event.is_set():
+        try:
+            await _reply_bounce_detection_once(pool)
+        except Exception as exc:
+            logger.error("detection_loop.error", error=str(exc))
+        await asyncio.sleep(3600)
 
 
 async def main() -> None:
@@ -144,6 +602,10 @@ async def main() -> None:
     await asyncio.gather(
         _job_poll_loop(),
         _snooze_resurface_loop(pool),
+        _linkedin_acceptance_poll_loop(pool),
+        _linkedin_queued_send_loop(pool),
+        _outreach_send_loop(pool),
+        _reply_bounce_detection_loop(pool),
     )
 
 

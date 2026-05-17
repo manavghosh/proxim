@@ -29,6 +29,20 @@
       "when": 1777948421762,
       "tag": "0003_early_tinkerer",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1778515521114,
+      "tag": "0004_pink_fantastic_four",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1778985817608,
+      "tag": "0005_calm_johnny_blaze",
+      "breakpoints": true
     }
   ]
 }

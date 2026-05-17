@@ -23,7 +23,14 @@ export async function POST(
       .update(jobs)
       .set({ status: 'approved' })
       .where(and(eq(jobs.id, jobId), inArray(jobs.status, ['scored', 'awaiting'] as JobStatus[])))
-      .returning({ id: jobs.id, status: jobs.status })
+      .returning({
+        id:                  jobs.id,
+        status:              jobs.status,
+        company:             jobs.company,
+        title:               jobs.title,
+        archetype:           jobs.archetype,
+        archetypeConfidence: jobs.archetypeConfidence,
+      })
 
     if (updated.length === 0) {
       // Fetch current status to give a meaningful error
@@ -62,6 +69,34 @@ export async function POST(
         payload: { job_id: jobId, candidate_id: candidateId },
       })
       .returning({ id: pipelineJobs.id })
+
+    // Enqueue LinkedIn connector in parallel with resume builder
+    await db.insert(pipelineJobs).values({
+      jobType: 'linkedin_connector',
+      candidateId,
+      payload: {
+        job_id:               jobId,
+        candidate_id:         candidateId,
+        company:              updated[0].company ?? '',
+        job_title:            updated[0].title,
+        archetype:            updated[0].archetype ?? '',
+        archetype_confidence: Number(updated[0].archetypeConfidence ?? 0),
+      },
+    })
+
+    // Enqueue outreach mailer (F6) — discovers hiring manager email + generates 3-email cadence
+    await db.insert(pipelineJobs).values({
+      jobType: 'outreach_mailer',
+      candidateId,
+      payload: {
+        job_id:               jobId,
+        candidate_id:         candidateId,
+        company:              updated[0].company ?? '',
+        job_title:            updated[0].title,
+        archetype:            updated[0].archetype ?? '',
+        archetype_confidence: Number(updated[0].archetypeConfidence ?? 0),
+      },
+    })
 
     return NextResponse.json({
       jobId,

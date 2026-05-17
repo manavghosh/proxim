@@ -17,6 +17,23 @@ vi.mock('@/db/schema', () => ({
   hitlCheckpoints: {
     jobId: 'jobId', status: 'status', snoozedUntil: 'snoozedUntil', createdAt: 'createdAt', id: 'id',
   },
+  outreachTargets: {
+    jobId: 'jobId', id: 'id', status: 'status', name: 'name', linkedinUrl: 'linkedinUrl',
+    title: 'title', seniority: 'seniority', noteA: 'noteA', noteB: 'noteB',
+    selectedNote: 'selectedNote', editedNote: 'editedNote',
+    sentAt: 'sentAt', acceptedAt: 'acceptedAt', errorMessage: 'errorMessage',
+  },
+  emailCadences: {
+    id: 'id', jobId: 'jobId', candidateId: 'candidateId', status: 'status',
+    hiringManagerEmail: 'hiringManagerEmail', emailConfidence: 'emailConfidence',
+    approvedAt: 'approvedAt', replyDetectedAt: 'replyDetectedAt', bounceDetectedAt: 'bounceDetectedAt',
+  },
+  emailDrafts: {
+    id: 'id', cadenceId: 'cadenceId', candidateId: 'candidateId', dayNumber: 'dayNumber',
+    subject: 'subject', bodyHtml: 'bodyHtml', originalBodyHtml: 'originalBodyHtml',
+    isApproved: 'isApproved', status: 'status', scheduledSendAt: 'scheduledSendAt',
+    sentAt: 'sentAt', openDetectedAt: 'openDetectedAt', clickDetectedAt: 'clickDetectedAt',
+  },
 }))
 
 const makeJob = (overrides = {}) => ({
@@ -26,6 +43,10 @@ const makeJob = (overrides = {}) => ({
   score10d: null, reportMd: null, archetype: null, archetypeConfidence: null,
   createdAt: '2026-05-01T00:00:00Z',
   hitlCheckpointId: null, hitlStatus: null, hitlSnoozedUntil: null, hitlCreatedAt: null,
+  outreachId: null, outreachStatus: null, outreachName: null, outreachLinkedinUrl: null,
+  outreachTitle: null, outreachSeniority: null, outreachNoteA: null, outreachNoteB: null,
+  outreachSelectedNote: null, outreachEditedNote: null, outreachSentAt: null,
+  outreachAcceptedAt: null, outreachErrorMessage: null,
   ...overrides,
 })
 
