@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { approveCadence, overrideEmail } from '@/lib/api'
 import { EmailDraftCard } from './EmailDraftCard'
 import type { EmailCadenceSummary, EmailDraftSummary } from '@/types/candidate'
@@ -15,11 +16,19 @@ interface Props {
   onCadenceUpdated: (c: EmailCadenceSummary) => void
 }
 
+const DAY_LABELS: Record<number, string> = { 1: 'Day 1', 3: 'Day 3', 7: 'Day 7' }
+const DAY_SUBLABELS: Record<number, string> = {
+  1: 'Intro',
+  3: 'Value add',
+  7: 'Gentle close',
+}
+
 export function EmailOutreachPanel({ cadence: initialCadence, candidateId, onCadenceUpdated }: Props) {
   const [cadence, setCadence] = useState(initialCadence)
   const [isApproving, setIsApproving] = useState(false)
   const [isOverriding, setIsOverriding] = useState(false)
   const [drafts, setDrafts] = useState<EmailDraftSummary[]>(initialCadence.drafts)
+  const [activeTab, setActiveTab] = useState('1')
 
   function handleDraftUpdated(updated: EmailDraftSummary) {
     setDrafts(prev => prev.map(d => d.id === updated.id ? updated : d))
@@ -29,12 +38,7 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, onCad
     setIsApproving(true)
     try {
       const result = await approveCadence(cadence.id, candidateId)
-      const updated: EmailCadenceSummary = {
-        ...cadence,
-        status: result.status,
-        approvedAt: result.approvedAt,
-        drafts,
-      }
+      const updated: EmailCadenceSummary = { ...cadence, status: result.status, approvedAt: result.approvedAt, drafts }
       setCadence(updated)
       onCadenceUpdated(updated)
     } finally {
@@ -55,48 +59,52 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, onCad
     }
   }
 
+  const showDraftTabs = (cadence.status === 'pending_approval' || cadence.status === 'active') && drafts.length > 0
+
   return (
     <div data-testid="email-outreach-panel" className="space-y-3">
       <p className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase">Email Outreach</p>
 
-      {cadence.status === 'pending_approval' && (
+      {/* ── Draft tabs — pending_approval + active ── */}
+      {showDraftTabs && (
         <>
-          <div className="space-y-2">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="w-full">
+              {drafts.map(d => (
+                <TabsTrigger key={d.id} value={String(d.dayNumber)} className="flex-1 flex-col gap-0 py-2">
+                  <span className="text-[11px] font-semibold">{DAY_LABELS[d.dayNumber]}</span>
+                  <span className="text-[9px] opacity-60">{DAY_SUBLABELS[d.dayNumber]}</span>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+
             {drafts.map(d => (
-              <EmailDraftCard
-                key={d.id}
-                draft={d}
-                cadenceId={cadence.id}
-                candidateId={candidateId}
-                onDraftUpdated={handleDraftUpdated}
-              />
+              <TabsContent key={d.id} value={String(d.dayNumber)} forceMount
+                className={String(d.dayNumber) !== activeTab ? 'hidden' : ''}>
+                <EmailDraftCard
+                  draft={d}
+                  cadenceId={cadence.id}
+                  candidateId={candidateId}
+                  onDraftUpdated={handleDraftUpdated}
+                />
+              </TabsContent>
             ))}
-          </div>
-          <Button
-            onClick={handleApprove}
-            isLoading={isApproving}
-            data-testid="approve-cadence-btn"
-            className="w-full"
-          >
-            Approve & Send
-          </Button>
+          </Tabs>
+
+          {cadence.status === 'pending_approval' && (
+            <Button
+              onClick={handleApprove}
+              isLoading={isApproving}
+              data-testid="approve-cadence-btn"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Approve & Send Day 1 Now
+            </Button>
+          )}
         </>
       )}
 
-      {cadence.status === 'active' && (
-        <div className="space-y-2">
-          {drafts.map(d => (
-            <EmailDraftCard
-              key={d.id}
-              draft={d}
-              cadenceId={cadence.id}
-              candidateId={candidateId}
-              onDraftUpdated={handleDraftUpdated}
-            />
-          ))}
-        </div>
-      )}
-
+      {/* ── Low confidence ── */}
       {cadence.status === 'low_confidence' && (
         <div data-testid="low-confidence-notice" className="space-y-2 rounded-md border border-orange-700/40 bg-orange-950/20 p-3">
           <p className="text-xs text-orange-300">
@@ -105,20 +113,15 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, onCad
               <Badge className="ml-2 bg-orange-100 text-orange-800 text-[10px]">{cadence.emailConfidence}% confidence</Badge>
             )}
           </p>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleOverride}
-            isLoading={isOverriding}
-            data-testid="override-email-btn"
-          >
+          <Button size="sm" variant="outline" onClick={handleOverride} isLoading={isOverriding} data-testid="override-email-btn">
             Send Anyway
           </Button>
         </div>
       )}
 
+      {/* ── Terminal / status states ── */}
       {cadence.status === 'email_not_found' && (
-        <p className="text-xs text-[#475569]">Email not found for this company domain.</p>
+        <p className="text-xs text-[#475569]">No email found for this company domain.</p>
       )}
 
       {cadence.status === 'replied' && (
@@ -132,7 +135,7 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, onCad
       {cadence.status === 'bounced' && (
         <Alert className="border-red-700/40 bg-red-950/20" data-testid="bounce-cancelled-banner">
           <AlertDescription className="text-red-300 text-xs">
-            Day 1 bounced — cadence cancelled. Day 3 and Day 7 have been cancelled.
+            Day 1 bounced — Day 3 and Day 7 cancelled.
           </AlertDescription>
         </Alert>
       )}
@@ -152,7 +155,7 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, onCad
       {cadence.status === 'attachment_missing' && (
         <div data-testid="attachment-missing-notice" className="flex items-center gap-2 text-xs text-[#475569]">
           <Spinner className="size-3" />
-          Awaiting resume PDF — Day 1 will send automatically once available.
+          Awaiting resume PDF — Day 1 will send once available.
         </div>
       )}
     </div>
