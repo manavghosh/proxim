@@ -666,8 +666,17 @@ async def main() -> None:
     from agent.config import settings
     from agent.db import create_pool, close_pool, claim_pipeline_job
 
-    signal.signal(signal.SIGTERM, _handle_sigterm)
-    signal.signal(signal.SIGINT, _handle_sigterm)
+    loop = asyncio.get_running_loop()
+
+    def _handle_shutdown(*_):
+        logger.info("shutdown_signal", message="Shutting down — cancelling all tasks")
+        _stop_event.set()
+        for task in asyncio.all_tasks(loop):
+            if task is not asyncio.current_task():
+                task.cancel()
+
+    signal.signal(signal.SIGTERM, _handle_shutdown)
+    signal.signal(signal.SIGINT, _handle_shutdown)
 
     logger.info("daemon_starting", polling_interval_seconds=settings.polling_interval_seconds)
     pool = await create_pool(settings.database_url)
@@ -682,18 +691,23 @@ async def main() -> None:
                 else:
                     logger.debug("poll_idle", message="No jobs queued")
                 await asyncio.sleep(settings.polling_interval_seconds)
+        except asyncio.CancelledError:
+            pass
         finally:
             await close_pool(pool)
             logger.info("daemon_stopped")
 
-    await asyncio.gather(
-        _job_poll_loop(),
-        _snooze_resurface_loop(pool),
-        _linkedin_acceptance_poll_loop(pool),
-        _linkedin_queued_send_loop(pool),
-        _outreach_send_loop(pool),
-        _reply_bounce_detection_loop(pool),
-    )
+    try:
+        await asyncio.gather(
+            _job_poll_loop(),
+            _snooze_resurface_loop(pool),
+            _linkedin_acceptance_poll_loop(pool),
+            _linkedin_queued_send_loop(pool),
+            _outreach_send_loop(pool),
+            _reply_bounce_detection_loop(pool),
+        )
+    except asyncio.CancelledError:
+        logger.info("daemon_cancelled", message="All tasks cancelled, exiting cleanly")
 
 
 if __name__ == "__main__":
