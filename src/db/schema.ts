@@ -57,6 +57,13 @@ type Preferences = {
   preferred_domains?: string[]
   enabled_sources?: string[]
   custom_job_sites?: string[]
+  linkedin_access_token?: string
+  linkedin_refresh_token?: string | null
+  linkedin_token_expires_at?: string
+  linkedin_connected_at?: string
+  linkedin_profile_name?: string
+  linkedin_paused?: boolean
+  do_not_contact_companies?: string[]
 }
 
 export const parseStatusEnum = pgEnum('parse_status', [
@@ -221,3 +228,155 @@ export const hitlCheckpoints = pgTable('hitl_checkpoints', {
 ])
 
 export type HitlCheckpoint = typeof hitlCheckpoints.$inferSelect
+
+// ── LinkedIn Connector Agent (F5) ─────────────────────────────────────────────
+
+export type ProxycurlPersonEnrichment = {
+  full_name:   string | null
+  headline:    string | null
+  summary:     string | null
+  experiences: Array<{
+    title:     string
+    company:   string
+    starts_at: { day: number; month: number; year: number } | null
+    ends_at:   { day: number; month: number; year: number } | null
+  }>
+  education: Array<{
+    degree_name: string | null
+    school:      { name: string } | null
+    ends_at:     { year: number } | null
+  }>
+}
+
+export const outreachStatusEnum = pgEnum('outreach_status', [
+  'pending',
+  'discovering',
+  'enriching',
+  'generating',
+  'notes_ready',
+  'sent',
+  'queued',
+  'accepted',
+  'expired',
+  'paused',
+  'no_contact_found',
+  'skipped_dnc',
+  'failed',
+])
+
+export const outreachTargets = pgTable('outreach_targets', {
+  id:                   uuid().defaultRandom().primaryKey(),
+  jobId:                uuid().references(() => jobs.id).notNull(),
+  candidateId:          uuid().references(() => candidates.id).notNull(),
+  name:                 text(),
+  linkedinUrl:          text(),
+  title:                text(),
+  company:              text().notNull(),
+  seniority:            text(),
+  enrichmentJson:       jsonb().$type<ProxycurlPersonEnrichment>(),
+  noteA:                text(),
+  noteB:                text(),
+  selectedNote:         text(),
+  editedNote:           text(),
+  status:               outreachStatusEnum().default('pending').notNull(),
+  sentAt:               timestamp({ withTimezone: true }),
+  acceptedAt:           timestamp({ withTimezone: true }),
+  lastPolledAt:         timestamp({ withTimezone: true }),
+  linkedinInvitationId: text(),
+  errorMessage:         text(),
+  // F6 email discovery fields
+  email:                text(),
+  emailConfidence:      integer(),
+  emailSource:          text(),
+  createdAt:            timestamp({ withTimezone: true }).defaultNow().notNull(),
+  updatedAt:            timestamp({ withTimezone: true }).defaultNow().notNull().$onUpdateFn(() => new Date()),
+}, (table) => [
+  uniqueIndex('outreach_targets_job_id_unique').on(table.jobId),
+  index('outreach_targets_candidate_status_idx').on(table.candidateId, table.status),
+  index('outreach_targets_sent_at_idx').on(table.sentAt),
+])
+
+export type OutreachTarget = typeof outreachTargets.$inferSelect
+
+// ── Outreach Mailer Agent (F6) ────────────────────────────────────────────────
+
+export const emailCadenceStatusEnum = pgEnum('email_cadence_status', [
+  'pending_discovery',
+  'discovering',
+  'low_confidence',
+  'email_not_found',
+  'generating',
+  'pending_approval',
+  'approved',
+  'active',
+  'paused',
+  'auth_expired',
+  'attachment_missing',
+  'replied',
+  'cadence_complete',
+  'bounced',
+  'cancelled',
+  'failed',
+])
+
+export const emailCadences = pgTable('email_cadences', {
+  id:                 uuid().defaultRandom().primaryKey(),
+  jobId:              uuid().references(() => jobs.id).notNull(),
+  candidateId:        uuid().references(() => candidates.id).notNull(),
+  hiringManagerEmail: text(),
+  emailConfidence:    integer(),
+  emailSource:        text(),
+  gmailThreadId:      text(),
+  day1MessageId:      text(),
+  status:             emailCadenceStatusEnum().default('pending_discovery').notNull(),
+  approvedAt:         timestamp({ withTimezone: true }),
+  replyDetectedAt:    timestamp({ withTimezone: true }),
+  bounceDetectedAt:   timestamp({ withTimezone: true }),
+  errorMessage:       text(),
+  createdAt:          timestamp({ withTimezone: true }).defaultNow().notNull(),
+  updatedAt:          timestamp({ withTimezone: true }).defaultNow().notNull().$onUpdateFn(() => new Date()),
+}, (table) => [
+  uniqueIndex('email_cadences_job_id_unique').on(table.jobId),
+  index('email_cadences_candidate_status_idx').on(table.candidateId, table.status),
+])
+
+export type EmailCadence = typeof emailCadences.$inferSelect
+
+export const emailDraftStatusEnum = pgEnum('email_draft_status', [
+  'draft',
+  'approved',
+  'superseded',
+  'scheduled',
+  'sending',
+  'sent',
+  'bounced',
+  'rate_limited',
+  'cancelled',
+])
+
+export const emailDrafts = pgTable('email_drafts', {
+  id:               uuid().defaultRandom().primaryKey(),
+  cadenceId:        uuid().references(() => emailCadences.id).notNull(),
+  candidateId:      uuid().references(() => candidates.id).notNull(),
+  dayNumber:        integer().notNull(),
+  subject:          text().notNull(),
+  bodyHtml:         text().notNull(),
+  bodyText:         text().notNull(),
+  originalBodyHtml: text().notNull(),
+  isApproved:       boolean().default(false).notNull(),
+  scheduledSendAt:  timestamp({ withTimezone: true }),
+  status:           emailDraftStatusEnum().default('draft').notNull(),
+  sentAt:           timestamp({ withTimezone: true }),
+  gmailMessageId:   text(),
+  openDetectedAt:   timestamp({ withTimezone: true }),
+  clickDetectedAt:  timestamp({ withTimezone: true }),
+  bounceDetectedAt: timestamp({ withTimezone: true }),
+  createdAt:        timestamp({ withTimezone: true }).defaultNow().notNull(),
+  updatedAt:        timestamp({ withTimezone: true }).defaultNow().notNull().$onUpdateFn(() => new Date()),
+}, (table) => [
+  index('email_drafts_cadence_day_idx').on(table.cadenceId, table.dayNumber),
+  index('email_drafts_candidate_status_idx').on(table.candidateId, table.status),
+  index('email_drafts_scheduled_idx').on(table.scheduledSendAt),
+])
+
+export type EmailDraft = typeof emailDrafts.$inferSelect

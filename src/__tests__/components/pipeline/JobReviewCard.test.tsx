@@ -24,6 +24,8 @@ const baseJob: HitlJob = {
     snoozedUntil: null,
     createdAt: '2026-05-03T10:00:00Z',
   },
+  outreachTarget: null,
+  emailCadence: null,
 }
 
 const makeProps = (overrides: Partial<HitlJob> = {}) => ({

@@ -26,6 +26,11 @@ setuptools = "^82.0.1"
 jinja2 = "^3.1"
 pdfplumber = "^0.11"
 xhtml2pdf = "^0.2.17"
+exa-py = "^2.12.1"
+httpx = "^0.28"
+google-api-python-client = "^2.130"
+google-auth = "^2.30"
+google-auth-oauthlib = "^1.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8"

@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     environment: str = "development"
     polling_interval_seconds: int = 3
     agent_port: int = 8001
+    proxycurl_api_key: str = ""   # legacy — Proxycurl shut down July 2026
+    exa_api_key: str = ""
+    hunter_api_key: str = ""
+    tracking_host: str = "http://localhost:3000"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

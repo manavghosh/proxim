@@ -1,4 +1,4 @@
-import type { CandidateState, Preferences, PipelineReadiness } from '@/types/candidate'
+import type { CandidateState, Preferences, PipelineReadiness, OutreachTargetSummary, OutreachStatus, EmailCadenceSummary, EmailCadenceStatus, EmailDraftSummary } from '@/types/candidate'
 import type { PositionGroup } from '@/lib/position-normalizer'
 
 export type { PositionGroup }
@@ -150,15 +150,10 @@ export async function getJobs(
   return request(`/api/jobs${qs(candidateId)}&grades=${encodeURIComponent(grades.join(','))}`)
 }
 
-export async function submitDecision(
+export async function markSubmitted(
   jobId: string,
-  decision: 'approved' | 'rejected' | 'snoozed' | 'scored'
 ): Promise<{ jobId: string; status: string }> {
-  return request(`/api/jobs/${jobId}/decision`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ decision }),
-  })
+  return request(`/api/jobs/${jobId}/mark-submitted`, { method: 'POST' })
 }
 
 export async function getJobReport(
@@ -235,6 +230,14 @@ export async function getResumeVersions(
   return request(`/api/jobs/${jobId}/resume${qs(candidateId)}`)
 }
 
+// Latest `resume_builder` pipeline_job for a given job — feeds the inline
+// build-progress pane on the Applications card.
+export async function getResumePipelineJob(
+  jobId: string,
+): Promise<{ pipelineJobId: string | null; status: string | null }> {
+  return request(`/api/jobs/${jobId}/resume/pipeline-job`)
+}
+
 export function downloadResumeUrl(
   jobId: string,
   versionId: string,
@@ -275,15 +278,20 @@ export interface HitlJob {
   archetype: string | null
   archetypeConfidence: string | null
   hitlCheckpoint: HitlCheckpointSummary | null
+  outreachTarget: OutreachTargetSummary | null
+  emailCadence: EmailCadenceSummary | null
 }
 
 export async function getCandidateJobs(
   candidateId: string,
-  filter?: string,
+  grades?: string[],
   sort?: string
 ): Promise<{ jobs: HitlJob[]; total: number }> {
   const params = new URLSearchParams({ candidateId })
-  if (filter) params.set('filter', filter)
+  // Always send the new multi-select grades param. Empty array == no grades
+  // selected (route returns no rows). The route still accepts legacy ?filter=
+  // for any older client that hasn't been updated.
+  if (grades !== undefined) params.set('grades', grades.join(','))
   if (sort) params.set('sort', sort)
   return request(`/api/candidates/${candidateId}/jobs?${params.toString()}`)
 }
@@ -356,4 +364,101 @@ export function startJobStream(
   }
 
   return () => eventSource.close()
+}
+
+// ── LinkedIn Connector (F5) ───────────────────────────────────────────────────
+
+export interface OutreachTargetFull extends OutreachTargetSummary {
+  company: string
+  enrichmentJson: Record<string, unknown> | null
+}
+
+export interface LinkedInStatus {
+  connected:        boolean
+  expired:          boolean
+  paused:           boolean
+  profileName:      string | null
+  connectedAt:      string | null
+  dailySendsToday:  number
+  dailyLimit:       number
+  queuedCount:      number
+  doNotContactCompanies: string[]
+}
+
+export async function getOutreachTarget(
+  targetId: string,
+  candidateId: string,
+): Promise<OutreachTargetFull> {
+  return request(`/api/outreach/${targetId}${qs(candidateId)}`)
+}
+
+export async function selectAndSendNote(
+  targetId: string,
+  candidateId: string,
+  selectedNote: 'A' | 'B',
+  editedNote?: string,
+): Promise<{ targetId: string; status: OutreachStatus; sentAt?: string; message?: string }> {
+  return request(`/api/outreach/${targetId}/select-and-send${qs(candidateId)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ selectedNote, editedNote }),
+  })
+}
+
+export async function regenerateNotes(
+  targetId: string,
+  candidateId: string,
+): Promise<{ targetId: string; status: string; message: string }> {
+  return request(`/api/outreach/${targetId}/regenerate${qs(candidateId)}`, { method: 'POST' })
+}
+
+export async function getLinkedInStatus(candidateId: string): Promise<LinkedInStatus> {
+  return request(`/api/linkedin/status${qs(candidateId)}`)
+}
+
+export async function resumeLinkedIn(candidateId: string): Promise<{ paused: boolean; message: string }> {
+  return request(`/api/linkedin/resume${qs(candidateId)}`, { method: 'POST' })
+}
+
+// ── Outreach Mailer (F6) ──────────────────────────────────────────────────────
+
+export { type EmailCadenceSummary, type EmailCadenceStatus, type EmailDraftSummary }
+
+export async function getEmailCadence(
+  cadenceId: string,
+  candidateId: string,
+): Promise<EmailCadenceSummary> {
+  return request(`/api/email-cadence/${cadenceId}${qs(candidateId)}`)
+}
+
+export async function approveCadence(
+  cadenceId: string,
+  candidateId: string,
+): Promise<{ cadenceId: string; status: EmailCadenceStatus; approvedAt: string; drafts: { draftId: string; dayNumber: number; status: string; scheduledSendAt: string | null }[] }> {
+  return request(`/api/email-cadence/${cadenceId}/approve${qs(candidateId)}`, { method: 'POST' })
+}
+
+export async function updateDraft(
+  cadenceId: string,
+  draftId: string,
+  candidateId: string,
+  bodyHtml: string,
+): Promise<EmailDraftSummary> {
+  return request(`/api/email-cadence/${cadenceId}/drafts/${draftId}${qs(candidateId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bodyHtml }),
+  })
+}
+
+export async function overrideEmail(
+  cadenceId: string,
+  candidateId: string,
+  confirmedEmail: string,
+): Promise<{ cadenceId: string; status: EmailCadenceStatus; hiringManagerEmail: string; emailSource: string }> {
+  return request(`/api/email-cadence/${cadenceId}/override-email${qs(candidateId)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ confirmedEmail }),
+  })
 }

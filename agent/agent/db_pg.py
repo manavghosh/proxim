@@ -173,6 +173,16 @@ async def get_candidate_preferences(pool: asyncpg.Pool, candidate_id: str) -> di
         return dict(prefs)
 
 
+async def get_candidate_name(pool: asyncpg.Pool, candidate_id: str) -> str:
+    """Return the candidate's display name (empty string if unknown)."""
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT name FROM candidates WHERE id = $1",
+            candidate_id,
+        )
+    return row['name'] if row and row['name'] else ''
+
+
 def _to_snake(name: str) -> str:
     import re
     s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
@@ -340,4 +350,346 @@ async def resurface_snoozed_job(
         await conn.execute(
             "UPDATE jobs SET status = 'awaiting', updated_at = NOW() WHERE id = $1",
             job_id,
+        )
+
+
+# ── LinkedIn Connector DB functions (F5) ──────────────────────────────────────
+
+async def get_outreach_target(
+    pool: asyncpg.Pool,
+    target_id: str,
+) -> dict | None:
+    """Return a single outreach_target row as a dict, or None if not found."""
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT id, job_id, candidate_id, company, linkedin_url, title, seniority, "
+            "enrichment_json, note_a, note_b, selected_note, edited_note, status "
+            "FROM outreach_targets WHERE id = $1",
+            target_id,
+        )
+    if row is None:
+        return None
+    result = dict(row)
+    result["id"] = str(result["id"])
+    result["job_id"] = str(result["job_id"])
+    result["candidate_id"] = str(result["candidate_id"])
+    return result
+
+
+async def insert_outreach_target(
+    pool: asyncpg.Pool,
+    job_id: str,
+    candidate_id: str,
+    company: str,
+) -> str:
+    """Insert a new outreach_targets row with status='pending'. Returns the new id."""
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "INSERT INTO outreach_targets (job_id, candidate_id, company, status) "
+            "VALUES ($1, $2, $3, 'pending') RETURNING id",
+            job_id, candidate_id, company,
+        )
+    return str(row["id"])
+
+
+async def update_outreach_target(
+    pool: asyncpg.Pool,
+    target_id: str,
+    **kwargs: object,
+) -> None:
+    """Dynamically UPDATE outreach_targets columns for the given target_id."""
+    if not kwargs:
+        return
+    import json
+    set_clauses: list[str] = []
+    values: list[object] = []
+    for i, (key, val) in enumerate(kwargs.items(), start=1):
+        col = _to_snake(key)
+        if isinstance(val, (dict, list)):
+            set_clauses.append(f"{col} = ${i}::jsonb")
+            values.append(json.dumps(val))
+        else:
+            set_clauses.append(f"{col} = ${i}")
+            values.append(val)
+    set_clauses.append("updated_at = NOW()")
+    values.append(target_id)
+    query = f"UPDATE outreach_targets SET {', '.join(set_clauses)} WHERE id = ${len(values)}"
+    async with pool.acquire() as conn:
+        await conn.execute(query, *values)
+
+
+async def get_queued_outreach_targets(
+    pool: asyncpg.Pool,
+    candidate_id: str,
+) -> list[dict]:
+    """Return outreach targets with status='queued' for a candidate."""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT id, job_id, candidate_id, company, note_a, note_b, "
+            "selected_note, edited_note, linkedin_url "
+            "FROM outreach_targets "
+            "WHERE candidate_id = $1 AND status = 'queued' "
+            "ORDER BY created_at",
+            candidate_id,
+        )
+    return [
+        {
+            "id": str(r["id"]), "job_id": str(r["job_id"]),
+            "candidate_id": str(r["candidate_id"]), "company": r["company"],
+            "note_a": r["note_a"], "note_b": r["note_b"],
+            "selected_note": r["selected_note"], "edited_note": r["edited_note"],
+            "linkedin_url": r["linkedin_url"],
+        }
+        for r in rows
+    ]
+
+
+async def get_sent_outreach_targets_for_polling(
+    pool: asyncpg.Pool,
+) -> list[dict]:
+    """Return sent targets due for acceptance polling (>24 h since last poll)."""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT id, candidate_id, linkedin_invitation_id "
+            "FROM outreach_targets "
+            "WHERE status = 'sent' "
+            "AND (last_polled_at IS NULL "
+            "     OR last_polled_at < NOW() - INTERVAL '24 hours') "
+            "ORDER BY sent_at",
+        )
+    return [
+        {
+            "id": str(r["id"]),
+            "candidate_id": str(r["candidate_id"]),
+            "linkedin_invitation_id": r["linkedin_invitation_id"],
+        }
+        for r in rows
+    ]
+
+
+async def get_daily_send_count(
+    pool: asyncpg.Pool,
+    candidate_id: str,
+) -> int:
+    """Count connection requests sent today (UTC) for this candidate."""
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT COUNT(*) AS c FROM outreach_targets "
+            "WHERE candidate_id = $1 AND status = 'sent' "
+            "AND sent_at::date = CURRENT_DATE",
+            candidate_id,
+        )
+    return row["c"] if row else 0
+
+
+# ── Outreach Mailer Agent (F6) ────────────────────────────────────────────────
+
+async def insert_email_cadence(
+    pool: asyncpg.Pool,
+    job_id: str,
+    candidate_id: str,
+) -> str:
+    """Insert a new email_cadences row with status=pending_discovery. Returns cadence id."""
+    import uuid as _uuid
+    cadence_id = str(_uuid.uuid4())
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO email_cadences (id, job_id, candidate_id, status, created_at, updated_at) "
+            "VALUES ($1, $2, $3, 'pending_discovery', NOW(), NOW())",
+            cadence_id, job_id, candidate_id,
+        )
+    return cadence_id
+
+
+async def update_email_cadence(
+    pool: asyncpg.Pool,
+    cadence_id: str,
+    **kwargs,
+) -> None:
+    """Dynamically update email_cadences columns by keyword argument."""
+    if not kwargs:
+        return
+    col_map = {
+        "status": "status",
+        "hiring_manager_email": "hiring_manager_email",
+        "email_confidence": "email_confidence",
+        "email_source": "email_source",
+        "gmail_thread_id": "gmail_thread_id",
+        "day1_message_id": "day1_message_id",
+        "approved_at": "approved_at",
+        "reply_detected_at": "reply_detected_at",
+        "bounce_detected_at": "bounce_detected_at",
+        "error_message": "error_message",
+    }
+    sets, values = [], []
+    for i, (k, v) in enumerate(kwargs.items(), start=1):
+        col = col_map.get(k, k)
+        sets.append(f"{col} = ${i}")
+        values.append(v)
+    idx = len(values) + 1
+    sets.append(f"updated_at = NOW()")
+    values.append(cadence_id)
+    async with pool.acquire() as conn:
+        await conn.execute(
+            f"UPDATE email_cadences SET {', '.join(sets)} WHERE id = ${idx}",
+            *values,
+        )
+
+
+async def insert_email_drafts(
+    pool: asyncpg.Pool,
+    cadence_id: str,
+    candidate_id: str,
+    drafts: list[dict],
+) -> None:
+    """Batch insert email_drafts rows (one per day)."""
+    import uuid as _uuid
+    async with pool.acquire() as conn:
+        for d in drafts:
+            draft_id = str(_uuid.uuid4())
+            await conn.execute(
+                "INSERT INTO email_drafts "
+                "(id, cadence_id, candidate_id, day_number, subject, body_html, body_text, "
+                "original_body_html, is_approved, status, created_at, updated_at) "
+                "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false, 'draft', NOW(), NOW())",
+                draft_id, cadence_id, candidate_id,
+                d["day_number"], d["subject"],
+                d["body_html"], d["body_text"], d["original_body_html"],
+            )
+
+
+async def update_email_draft(
+    pool: asyncpg.Pool,
+    draft_id: str,
+    **kwargs,
+) -> None:
+    """Dynamically update email_drafts columns by keyword argument."""
+    if not kwargs:
+        return
+    col_map = {
+        "status": "status",
+        "is_approved": "is_approved",
+        "scheduled_send_at": "scheduled_send_at",
+        "sent_at": "sent_at",
+        "gmail_message_id": "gmail_message_id",
+        "open_detected_at": "open_detected_at",
+        "click_detected_at": "click_detected_at",
+        "bounce_detected_at": "bounce_detected_at",
+        "body_html": "body_html",
+        "body_text": "body_text",
+    }
+    sets, values = [], []
+    for i, (k, v) in enumerate(kwargs.items(), start=1):
+        col = col_map.get(k, k)
+        sets.append(f"{col} = ${i}")
+        values.append(v)
+    idx = len(values) + 1
+    sets.append(f"updated_at = NOW()")
+    values.append(draft_id)
+    async with pool.acquire() as conn:
+        await conn.execute(
+            f"UPDATE email_drafts SET {', '.join(sets)} WHERE id = ${idx}",
+            *values,
+        )
+
+
+async def get_scheduled_drafts(pool: asyncpg.Pool) -> list[dict]:
+    """Return email drafts ready to send (scheduled_send_at elapsed, no reply/bounce)."""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT ed.id, ed.cadence_id, ed.candidate_id, ed.day_number, "
+            "ed.subject, ed.body_html, ed.body_text, ed.scheduled_send_at, "
+            "ec.gmail_thread_id, ec.day1_message_id, ec.hiring_manager_email, ec.status AS cadence_status "
+            "FROM email_drafts ed "
+            "JOIN email_cadences ec ON ec.id = ed.cadence_id "
+            "WHERE ed.status IN ('scheduled', 'approved') "
+            "AND ed.scheduled_send_at <= NOW() "
+            "AND ec.status IN ('approved', 'active') "
+            "AND ec.reply_detected_at IS NULL "
+            "AND ec.bounce_detected_at IS NULL "
+            "ORDER BY ed.scheduled_send_at "
+            "LIMIT 10 "
+            "FOR UPDATE OF ed SKIP LOCKED"
+        )
+    return [dict(r) for r in rows]
+
+
+async def get_active_cadences_for_polling(pool: asyncpg.Pool) -> list[dict]:
+    """Return active cadences with a day1 message ID set (for reply/bounce detection)."""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT id, candidate_id, day1_message_id, gmail_thread_id "
+            "FROM email_cadences "
+            "WHERE status = 'active' AND day1_message_id IS NOT NULL"
+        )
+    return [dict(r) for r in rows]
+
+
+async def get_daily_email_send_count(
+    pool: asyncpg.Pool,
+    candidate_id: str,
+) -> int:
+    """Count emails sent today (UTC) for this candidate across all cadences."""
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT COUNT(*) AS c FROM email_drafts "
+            "WHERE candidate_id = $1 AND status = 'sent' "
+            "AND sent_at::date = CURRENT_DATE",
+            candidate_id,
+        )
+    return row["c"] if row else 0
+
+
+async def get_resume_version_for_send(
+    pool: asyncpg.Pool,
+    candidate_id: str,
+    job_id: str,
+) -> dict | None:
+    """Return the latest resume version with a PDF path for Day 1 attachment."""
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT id, resume_pdf_path, cover_letter_pdf_path FROM resume_versions "
+            "WHERE candidate_id = $1 AND job_id = $2 "
+            "AND resume_pdf_path IS NOT NULL "
+            "ORDER BY created_at DESC LIMIT 1",
+            candidate_id, job_id,
+        )
+    if row is None:
+        return None
+    return dict(row)
+
+
+async def get_cadence_drafts(pool: asyncpg.Pool, cadence_id: str) -> list[dict]:
+    """Return all email drafts for a cadence."""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT id, day_number, status, scheduled_send_at FROM email_drafts "
+            "WHERE cadence_id = $1 ORDER BY day_number",
+            cadence_id,
+        )
+    return [dict(r) for r in rows]
+
+
+async def cancel_pending_drafts(pool: asyncpg.Pool, cadence_id: str) -> None:
+    """Cancel all scheduled/approved drafts for a cadence (reply detected)."""
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE email_drafts SET status = 'cancelled', updated_at = NOW() "
+            "WHERE cadence_id = $1 AND status IN ('scheduled', 'approved')",
+            cadence_id,
+        )
+
+
+async def bounce_day1_cancel_day3_day7(pool: asyncpg.Pool, cadence_id: str) -> None:
+    """Mark Day 1 as bounced; cancel Day 3 and Day 7 (bounce detected)."""
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE email_drafts SET status = 'bounced', bounce_detected_at = NOW(), updated_at = NOW() "
+            "WHERE cadence_id = $1 AND day_number = 1",
+            cadence_id,
+        )
+        await conn.execute(
+            "UPDATE email_drafts SET status = 'cancelled', updated_at = NOW() "
+            "WHERE cadence_id = $1 AND day_number IN (3, 7)",
+            cadence_id,
         )

@@ -52,6 +52,13 @@ type Preferences = {
   preferred_domains?: string[]
   enabled_sources?: string[]
   custom_job_sites?: string[]
+  linkedin_access_token?: string
+  linkedin_refresh_token?: string | null
+  linkedin_token_expires_at?: string
+  linkedin_connected_at?: string
+  linkedin_profile_name?: string
+  linkedin_paused?: boolean
+  do_not_contact_companies?: string[]
 }
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -197,3 +204,90 @@ export const hitlCheckpoints = sqliteTable('hitl_checkpoints', {
 ])
 
 export type HitlCheckpoint = typeof hitlCheckpoints.$inferSelect
+
+// ── LinkedIn Connector Agent (F5) ─────────────────────────────────────────────
+
+export const outreachTargets = sqliteTable('outreach_targets', {
+  id:                   text().primaryKey().$defaultFn(newId),
+  jobId:                text().notNull().references(() => jobs.id),
+  candidateId:          text().notNull().references(() => candidates.id),
+  name:                 text(),
+  linkedinUrl:          text(),
+  title:                text(),
+  company:              text().notNull(),
+  seniority:            text(),
+  enrichmentJson:       text({ mode: 'json' }),
+  noteA:                text(),
+  noteB:                text(),
+  selectedNote:         text(),
+  editedNote:           text(),
+  status:               text().default('pending').notNull(),
+  sentAt:               text(),
+  acceptedAt:           text(),
+  lastPolledAt:         text(),
+  linkedinInvitationId: text(),
+  errorMessage:         text(),
+  // F6 email discovery fields
+  email:                text(),
+  emailConfidence:      integer(),
+  emailSource:          text(),
+  createdAt:            text().$defaultFn(now).notNull(),
+  updatedAt:            text().$defaultFn(now).$onUpdateFn(now).notNull(),
+}, (table) => [
+  uniqueIndex('outreach_targets_job_id_unique').on(table.jobId),
+  index('outreach_targets_candidate_status_idx').on(table.candidateId, table.status),
+])
+
+export type OutreachTarget = typeof outreachTargets.$inferSelect
+
+// ── Outreach Mailer Agent (F6) ────────────────────────────────────────────────
+
+export const emailCadences = sqliteTable('email_cadences', {
+  id:                 text().primaryKey().$defaultFn(newId),
+  jobId:              text().notNull().references(() => jobs.id),
+  candidateId:        text().notNull().references(() => candidates.id),
+  hiringManagerEmail: text(),
+  emailConfidence:    integer(),
+  emailSource:        text(),
+  gmailThreadId:      text(),
+  day1MessageId:      text(),
+  status:             text().default('pending_discovery').notNull(),
+  approvedAt:         text(),
+  replyDetectedAt:    text(),
+  bounceDetectedAt:   text(),
+  errorMessage:       text(),
+  createdAt:          text().$defaultFn(now).notNull(),
+  updatedAt:          text().$defaultFn(now).$onUpdateFn(now).notNull(),
+}, (table) => [
+  uniqueIndex('email_cadences_job_id_unique').on(table.jobId),
+  index('email_cadences_candidate_status_idx').on(table.candidateId, table.status),
+])
+
+export type EmailCadence = typeof emailCadences.$inferSelect
+
+export const emailDrafts = sqliteTable('email_drafts', {
+  id:               text().primaryKey().$defaultFn(newId),
+  cadenceId:        text().notNull().references(() => emailCadences.id),
+  candidateId:      text().notNull().references(() => candidates.id),
+  dayNumber:        integer().notNull(),
+  subject:          text().notNull(),
+  bodyHtml:         text().notNull(),
+  bodyText:         text().notNull(),
+  originalBodyHtml: text().notNull(),
+  isApproved:       integer({ mode: 'boolean' }).default(false).notNull(),
+  scheduledSendAt:  text(),
+  status:           text().default('draft').notNull(),
+  sentAt:           text(),
+  gmailMessageId:   text(),
+  openDetectedAt:   text(),
+  clickDetectedAt:  text(),
+  bounceDetectedAt: text(),
+  createdAt:        text().$defaultFn(now).notNull(),
+  updatedAt:        text().$defaultFn(now).$onUpdateFn(now).notNull(),
+}, (table) => [
+  index('email_drafts_cadence_day_idx').on(table.cadenceId, table.dayNumber),
+  index('email_drafts_candidate_status_idx').on(table.candidateId, table.status),
+  index('email_drafts_scheduled_idx').on(table.scheduledSendAt),
+])
+
+export type EmailDraft = typeof emailDrafts.$inferSelect
