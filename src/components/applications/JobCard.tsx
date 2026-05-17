@@ -14,7 +14,10 @@ import { LazyScoreReportPane } from '@/components/applications/LazyScoreReportPa
 import { BuildProgressPane } from '@/components/applications/BuildProgressPane'
 import { EmailCadenceStatusBadge } from '@/components/pipeline/EmailCadenceStatusBadge'
 import { EmailOutreachPanel } from '@/components/pipeline/EmailOutreachPanel'
+import { OutreachNoteSelector } from '@/components/pipeline/OutreachNoteSelector'
+import { OutreachStatusBadge } from '@/components/pipeline/OutreachStatusBadge'
 import type { ScoredJob, EmailCadenceSummary } from '@/lib/api'
+import type { OutreachTargetSummary, OutreachStatus } from '@/types/candidate'
 
 const GRADE_STYLES: Record<string, { badge: string }> = {
   A: { badge: 'bg-emerald-500 text-white border-transparent' },
@@ -47,6 +50,9 @@ export function JobCard({
   candidateId,
 }: Props) {
   const [emailCadence, setEmailCadence] = useState<EmailCadenceSummary | null>(job.emailCadence)
+  const [outreachStatus, setOutreachStatus] = useState<OutreachStatus | null>(
+    job.outreachTarget?.status as OutreachStatus ?? null
+  )
   const score = (job.score10d as Record<string, unknown> | null)?.numeric_score as number | undefined
   const isSnoozed   = job.status === 'snoozed'
   const isApproved  = job.status === 'approved'
@@ -207,6 +213,25 @@ export function JobCard({
       {/* Build-progress log — auto-opens while building or on failure */}
       {(isApproved || isResumeReady || isSubmitted || isResumeFailed) && (
         <BuildProgressPane jobId={job.id} autoOpen={isApproved || isResumeFailed} />
+      )}
+
+      {/* F5 LinkedIn Outreach — note selector + send button */}
+      {job.outreachTarget && (
+        <div className="border-t border-[#1e2d4a] pt-3 mt-1">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase">
+              LinkedIn Outreach
+            </span>
+            <OutreachStatusBadge status={(outreachStatus ?? job.outreachTarget.status) as OutreachStatus} />
+          </div>
+          {(outreachStatus ?? job.outreachTarget.status) === 'notes_ready' && (
+            <OutreachNoteSelector
+              target={{ ...job.outreachTarget, status: (outreachStatus ?? job.outreachTarget.status) as OutreachStatus }}
+              candidateId={candidateId}
+              onStatusChange={(s) => setOutreachStatus(s)}
+            />
+          )}
+        </div>
       )}
 
       {/* F6 Email cadence — status badge + full draft review panel */}

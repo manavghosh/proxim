@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
 import { eq, and, inArray } from 'drizzle-orm'
 import { db } from '@/db'
-import { jobs, emailCadences, emailDrafts } from '@/db/schema'
+import { jobs, emailCadences, emailDrafts, outreachTargets } from '@/db/schema'
 import { getOrCreateCandidate, getCandidateById } from '@/lib/cv-service'
-import type { EmailCadenceSummary, EmailCadenceStatus, EmailDraftStatus, EmailDraftSummary } from '@/types/candidate'
+import type { EmailCadenceSummary, EmailCadenceStatus, EmailDraftStatus, EmailDraftSummary, OutreachTargetSummary, OutreachStatus } from '@/types/candidate'
 
 const ALL_GRADES = ['A', 'B', 'C', 'D', 'E', 'F'] as const
 // Applications is post-decision tracking only: hide jobs that haven't been
@@ -45,9 +45,24 @@ export async function GET(request: Request) {
         cadenceApprovedAt:      emailCadences.approvedAt,
         cadenceReplyAt:         emailCadences.replyDetectedAt,
         cadenceBounceAt:        emailCadences.bounceDetectedAt,
+        // F5 outreach
+        outreachId:           outreachTargets.id,
+        outreachStatus:       outreachTargets.status,
+        outreachName:         outreachTargets.name,
+        outreachLinkedinUrl:  outreachTargets.linkedinUrl,
+        outreachTitle:        outreachTargets.title,
+        outreachSeniority:    outreachTargets.seniority,
+        outreachNoteA:        outreachTargets.noteA,
+        outreachNoteB:        outreachTargets.noteB,
+        outreachSelectedNote: outreachTargets.selectedNote,
+        outreachEditedNote:   outreachTargets.editedNote,
+        outreachSentAt:       outreachTargets.sentAt,
+        outreachAcceptedAt:   outreachTargets.acceptedAt,
+        outreachErrorMessage: outreachTargets.errorMessage,
       })
       .from(jobs)
       .leftJoin(emailCadences, eq(emailCadences.jobId, jobs.id))
+      .leftJoin(outreachTargets, eq(outreachTargets.jobId, jobs.id))
       .where(eq(jobs.candidateId, candidate.id))
       .orderBy(jobs.createdAt)
 
@@ -99,6 +114,21 @@ export async function GET(request: Request) {
       archetype:           j.archetype,
       archetypeConfidence: j.archetypeConfidence,
       createdAt:           j.createdAt,
+      outreachTarget: j.outreachId ? ({
+        id:           j.outreachId,
+        status:       j.outreachStatus as OutreachStatus,
+        name:         j.outreachName,
+        linkedinUrl:  j.outreachLinkedinUrl,
+        title:        j.outreachTitle,
+        seniority:    j.outreachSeniority,
+        noteA:        j.outreachNoteA,
+        noteB:        j.outreachNoteB,
+        selectedNote: j.outreachSelectedNote as 'A' | 'B' | null,
+        editedNote:   j.outreachEditedNote,
+        sentAt:       j.outreachSentAt ? String(j.outreachSentAt) : null,
+        acceptedAt:   j.outreachAcceptedAt ? String(j.outreachAcceptedAt) : null,
+        errorMessage: j.outreachErrorMessage,
+      } satisfies OutreachTargetSummary) : null,
       emailCadence: j.cadenceId ? ({
         id:                 j.cadenceId,
         status:             j.cadenceStatus as EmailCadenceStatus,

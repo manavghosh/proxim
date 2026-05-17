@@ -26,6 +26,12 @@ vi.mock('@/db/schema', () => ({
     isApproved: 'isApproved', scheduledSendAt: 'scheduledSendAt',
     sentAt: 'sentAt', openDetectedAt: 'openDetectedAt', clickDetectedAt: 'clickDetectedAt',
   },
+  outreachTargets: {
+    id: 'id', jobId: 'jobId', candidateId: 'candidateId', status: 'status',
+    name: 'name', linkedinUrl: 'linkedinUrl', title: 'title', seniority: 'seniority',
+    noteA: 'noteA', noteB: 'noteB', selectedNote: 'selectedNote', editedNote: 'editedNote',
+    sentAt: 'sentAt', acceptedAt: 'acceptedAt', errorMessage: 'errorMessage',
+  },
 }))
 
 describe('GET /api/jobs', () => {

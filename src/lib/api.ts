@@ -141,6 +141,7 @@ export interface ScoredJob {
   archetype: string | null
   archetypeConfidence: string | null
   createdAt: string
+  outreachTarget: OutreachTargetSummary | null
   emailCadence: EmailCadenceSummary | null
 }
 
