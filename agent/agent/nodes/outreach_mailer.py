@@ -116,6 +116,13 @@ def _strip_markdown(text: str) -> str:
     return text.strip()
 
 
+def _api_key(settings) -> str:
+    """Return the API key for the configured LLM provider."""
+    if settings.llm_provider == "gemini":
+        return settings.gemini_api_key
+    return settings.anthropic_api_key
+
+
 async def litellm_generate(state: OutreachMailerState, settings) -> EmailDraftOutput:
     import json
 
@@ -137,6 +144,7 @@ async def litellm_generate(state: OutreachMailerState, settings) -> EmailDraftOu
 
     resp = await litellm.acompletion(
         model=_model_string(settings),
+        api_key=_api_key(settings),
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
     )
@@ -161,6 +169,7 @@ async def litellm_self_review(draft: EmailDraftOutput, settings) -> SelfReviewRe
 
     resp = await litellm.acompletion(
         model=_model_string(settings),
+        api_key=_api_key(settings),
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
     )
