@@ -17,7 +17,7 @@ import { EmailOutreachPanel } from '@/components/pipeline/EmailOutreachPanel'
 import { OutreachNoteSelector } from '@/components/pipeline/OutreachNoteSelector'
 import { OutreachStatusBadge } from '@/components/pipeline/OutreachStatusBadge'
 import type { ScoredJob, EmailCadenceSummary } from '@/lib/api'
-import type { OutreachTargetSummary, OutreachStatus } from '@/types/candidate'
+import type { OutreachTargetSummary, OutreachStatus, EmailOutreachMode } from '@/types/candidate'
 
 const GRADE_STYLES: Record<string, { badge: string }> = {
   A: { badge: 'bg-emerald-500 text-white border-transparent' },
@@ -37,6 +37,7 @@ interface Props {
   onViewCoverLetter?: (jobId: string) => void
   isPending: boolean
   candidateId: string
+  emailOutreachMode?: EmailOutreachMode
 }
 
 export function JobCard({
@@ -48,6 +49,7 @@ export function JobCard({
   onViewCoverLetter,
   isPending,
   candidateId,
+  emailOutreachMode = 'manual',
 }: Props) {
   const [emailCadence, setEmailCadence] = useState<EmailCadenceSummary | null>(job.emailCadence)
   const [outreachStatus, setOutreachStatus] = useState<OutreachStatus | null>(
@@ -253,6 +255,7 @@ export function JobCard({
             <EmailOutreachPanel
               cadence={emailCadence}
               candidateId={candidateId}
+              mode={emailOutreachMode}
               onCadenceUpdated={setEmailCadence}
             />
           )}

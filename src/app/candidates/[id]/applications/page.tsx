@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
-import { getJobs, markSubmitted, rejectJob, getResumeVersions, triggerResumeGeneration } from '@/lib/api'
+import { getJobs, markSubmitted, rejectJob, getResumeVersions, triggerResumeGeneration, getPreferences } from '@/lib/api'
 import type { ScoredJob, ResumeVersion } from '@/lib/api'
+import type { EmailOutreachMode } from '@/types/candidate'
 import { Topbar } from '@/components/layout/Topbar'
 import { CandidateSwitcher } from '@/components/layout/CandidateSwitcher'
 import { JobCard } from '@/components/applications/JobCard'
@@ -27,13 +28,18 @@ export default function ApplicationsPage() {
   const [resumeVersions, setResumeVersions] = useState<ResumeVersion[]>([])
   const [resumeCvHash, setResumeCvHash]     = useState<string | null>(null)
   const [error, setError]                   = useState<string | null>(null)
+  const [emailOutreachMode, setEmailOutreachMode] = useState<EmailOutreachMode>('manual')
 
   const loadJobs = useCallback(async (grades: Grade[]) => {
     setLoading(true)
     setError(null)
     try {
-      const r = await getJobs(candidateId, grades.length > 0 ? grades : [...ALL_GRADES])
-      setJobs(r.jobs)
+      const [jobsResult, prefsResult] = await Promise.all([
+        getJobs(candidateId, grades.length > 0 ? grades : [...ALL_GRADES]),
+        getPreferences(candidateId),
+      ])
+      setJobs(jobsResult.jobs)
+      setEmailOutreachMode(prefsResult.preferences.email_outreach_mode ?? 'manual')
     } catch {
       setError('Failed to load jobs. Please refresh.')
     } finally {
@@ -144,6 +150,7 @@ export default function ApplicationsPage() {
                 key={job.id}
                 job={job}
                 candidateId={candidateId}
+                emailOutreachMode={emailOutreachMode}
                 onMarkSubmitted={handleMarkSubmitted}
                 onMoveToRejected={handleMoveToRejected}
                 onRetryResume={handleRetryResume}
