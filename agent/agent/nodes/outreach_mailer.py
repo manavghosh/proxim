@@ -274,18 +274,19 @@ async def generate_emails_node(state: OutreachMailerState, config) -> OutreachMa
                 }
         except Exception as exc:
             import traceback
-            err_detail = traceback.format_exc()
+            last_err = f"[{type(exc).__name__}] {str(exc)[:300]}"
             logger.warning("outreach_mailer.generation_error", attempt=attempts,
-                           error=str(exc), traceback=err_detail[:500])
-            # Write error to DB so it's visible without daemon logs
+                           error_type=type(exc).__name__, error=str(exc)[:300],
+                           traceback=traceback.format_exc()[-500:])
+            # Write to DB immediately so it's visible even if overwritten
             try:
                 await update_email_cadence(pool, cadence_id,
-                                           error_message=f"Attempt {attempts}: {type(exc).__name__}: {str(exc)[:200]}")
+                                           error_message=f"Attempt {attempts}/{max_attempts}: {last_err}")
             except Exception:
                 pass
 
-    last_err = f"Generation failed after {max_attempts} attempts"
-    await update_email_cadence(pool, cadence_id, status="failed", error_message=last_err)
+    final_msg = locals().get("last_err", "Self-review failed") + f" (after {attempts} attempts)"
+    await update_email_cadence(pool, cadence_id, status="failed", error_message=final_msg)
     return {**state, "status": "failed", "generation_attempts": attempts}
 
 
