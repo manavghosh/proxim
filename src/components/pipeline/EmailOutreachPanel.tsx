@@ -6,7 +6,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { approveCadence, overrideEmail, startCountdown, cancelCadence } from '@/lib/api'
+import { approveCadence, overrideEmail, startCountdown, cancelCadence, retryCadenceGeneration } from '@/lib/api'
 import { EmailDraftCard } from './EmailDraftCard'
 import { ManualSendDraftCard } from './ManualSendDraftCard'
 import type { EmailCadenceSummary, EmailDraftSummary, EmailOutreachMode } from '@/types/candidate'
@@ -29,6 +29,7 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, mode 
   const [isOverriding, setIsOverriding]     = useState(false)
   const [isCancelling, setIsCancelling]     = useState(false)
   const [isStarting, setIsStarting]         = useState(false)
+  const [isRetrying, setIsRetrying]         = useState(false)
   const [day1GmailOpened, setDay1GmailOpened] = useState(false)
 
   function handleDraftUpdated(updated: EmailDraftSummary) {
@@ -210,8 +211,32 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, mode 
         </div>
       )}
 
-      {cadence.status === 'email_not_found' && (
-        <p className="text-xs text-[#475569]">No email found for this company domain.</p>
+      {(cadence.status === 'failed' || cadence.status === 'email_not_found') && (
+        <div className="space-y-2">
+          <p className="text-xs text-[#475569]">
+            {cadence.status === 'failed'
+              ? 'Email draft generation failed — the daemon will retry, or you can trigger it now.'
+              : 'No email address found for this company domain.'}
+          </p>
+          <Button
+            size="sm" variant="outline"
+            className="text-xs border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c] gap-1.5"
+            isLoading={isRetrying}
+            data-testid="retry-email-btn"
+            onClick={async () => {
+              setIsRetrying(true)
+              try {
+                await retryCadenceGeneration(cadence.id, candidateId)
+                const updated: EmailCadenceSummary = { ...cadence, status: 'generating' }
+                setCadence(updated)
+                onCadenceUpdated(updated)
+              } finally { setIsRetrying(false) }
+            }}
+          >
+            <span>↺</span>
+            {cadence.status === 'failed' ? 'Retry email generation' : 'Retry with domain search'}
+          </Button>
+        </div>
       )}
       {cadence.status === 'replied' && (
         <Alert className="border-emerald-700/40 bg-emerald-950/20" data-testid="reply-received-banner">

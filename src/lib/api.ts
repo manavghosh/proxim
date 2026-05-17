@@ -492,6 +492,20 @@ export async function overrideEmail(
   })
 }
 
+export async function retryLinkedIn(
+  jobId: string,
+  candidateId: string,
+): Promise<{ pipelineJobId: string; status: string }> {
+  return request(`/api/jobs/${jobId}/retry-linkedin${qs(candidateId)}`, { method: 'POST' })
+}
+
+export async function retryCadenceGeneration(
+  cadenceId: string,
+  candidateId: string,
+): Promise<{ cadenceId: string; pipelineJobId: string; status: string }> {
+  return request(`/api/email-cadence/${cadenceId}/retry${qs(candidateId)}`, { method: 'POST' })
+}
+
 export async function startCountdown(
   cadenceId: string,
   candidateId: string,

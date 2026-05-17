@@ -10,6 +10,7 @@ vi.mock('@/lib/api', () => ({
   startCountdown: vi.fn(),
   cancelCadence: vi.fn(),
   markDraftSent: vi.fn(),
+  retryCadenceGeneration: vi.fn(),
 }))
 
 const makeDraft = (day: 1 | 3 | 7): EmailDraftSummary => ({

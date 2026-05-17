@@ -4,9 +4,10 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 vi.mock('@/lib/api', () => ({
   selectAndSendNote: vi.fn(),
   regenerateNotes:   vi.fn(),
+  retryLinkedIn:     vi.fn(),
 }))
 
-import { selectAndSendNote, regenerateNotes } from '@/lib/api'
+import { selectAndSendNote, regenerateNotes, retryLinkedIn } from '@/lib/api'
 import { OutreachNoteSelector } from '@/components/pipeline/OutreachNoteSelector'
 import type { OutreachTargetSummary } from '@/types/candidate'
 
@@ -29,6 +30,7 @@ const BASE_TARGET: OutreachTargetSummary = {
 const makeProps = (overrides: Partial<OutreachTargetSummary> = {}) => ({
   target:         { ...BASE_TARGET, ...overrides },
   candidateId:    'cand-1',
+  jobId:          'job-1',
   onStatusChange: vi.fn(),
 })
 

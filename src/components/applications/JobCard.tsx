@@ -226,10 +226,13 @@ export function JobCard({
             </span>
             <OutreachStatusBadge status={(outreachStatus ?? job.outreachTarget.status) as OutreachStatus} />
           </div>
-          {(outreachStatus ?? job.outreachTarget.status) === 'notes_ready' && (
+          {(['notes_ready', 'no_contact_found', 'failed'] as OutreachStatus[]).includes(
+            (outreachStatus ?? job.outreachTarget.status) as OutreachStatus
+          ) && (
             <OutreachNoteSelector
               target={{ ...job.outreachTarget, status: (outreachStatus ?? job.outreachTarget.status) as OutreachStatus }}
               candidateId={candidateId}
+              jobId={job.id}
               onStatusChange={(s) => setOutreachStatus(s)}
             />
           )}

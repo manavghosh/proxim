@@ -5,20 +5,22 @@ import { AlertCircle, RefreshCw, Send } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { selectAndSendNote, regenerateNotes } from '@/lib/api'
+import { selectAndSendNote, regenerateNotes, retryLinkedIn } from '@/lib/api'
 import type { OutreachTargetSummary, OutreachStatus } from '@/types/candidate'
 
 interface Props {
   target:         OutreachTargetSummary
   candidateId:    string
+  jobId:          string
   onStatusChange: (newStatus: OutreachStatus) => void
 }
 
-export function OutreachNoteSelector({ target, candidateId, onStatusChange }: Props) {
+export function OutreachNoteSelector({ target, candidateId, jobId, onStatusChange }: Props) {
   const [activeTab,    setActiveTab]    = useState<'A' | 'B'>('A')
   const [editedText,   setEditedText]   = useState('')
   const [sending,      setSending]      = useState(false)
   const [regenerating, setRegenerating] = useState(false)
+  const [retrying,     setRetrying]     = useState(false)
   const [resultStatus, setResultStatus] = useState<OutreachStatus | null>(null)
 
   const effectiveStatus = resultStatus ?? target.status
@@ -32,6 +34,34 @@ export function OutreachNoteSelector({ target, candidateId, onStatusChange }: Pr
       >
         <AlertCircle className="w-3.5 h-3.5 shrink-0" />
         LinkedIn outreach is paused due to rate limiting. Resume in settings.
+      </div>
+    )
+  }
+
+  // ── No contact found ──────────────────────────────────────────────────────
+  if (effectiveStatus === 'no_contact_found') {
+    return (
+      <div className="space-y-2">
+        <p className="text-xs text-[#64748b]">
+          No hiring manager found at this company via LinkedIn search.
+        </p>
+        <Button
+          size="sm" variant="outline"
+          className="text-xs border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c]"
+          isLoading={retrying}
+          data-testid="linkedin-retry-btn"
+          onClick={async () => {
+            setRetrying(true)
+            try {
+              await retryLinkedIn(jobId, candidateId)
+              setResultStatus('discovering')
+              onStatusChange('discovering')
+            } finally { setRetrying(false) }
+          }}
+        >
+          <RefreshCw className="w-3 h-3 mr-1.5" />
+          Retry LinkedIn search
+        </Button>
       </div>
     )
   }
