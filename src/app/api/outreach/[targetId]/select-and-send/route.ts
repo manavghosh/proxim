@@ -94,7 +94,11 @@ export async function POST(
     const accessToken = prefs.linkedin_access_token ?? ''
     const liRes = await fetch(LI_INVITATIONS, {
       method:  'POST',
-      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'X-Restli-Protocol-Version': '2.0.0',
+      },
       body: JSON.stringify({
         invitee: {
           'com.linkedin.voyager.growth.invitation.InviteeProfile': {

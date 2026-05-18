@@ -42,6 +42,7 @@ async def send_connection_request(
             headers={
                 "Authorization": f"Bearer {access_token}",
                 "Content-Type": "application/json",
+                "X-Restli-Protocol-Version": "2.0.0",
             },
         )
 
