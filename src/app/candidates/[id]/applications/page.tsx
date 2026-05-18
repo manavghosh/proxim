@@ -130,7 +130,16 @@ export default function ApplicationsPage() {
       <Topbar title="Applications" actions={<CandidateSwitcher candidateId={candidateId} />} />
       <main className="flex-1 overflow-y-auto p-6 bg-[#0d1829]">
         {error && (
-          <div className="mb-4 px-4 py-3 bg-[#450a0a] border border-[#7f1d1d] rounded-lg text-[12px] text-[#fca5a5]">{error}</div>
+          <div className="mb-4 px-4 py-3 bg-[#450a0a] border border-[#7f1d1d] rounded-lg text-[12px] text-[#fca5a5] flex items-center justify-between gap-3">
+            <span>{error}</span>
+            <button
+              onClick={() => setError(null)}
+              aria-label="Dismiss"
+              className="shrink-0 text-[#fca5a5] hover:text-white transition-colors"
+            >
+              ✕
+            </button>
+          </div>
         )}
         <div className="mb-5">
           <GradeFilterDropdown selected={selectedGrades} onChange={setSelectedGrades} counts={counts} />

@@ -12,6 +12,8 @@ interface Props {
   autoOpen?: boolean
   /** Called once when the pipeline job transitions to failed status. */
   onBuildFailed?: () => void
+  /** Called whenever the running state changes so the parent can disable Retry. */
+  onRunningChange?: (running: boolean) => void
 }
 
 interface LogEntry {
@@ -48,7 +50,7 @@ function formatTime(iso: string): string {
 // Inline expand showing the resume_builder progress for one job. Mirrors the
 // Pipeline page's PipelineLogPane in look-and-feel; lazy-resolves the latest
 // pipeline_job_id for the job, then polls /api/pipeline/{id}/logs.
-export function BuildProgressPane({ jobId, autoOpen = false, onBuildFailed }: Props) {
+export function BuildProgressPane({ jobId, autoOpen = false, onBuildFailed, onRunningChange }: Props) {
   const [open, setOpen] = useState(autoOpen)
   const [pipelineJobId, setPipelineJobId] = useState<string | null>(null)
   const [pipelineStatus, setPipelineStatus] = useState<string | null>(null)
@@ -74,6 +76,15 @@ export function BuildProgressPane({ jobId, autoOpen = false, onBuildFailed }: Pr
     if (open) scrollToPane()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
+
+  // Notify parent whenever the build transitions between running / not-running.
+  useEffect(() => {
+    if (pipelineStatus !== null) {
+      onRunningChange?.(!TERMINAL_STATUSES.has(pipelineStatus))
+    }
+  // onRunningChange is a callback prop — omit from deps to avoid infinite loops
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pipelineStatus])
 
   // Resolve the latest pipeline_job_id for this job the first time we open.
   useEffect(() => {

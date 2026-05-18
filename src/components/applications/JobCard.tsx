@@ -64,6 +64,8 @@ export function JobCard({
   // Tracks build failure detected by BuildProgressPane polling — covers the case
   // where the pipeline job fails before the DB job status flips to resume_failed.
   const [localResumeFailed, setLocalResumeFailed] = useState(false)
+  // True while BuildProgressPane is actively polling a running pipeline job.
+  const [buildRunning, setBuildRunning] = useState(false)
   // Incremented on each retry to force BuildProgressPane to remount and re-fetch.
   const [retryCount, setRetryCount] = useState(0)
   const score = (job.score10d as Record<string, unknown> | null)?.numeric_score as number | undefined
@@ -171,16 +173,18 @@ export function JobCard({
         )}
 
         {/* Retry on failure — covers both DB-level resume_failed and
-            locally-detected pipeline job failure */}
+            locally-detected pipeline job failure. Disabled while a build
+            is actively running to prevent double-submissions. */}
         {(isResumeFailed || localResumeFailed) && (
           <Button size="sm" variant="outline"
             className="h-7 text-[11px] border-red-700/40 text-red-400 hover:bg-red-950/30 gap-1"
             onClick={() => {
               setLocalResumeFailed(false)
+              setBuildRunning(false)
               setRetryCount((c) => c + 1)
               onRetryResume(job.id)
             }}
-            disabled={isPending}
+            disabled={isPending || buildRunning}
             isLoading={isPending}>
             <RotateCcw className="w-3 h-3" />
             Retry Resume
@@ -235,6 +239,7 @@ export function JobCard({
           jobId={job.id}
           autoOpen={isApproved || isResumeFailed}
           onBuildFailed={() => setLocalResumeFailed(true)}
+          onRunningChange={setBuildRunning}
         />
       )}
 
