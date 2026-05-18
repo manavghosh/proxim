@@ -56,6 +56,7 @@ export async function POST(
 
     // 3. Count today's sends
     const todayStart = new Date(); todayStart.setUTCHours(0, 0, 0, 0)
+    const todayStartStr = todayStart.toISOString() as unknown as Date
     const [{ count: dailyCount }] = await db
       .select({ count: count() })
       .from(outreachTargets)
@@ -63,7 +64,7 @@ export async function POST(
         and(
           eq(outreachTargets.candidateId, candidateId),
           eq(outreachTargets.status, 'sent'),
-          gte(outreachTargets.sentAt, todayStart)
+          gte(outreachTargets.sentAt, todayStartStr)
         )
       )
 
