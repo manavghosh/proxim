@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { AlertCircle, RefreshCw, Send } from 'lucide-react'
+import { AlertCircle, ClipboardCopy, ExternalLink, RefreshCw, Send } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -18,11 +18,14 @@ interface Props {
 export function OutreachNoteSelector({ target, candidateId, jobId, onStatusChange }: Props) {
   const [activeTab,    setActiveTab]    = useState<'A' | 'B'>('A')
   const [editedText,   setEditedText]   = useState('')
-  const [sending,      setSending]      = useState(false)
-  const [regenerating, setRegenerating] = useState(false)
-  const [retrying,     setRetrying]     = useState(false)
-  const [resultStatus, setResultStatus] = useState<OutreachStatus | null>(null)
-  const [sendError,    setSendError]    = useState<string | null>(null)
+  const [sending,       setSending]       = useState(false)
+  const [regenerating,  setRegenerating]  = useState(false)
+  const [retrying,      setRetrying]      = useState(false)
+  const [resultStatus,  setResultStatus]  = useState<OutreachStatus | null>(null)
+  const [sendError,     setSendError]     = useState<string | null>(null)
+  const [showManual,    setShowManual]    = useState(false)
+  const [copied,        setCopied]        = useState(false)
+  const [markingSent,   setMarkingSent]   = useState(false)
 
   const effectiveStatus = resultStatus ?? target.status
 
@@ -114,6 +117,7 @@ export function OutreachNoteSelector({ target, candidateId, jobId, onStatusChang
   async function handleSend() {
     setSending(true)
     setSendError(null)
+    setShowManual(false)
     try {
       const result = await selectAndSendNote(
         target.id, candidateId, activeTab, editedText || undefined
@@ -122,14 +126,42 @@ export function OutreachNoteSelector({ target, candidateId, jobId, onStatusChang
       onStatusChange(result.status)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      // Surface a readable message — strip the leading status code if present
       const readable = msg.replace(/^\d+:\s*/, '')
-      let parsed: { error?: string } | null = null
+      let parsed: { error?: string; code?: string; liBody?: string } | null = null
       try { parsed = JSON.parse(readable) } catch { /* not JSON */ }
-      setSendError(parsed?.error ?? 'Failed to send connection request. Please try again.')
+      // LinkedIn API partner restriction — fall back to manual flow
+      const liBody = parsed?.liBody ?? ''
+      if (liBody.includes('ACCESS_DENIED') || liBody.includes('NO_VERSION')) {
+        setShowManual(true)
+      } else {
+        setSendError(parsed?.error ?? 'Failed to send. Please try again.')
+      }
     } finally {
       setSending(false)
     }
+  }
+
+  async function handleMarkSent() {
+    setMarkingSent(true)
+    try {
+      const result = await selectAndSendNote(
+        target.id, candidateId, activeTab, editedText || undefined, true
+      )
+      setResultStatus(result.status)
+      onStatusChange(result.status)
+    } catch (e) {
+      setSendError(e instanceof Error ? e.message : 'Failed to mark as sent.')
+    } finally {
+      setMarkingSent(false)
+    }
+  }
+
+  function handleCopy() {
+    const note = editedText || (activeTab === 'A' ? target.noteA : target.noteB) || ''
+    navigator.clipboard.writeText(note).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
   }
 
   return (
@@ -189,6 +221,43 @@ export function OutreachNoteSelector({ target, candidateId, jobId, onStatusChang
         <div className="flex items-start gap-2 rounded-lg bg-red-950/40 border border-red-800/40 px-3 py-2 text-xs text-red-400">
           <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
           <span>{sendError}</span>
+        </div>
+      )}
+
+      {showManual && (
+        <div className="rounded-lg border border-amber-800/40 bg-amber-950/30 p-3 space-y-2.5">
+          <p className="text-[11px] text-amber-400 leading-relaxed">
+            LinkedIn&apos;s API restricts automated invitations. Copy the note below and send the
+            connection request manually on LinkedIn, then mark it as sent.
+          </p>
+          <div className="flex gap-2">
+            <Button
+              size="sm" variant="outline"
+              className="h-7 text-[11px] border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c] gap-1 flex-1"
+              onClick={handleCopy}
+            >
+              <ClipboardCopy className="w-3 h-3" />
+              {copied ? 'Copied!' : 'Copy note'}
+            </Button>
+            {target.linkedinUrl && (
+              <Button size="sm" variant="outline" asChild
+                className="h-7 text-[11px] border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c] gap-1 flex-1">
+                <a href={target.linkedinUrl} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="w-3 h-3" />
+                  Open profile
+                </a>
+              </Button>
+            )}
+          </div>
+          <Button
+            size="sm"
+            className="w-full h-7 text-[11px] bg-emerald-800 hover:bg-emerald-700 text-white gap-1"
+            isLoading={markingSent}
+            onClick={handleMarkSent}
+          >
+            <Send className="w-3 h-3" />
+            I&apos;ve sent it — mark as sent
+          </Button>
         </div>
       )}
     </div>

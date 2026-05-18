@@ -17,9 +17,9 @@ export async function POST(
     const candidateId = searchParams.get('candidateId')
     if (!candidateId) return NextResponse.json({ error: 'candidateId required' }, { status: 400 })
 
-    let body: { selectedNote?: 'A' | 'B'; editedNote?: string }
+    let body: { selectedNote?: 'A' | 'B'; editedNote?: string; manual?: boolean }
     try { body = await request.json() } catch { body = {} }
-    const { selectedNote, editedNote } = body
+    const { selectedNote, editedNote, manual } = body
     if (!selectedNote) return NextResponse.json({ error: 'selectedNote required' }, { status: 400 })
 
     // 1. Load candidate prefs — check paused + get access token
@@ -79,7 +79,16 @@ export async function POST(
       return NextResponse.json({ status: 'queued', message: 'Daily limit reached. Sends tomorrow.' })
     }
 
-    // 5. Call LinkedIn Invitations API.
+    // 5a. Manual send — user confirmed they sent it themselves on LinkedIn.
+    if (manual === true) {
+      const sentAt = new Date()
+      await db.update(outreachTargets)
+        .set({ status: 'sent', selectedNote, editedNote: editedNote ?? null, sentAt })
+        .where(eq(outreachTargets.id, targetId))
+      return NextResponse.json({ targetId, status: 'sent', sentAt: sentAt.toISOString(), manual: true })
+    }
+
+    // 5b. Call LinkedIn Invitations API.
     //    Extract the vanity name from the URL:
     //      https://linkedin.com/in/caiosabenca          → caiosabenca
     //      https://linkedin.com/in/caiosabenca/         → caiosabenca

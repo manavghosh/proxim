@@ -399,11 +399,12 @@ export async function selectAndSendNote(
   candidateId: string,
   selectedNote: 'A' | 'B',
   editedNote?: string,
-): Promise<{ targetId: string; status: OutreachStatus; sentAt?: string; message?: string }> {
+  manual = false,
+): Promise<{ targetId: string; status: OutreachStatus; sentAt?: string; message?: string; manual?: boolean }> {
   return request(`/api/outreach/${targetId}/select-and-send${qs(candidateId)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ selectedNote, editedNote }),
+    body: JSON.stringify({ selectedNote, editedNote, manual }),
   })
 }
 
