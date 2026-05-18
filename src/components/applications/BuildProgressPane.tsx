@@ -10,6 +10,8 @@ interface Props {
   /** When true, the pane auto-opens on first mount (e.g. resume_failed —
    *  the user almost certainly wants to see why). */
   autoOpen?: boolean
+  /** Called once when the pipeline job transitions to failed status. */
+  onBuildFailed?: () => void
 }
 
 interface LogEntry {
@@ -46,7 +48,7 @@ function formatTime(iso: string): string {
 // Inline expand showing the resume_builder progress for one job. Mirrors the
 // Pipeline page's PipelineLogPane in look-and-feel; lazy-resolves the latest
 // pipeline_job_id for the job, then polls /api/pipeline/{id}/logs.
-export function BuildProgressPane({ jobId, autoOpen = false }: Props) {
+export function BuildProgressPane({ jobId, autoOpen = false, onBuildFailed }: Props) {
   const [open, setOpen] = useState(autoOpen)
   const [pipelineJobId, setPipelineJobId] = useState<string | null>(null)
   const [pipelineStatus, setPipelineStatus] = useState<string | null>(null)
@@ -83,6 +85,7 @@ export function BuildProgressPane({ jobId, autoOpen = false }: Props) {
         setPipelineJobId(res.pipelineJobId)
         setPipelineStatus(res.status)
         if (!res.pipelineJobId) setError('No build has run for this job yet.')
+        if (res.status === 'failed') onBuildFailed?.()
       })
       .catch(() => setError('Failed to look up build job.'))
       .finally(() => setLoadingLookup(false))
@@ -118,17 +121,20 @@ export function BuildProgressPane({ jobId, autoOpen = false }: Props) {
         if (TERMINAL_STATUSES.has(data.jobStatus) && intervalRef.current) {
           clearInterval(intervalRef.current)
           intervalRef.current = null
-          if (data.jobStatus === 'failed' && data.jobError) {
-            setLogs((prev) => [
-              ...prev,
-              {
-                id: `err-${Date.now()}`,
-                level: 'error',
-                step: 'failed',
-                message: `Build failed: ${data.jobError}`,
-                createdAt: new Date().toISOString(),
-              },
-            ])
+          if (data.jobStatus === 'failed') {
+            onBuildFailed?.()
+            if (data.jobError) {
+              setLogs((prev) => [
+                ...prev,
+                {
+                  id: `err-${Date.now()}`,
+                  level: 'error',
+                  step: 'failed',
+                  message: `Build failed: ${data.jobError}`,
+                  createdAt: new Date().toISOString(),
+                },
+              ])
+            }
           }
         }
       } finally {

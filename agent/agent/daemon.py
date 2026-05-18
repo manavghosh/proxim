@@ -92,6 +92,8 @@ async def _dispatch_job(pool, job: dict) -> None:
         target = await _db_regen.get_outreach_target(pool, target_id)
         if not target:
             logger.warning("linkedin_note_regen.target_not_found", target_id=target_id)
+            await _db_regen.update_pipeline_job_status(pool, job['id'], 'failed',
+                                                        error=f'Target {target_id} not found')
             return
 
         config = _RC(configurable={
@@ -120,15 +122,17 @@ async def _dispatch_job(pool, job: dict) -> None:
             state = {**state, **(await generate_notes_node(state, config))}
             logger.info("linkedin_note_regen.complete", target_id=target_id,
                         status=state["status"])
+            await _db_regen.update_pipeline_job_status(pool, job['id'], 'completed')
         except Exception as exc:
             logger.error("linkedin_note_regen.error", target_id=target_id, error=str(exc))
             await _db_regen.update_outreach_target(
                 pool, target_id, status="failed", error_message=str(exc)
             )
+            await _db_regen.update_pipeline_job_status(pool, job['id'], 'failed', error=str(exc))
 
     elif job['job_type'] == 'linkedin_connector':
         from agent.nodes.linkedin_connector import LinkedInConnectorState, check_dnc_node, discover_contact_node, enrich_profile_node, generate_notes_node
-        from agent.db import insert_outreach_target
+        from agent.db import insert_outreach_target, update_pipeline_job_status
         from agent.config import settings
         from langchain_core.runnables import RunnableConfig
 
@@ -170,22 +174,26 @@ async def _dispatch_job(pool, job: dict) -> None:
             state = {**state, **(await check_dnc_node(state, config))}
             if state["status"] == "skipped_dnc":
                 logger.info("linkedin.dnc_skip_complete", target_id=target_id)
+                await update_pipeline_job_status(pool, job['id'], 'completed')
                 return
 
             state = {**state, **(await discover_contact_node(state, config))}
             if state["status"] == "no_contact_found":
                 logger.info("linkedin.no_contact_complete", target_id=target_id)
+                await update_pipeline_job_status(pool, job['id'], 'completed')
                 return
 
             state = {**state, **(await enrich_profile_node(state, config))}
             state = {**state, **(await generate_notes_node(state, config))}
             logger.info("linkedin.connector_complete", target_id=target_id,
                         status=state["status"])
+            await update_pipeline_job_status(pool, job['id'], 'completed')
         except Exception as exc:
             from agent.db import update_outreach_target
             logger.error("linkedin.connector_error", target_id=target_id, error=str(exc))
             await update_outreach_target(pool, target_id, status="failed",
                                          error_message=str(exc))
+            await update_pipeline_job_status(pool, job['id'], 'failed', error=str(exc))
 
     elif job['job_type'] == 'import_jobs':
         from agent.db import (
@@ -279,7 +287,7 @@ async def _dispatch_job(pool, job: dict) -> None:
             OutreachMailerState, discover_email_node, generate_emails_node,
             write_cadence_checkpoint_node,
         )
-        from agent.db import insert_email_cadence
+        from agent.db import insert_email_cadence, update_pipeline_job_status, update_email_cadence
         from agent.config import settings as _settings
         from langchain_core.runnables import RunnableConfig
 
@@ -290,14 +298,26 @@ async def _dispatch_job(pool, job: dict) -> None:
         archetype  = payload.get('archetype', '')
         arch_conf  = float(payload.get('archetype_confidence', 0))
         cand_id    = str(job['candidate_id'])
+        pj_id      = job['id']
 
-        logger.info("job_dispatching", job_id=job['id'], job_type=job['job_type'],
+        logger.info("job_dispatching", job_id=pj_id, job_type=job['job_type'],
                     target_job_id=job_id, company=company)
 
         if job['job_type'] == 'outreach_mailer':
             cadence_id = await insert_email_cadence(pool, job_id, cand_id)
         else:
             cadence_id = str(payload.get('cadence_id', ''))
+            # Guard: cadence must exist — stale jobs from a prev session may reference
+            # a cadence that was deleted or never committed.
+            async with pool.execute(
+                "SELECT id FROM email_cadences WHERE id = ?", (cadence_id,)
+            ) as cursor:
+                if not await cursor.fetchone():
+                    logger.warning("outreach_mailer_generate.cadence_not_found",
+                                   cadence_id=cadence_id, pipeline_job_id=pj_id)
+                    await update_pipeline_job_status(pool, pj_id, 'failed',
+                                                     error=f'Cadence {cadence_id} not found')
+                    return
 
         config = RunnableConfig(configurable={"pool": pool, "settings": _settings})
 
@@ -326,15 +346,19 @@ async def _dispatch_job(pool, job: dict) -> None:
             if job['job_type'] == 'outreach_mailer':
                 state = {**state, **(await discover_email_node(state, config))}
                 if state["status"] in ("email_not_found", "low_confidence"):
+                    await update_pipeline_job_status(pool, pj_id, 'completed')
                     return
             state = {**state, **(await generate_emails_node(state, config))}
             if state["status"] == "failed":
+                await update_pipeline_job_status(pool, pj_id, 'failed',
+                                                  error=state.get("error") or "Generation failed")
                 return
             await write_cadence_checkpoint_node(state, config)
+            await update_pipeline_job_status(pool, pj_id, 'completed')
         except Exception as exc:
-            from agent.db import update_email_cadence
             logger.error("outreach_mailer.error", cadence_id=cadence_id, error=str(exc))
             await update_email_cadence(pool, cadence_id, status="failed", error_message=str(exc))
+            await update_pipeline_job_status(pool, pj_id, 'failed', error=str(exc))
 
     else:
         from agent.graphs.discovery import discovery_graph
@@ -671,7 +695,11 @@ async def _reply_bounce_detection_loop(pool) -> None:
 
 async def main() -> None:
     from agent.config import settings
-    from agent.db import create_pool, close_pool, claim_pipeline_job
+    from agent.db import (
+        create_pool, close_pool, claim_pipeline_job,
+        reset_stale_pipeline_jobs,
+        reset_stale_linkedin_outreach, reset_stale_email_cadences,
+    )
 
     loop = asyncio.get_running_loop()
 
@@ -687,6 +715,16 @@ async def main() -> None:
 
     logger.info("daemon_starting", polling_interval_seconds=settings.polling_interval_seconds)
     pool = await create_pool(settings.database_url)
+
+    # On startup, re-queue any pipeline_jobs that were 'running' when the
+    # daemon was last killed, then reset in-flight outreach rows to 'failed'.
+    # Together these ensure: interrupted jobs re-run automatically, and the
+    # UI shows Retry buttons instead of eternal spinners.
+    pj_reset = await reset_stale_pipeline_jobs(pool)
+    li_reset = await reset_stale_linkedin_outreach(pool)
+    em_reset = await reset_stale_email_cadences(pool)
+    if pj_reset or li_reset or em_reset:
+        logger.info("daemon_stale_reset", pipeline_jobs=pj_reset, linkedin=li_reset, email=em_reset)
 
     async def _job_poll_loop():
         try:

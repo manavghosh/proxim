@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ExternalLink, FileTextIcon, DownloadIcon, MoreHorizontal, XCircle, CheckCheck, RotateCcw } from 'lucide-react'
+import { ExternalLink, FileTextIcon, DownloadIcon, MoreHorizontal, XCircle, CheckCheck, RotateCcw, Link2, MailIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -18,7 +18,10 @@ import { OutreachNoteSelector } from '@/components/pipeline/OutreachNoteSelector
 import { OutreachStatusBadge } from '@/components/pipeline/OutreachStatusBadge'
 import type { ScoredJob, EmailCadenceSummary } from '@/lib/api'
 import { retryLinkedIn, startEmailOutreach } from '@/lib/api'
-import type { OutreachTargetSummary, OutreachStatus, EmailOutreachMode } from '@/types/candidate'
+import type { OutreachTargetSummary, OutreachStatus, EmailOutreachMode, EmailCadenceStatus } from '@/types/candidate'
+
+const LINKEDIN_TRANSIENT: OutreachStatus[] = ['pending', 'discovering', 'enriching', 'generating']
+const EMAIL_TRANSIENT: EmailCadenceStatus[] = ['pending_discovery', 'discovering', 'generating']
 
 const GRADE_STYLES: Record<string, { badge: string }> = {
   A: { badge: 'bg-emerald-500 text-white border-transparent' },
@@ -58,6 +61,11 @@ export function JobCard({
   )
   const [liStarting,  setLiStarting]  = useState(false)
   const [emStarting,  setEmStarting]  = useState(false)
+  // Tracks build failure detected by BuildProgressPane polling — covers the case
+  // where the pipeline job fails before the DB job status flips to resume_failed.
+  const [localResumeFailed, setLocalResumeFailed] = useState(false)
+  // Incremented on each retry to force BuildProgressPane to remount and re-fetch.
+  const [retryCount, setRetryCount] = useState(0)
   const score = (job.score10d as Record<string, unknown> | null)?.numeric_score as number | undefined
   const isSnoozed   = job.status === 'snoozed'
   const isApproved  = job.status === 'approved'
@@ -133,7 +141,7 @@ export function JobCard({
       {/* Actions — post-decision tracking only */}
       <div className="flex items-center gap-2 pt-1 flex-wrap">
         {/* Resume in-flight */}
-        {isApproved && (
+        {isApproved && !localResumeFailed && (
           <Button size="sm" variant="outline"
             className="h-7 text-[11px] border-blue-700/40 text-blue-400 hover:bg-blue-950/30 gap-1"
             onClick={() => onViewResume?.(job.id)}
@@ -162,11 +170,16 @@ export function JobCard({
           </>
         )}
 
-        {/* Retry on failure */}
-        {isResumeFailed && (
+        {/* Retry on failure — covers both DB-level resume_failed and
+            locally-detected pipeline job failure */}
+        {(isResumeFailed || localResumeFailed) && (
           <Button size="sm" variant="outline"
             className="h-7 text-[11px] border-red-700/40 text-red-400 hover:bg-red-950/30 gap-1"
-            onClick={() => onRetryResume(job.id)}
+            onClick={() => {
+              setLocalResumeFailed(false)
+              setRetryCount((c) => c + 1)
+              onRetryResume(job.id)
+            }}
             disabled={isPending}
             isLoading={isPending}>
             <RotateCcw className="w-3 h-3" />
@@ -217,92 +230,191 @@ export function JobCard({
 
       {/* Build-progress log — auto-opens while building or on failure */}
       {(isApproved || isResumeReady || isSubmitted || isResumeFailed) && (
-        <BuildProgressPane jobId={job.id} autoOpen={isApproved || isResumeFailed} />
+        <BuildProgressPane
+          key={retryCount}
+          jobId={job.id}
+          autoOpen={isApproved || isResumeFailed}
+          onBuildFailed={() => setLocalResumeFailed(true)}
+        />
       )}
 
-      {/* F5 LinkedIn — start button when outreach never ran */}
-      {!job.outreachTarget && (isApproved || isResumeReady || isSubmitted) && (
-        <div className="border-t border-[#1e2d4a] pt-3 mt-1 flex items-center gap-2">
-          <span className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase">
-            LinkedIn Outreach
-          </span>
-          <Button size="sm" variant="outline"
-            className="h-6 text-[10px] border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c] gap-1"
-            isLoading={liStarting}
-            onClick={async () => {
-              setLiStarting(true)
-              try {
-                await retryLinkedIn(job.id, candidateId)
-                setOutreachStatus('discovering')
-              } finally { setLiStarting(false) }
-            }}
-          >
-            Start
-          </Button>
-        </div>
-      )}
-
-      {/* F5 LinkedIn Outreach — note selector + send button */}
-      {job.outreachTarget && (
+      {/* F5 LinkedIn Outreach */}
+      {(isApproved || isResumeReady || isSubmitted) && (
         <div className="border-t border-[#1e2d4a] pt-3 mt-1">
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2">
             <span className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase">
               LinkedIn Outreach
             </span>
-            <OutreachStatusBadge status={(outreachStatus ?? job.outreachTarget.status) as OutreachStatus} />
+
+            {/* No outreach yet → Start */}
+            {!job.outreachTarget && (
+              <Button size="sm" variant="outline"
+                className="h-6 text-[10px] border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c] gap-1"
+                isLoading={liStarting}
+                onClick={async () => {
+                  setLiStarting(true)
+                  try {
+                    await retryLinkedIn(job.id, candidateId)
+                    setOutreachStatus('discovering')
+                  } finally { setLiStarting(false) }
+                }}>
+                Start
+              </Button>
+            )}
+
+            {/* Transient state (daemon was killed mid-run) → Retry */}
+            {job.outreachTarget && LINKEDIN_TRANSIENT.includes(
+              (outreachStatus ?? job.outreachTarget.status) as OutreachStatus
+            ) && (
+              <Button size="sm" variant="outline"
+                className="h-6 text-[10px] border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c] gap-1"
+                isLoading={liStarting}
+                onClick={async () => {
+                  setLiStarting(true)
+                  try {
+                    await retryLinkedIn(job.id, candidateId)
+                    setOutreachStatus('discovering')
+                  } finally { setLiStarting(false) }
+                }}>
+                <RotateCcw className="w-3 h-3" />
+                Retry
+              </Button>
+            )}
+
+            {/* Terminal / action states → badge */}
+            {job.outreachTarget && !LINKEDIN_TRANSIENT.includes(
+              (outreachStatus ?? job.outreachTarget.status) as OutreachStatus
+            ) && (
+              <OutreachStatusBadge status={(outreachStatus ?? job.outreachTarget.status) as OutreachStatus} />
+            )}
           </div>
-          {(['notes_ready', 'no_contact_found', 'failed'] as OutreachStatus[]).includes(
+
+          {/* Target profile link — show once we know who the contact is */}
+          {job.outreachTarget?.name && (
+            <div className="flex items-center gap-1.5 mt-1.5">
+              <Link2 className="w-3 h-3 text-[#0A66C2] flex-shrink-0" />
+              {job.outreachTarget.linkedinUrl ? (
+                <a
+                  href={job.outreachTarget.linkedinUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] text-[#60a5fa] hover:underline truncate"
+                >
+                  {job.outreachTarget.name}
+                  {job.outreachTarget.title && (
+                    <span className="text-[#475569]"> · {job.outreachTarget.title}</span>
+                  )}
+                </a>
+              ) : (
+                <span className="text-[10px] text-[#64748b]">
+                  {job.outreachTarget.name}
+                  {job.outreachTarget.title && (
+                    <span className="text-[#475569]"> · {job.outreachTarget.title}</span>
+                  )}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Notes selector for actionable terminal states */}
+          {job.outreachTarget && (['notes_ready', 'no_contact_found', 'failed'] as OutreachStatus[]).includes(
             (outreachStatus ?? job.outreachTarget.status) as OutreachStatus
           ) && (
-            <OutreachNoteSelector
-              target={{ ...job.outreachTarget, status: (outreachStatus ?? job.outreachTarget.status) as OutreachStatus }}
-              candidateId={candidateId}
-              jobId={job.id}
-              onStatusChange={(s) => setOutreachStatus(s)}
-            />
+            <div className="mt-2">
+              <OutreachNoteSelector
+                target={{ ...job.outreachTarget, status: (outreachStatus ?? job.outreachTarget.status) as OutreachStatus }}
+                candidateId={candidateId}
+                jobId={job.id}
+                onStatusChange={(s) => setOutreachStatus(s)}
+              />
+            </div>
           )}
         </div>
       )}
 
-      {/* F6 Email — start button when outreach never ran */}
-      {!emailCadence && (isApproved || isResumeReady || isSubmitted) && (
-        <div className="border-t border-[#1e2d4a] pt-3 mt-1 flex items-center gap-2">
-          <span className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase">
-            Email
-          </span>
-          <Button size="sm" variant="outline"
-            className="h-6 text-[10px] border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c] gap-1"
-            isLoading={emStarting}
-            onClick={async () => {
-              setEmStarting(true)
-              try {
-                await startEmailOutreach(job.id, candidateId)
-                setEmailCadence({ id: '', status: 'pending_discovery', hiringManagerEmail: null,
-                  emailConfidence: null, approvedAt: null, replyDetectedAt: null, bounceDetectedAt: null, drafts: [] })
-              } finally { setEmStarting(false) }
-            }}
-          >
-            Start
-          </Button>
-        </div>
-      )}
-
-      {/* F6 Email cadence — status badge + full draft review panel */}
-      {emailCadence && (
+      {/* F6 Email Outreach */}
+      {(isApproved || isResumeReady || isSubmitted) && (
         <div className="border-t border-[#1e2d4a] pt-3 mt-1">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase">
               Email
             </span>
-            <EmailCadenceStatusBadge status={emailCadence.status} />
+
+            {/* No cadence yet → Start */}
+            {!emailCadence && (
+              <Button size="sm" variant="outline"
+                className="h-6 text-[10px] border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c] gap-1"
+                isLoading={emStarting}
+                onClick={async () => {
+                  setEmStarting(true)
+                  try {
+                    await startEmailOutreach(job.id, candidateId)
+                    setEmailCadence({ id: '', status: 'pending_discovery', hiringManagerEmail: null,
+                      emailConfidence: null, approvedAt: null, replyDetectedAt: null, bounceDetectedAt: null, drafts: [] })
+                  } finally { setEmStarting(false) }
+                }}>
+                Start
+              </Button>
+            )}
+
+            {/* Transient or terminal-failed state → Retry */}
+            {emailCadence && (
+              EMAIL_TRANSIENT.includes(emailCadence.status) ||
+              emailCadence.status === 'failed' ||
+              emailCadence.status === 'email_not_found' ||
+              emailCadence.status === 'cancelled'
+            ) && (
+              <Button size="sm" variant="outline"
+                className="h-6 text-[10px] border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c] gap-1"
+                isLoading={emStarting}
+                onClick={async () => {
+                  setEmStarting(true)
+                  try {
+                    await startEmailOutreach(job.id, candidateId)
+                    setEmailCadence({ id: '', status: 'pending_discovery', hiringManagerEmail: null,
+                      emailConfidence: null, approvedAt: null, replyDetectedAt: null, bounceDetectedAt: null, drafts: [] })
+                  } catch (e) {
+                    // 409 means server moved past transient state while UI was stale — sync local state so UI self-corrects
+                    if (e instanceof Error && e.message.startsWith('409')) {
+                      try {
+                        const body = JSON.parse(e.message.replace(/^\d+:\s*/, ''))
+                        if (body.currentStatus && emailCadence) {
+                          setEmailCadence({ ...emailCadence, status: body.currentStatus as EmailCadenceStatus })
+                        }
+                      } catch { /* ignore JSON parse failure */ }
+                    }
+                  } finally { setEmStarting(false) }
+                }}>
+                <RotateCcw className="w-3 h-3" />
+                Retry
+              </Button>
+            )}
+
+            {/* Badge only for non-transient states */}
+            {emailCadence && !EMAIL_TRANSIENT.includes(emailCadence.status) && (
+              <EmailCadenceStatusBadge status={emailCadence.status} />
+            )}
           </div>
-          {(emailCadence.status === 'pending_approval' ||
+
+          {/* Hiring manager email — show as soon as it's discovered */}
+          {emailCadence?.hiringManagerEmail && (
+            <div className="flex items-center gap-1.5 mb-2">
+              <MailIcon className="w-3 h-3 text-[#475569] flex-shrink-0" />
+              <span className="text-[10px] text-[#64748b] font-mono truncate">
+                {emailCadence.hiringManagerEmail}
+              </span>
+            </div>
+          )}
+
+          {emailCadence && (
+            emailCadence.status === 'pending_approval' ||
             emailCadence.status === 'active' ||
             emailCadence.status === 'low_confidence' ||
             emailCadence.status === 'replied' ||
             emailCadence.status === 'bounced' ||
             emailCadence.status === 'auth_expired' ||
-            emailCadence.status === 'attachment_missing') && (
+            emailCadence.status === 'attachment_missing'
+          ) && (
             <EmailOutreachPanel
               cadence={emailCadence}
               candidateId={candidateId}
