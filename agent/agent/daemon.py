@@ -574,7 +574,10 @@ async def _outreach_send_once(pool) -> None:
                 logger.info("outreach.attachment_missing", cadence_id=cadence_id)
                 continue
             pdf_path = resume.get("resume_pdf_path")
+            cl_path  = resume.get("cover_letter_pdf_path")
             attachments = [{"path": pdf_path, "filename": "resume.pdf"}] if pdf_path else []
+            if cl_path:
+                attachments.append({"path": cl_path, "filename": "cover_letter.pdf"})
 
         # Load candidate preferences
         prefs = await _db.get_candidate_preferences(pool, candidate_id)
