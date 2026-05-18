@@ -14,10 +14,21 @@ from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel, field_validator
 
 from agent import proxycurl
+from agent.config import settings as _settings
 from agent.db_sqlite import (
     get_candidate_preferences,
     update_outreach_target,
 )
+
+
+def _llm_model() -> str:
+    return f"{_settings.llm_provider}/{_settings.llm_model}"
+
+
+def _llm_api_key() -> str:
+    if _settings.llm_provider == "gemini":
+        return _settings.gemini_api_key
+    return _settings.anthropic_api_key
 
 logger = structlog.get_logger(__name__)
 
@@ -227,7 +238,8 @@ async def generate_notes_node(state: LinkedInConnectorState, config: RunnableCon
             candidate_id=state["candidate_id"],
         )
         response = litellm.completion(
-            model="gemini/gemini-2.0-flash",
+            model=_llm_model(),
+            api_key=_llm_api_key(),
             messages=[
                 {"role": "system", "content": _NOTE_SYSTEM},
                 {"role": "user",   "content": prompt},

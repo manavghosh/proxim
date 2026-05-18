@@ -27,7 +27,8 @@ export async function POST(
       .where(eq(emailCadences.jobId, jobId))
       .limit(1)
 
-    if (existing && !['failed', 'cancelled', 'email_not_found'].includes(existing.status)) {
+    const RESTARTABLE = ['failed', 'cancelled', 'email_not_found', 'pending_discovery', 'discovering', 'generating']
+    if (existing && !RESTARTABLE.includes(existing.status)) {
       return NextResponse.json(
         { error: 'Email outreach already running', currentStatus: existing.status },
         { status: 409 }

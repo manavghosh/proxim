@@ -571,17 +571,25 @@ async def insert_outreach_target(
     candidate_id: str,
     company: str,
 ) -> str:
-    """Insert a new outreach_targets row with status='pending'. Returns the new id."""
+    """Insert a new outreach_targets row with status='pending'. Returns the row id.
+
+    Uses INSERT OR IGNORE so re-processing a job after a daemon crash doesn't
+    raise a UNIQUE violation — the existing row's id is returned instead.
+    """
     target_id = _new_id()
     now = _now()
     await pool.execute(
-        "INSERT INTO outreach_targets "
+        "INSERT OR IGNORE INTO outreach_targets "
         "(id, job_id, candidate_id, company, status, created_at, updated_at) "
         "VALUES (?, ?, ?, ?, 'pending', ?, ?)",
         (target_id, job_id, candidate_id, company, now, now),
     )
     await pool.commit()
-    return target_id
+    async with pool.execute(
+        "SELECT id FROM outreach_targets WHERE job_id = ?", (job_id,)
+    ) as cursor:
+        row = await cursor.fetchone()
+    return row[0]
 
 
 async def update_outreach_target(
@@ -669,6 +677,52 @@ async def get_daily_send_count(
     return row[0] if row else 0
 
 
+async def reset_stale_pipeline_jobs(pool: aiosqlite.Connection) -> int:
+    """Reset pipeline_jobs left in 'running' state back to 'queued'.
+
+    Called once at daemon startup. A 'running' job after startup means the
+    daemon was killed mid-flight; re-queueing lets the poll loop re-dispatch
+    it automatically so the user doesn't have to manually retry from the UI.
+    """
+    cursor = await pool.execute(
+        "UPDATE pipeline_jobs SET status = 'queued', started_at = NULL "
+        "WHERE status = 'running'",
+    )
+    await pool.commit()
+    return cursor.rowcount
+
+
+async def reset_stale_linkedin_outreach(pool: aiosqlite.Connection) -> int:
+    """Reset outreach_targets stuck in in-flight states to 'failed'.
+
+    Called once at daemon startup so the UI shows Retry buttons for any work
+    that wasn't re-queued by reset_stale_pipeline_jobs (e.g. orphaned rows).
+    Includes 'pending' since that state is set before the first node fires.
+    """
+    cursor = await pool.execute(
+        "UPDATE outreach_targets SET status = 'failed', updated_at = ? "
+        "WHERE status IN ('pending', 'discovering', 'enriching', 'generating')",
+        (_now(),),
+    )
+    await pool.commit()
+    return cursor.rowcount
+
+
+async def reset_stale_email_cadences(pool: aiosqlite.Connection) -> int:
+    """Reset email_cadences stuck in in-flight states to 'failed'.
+
+    Same pattern as reset_stale_linkedin_outreach — cleans up interrupted work
+    so the UI shows a Retry button on next load.
+    """
+    cursor = await pool.execute(
+        "UPDATE email_cadences SET status = 'failed', updated_at = ? "
+        "WHERE status IN ('discovering', 'generating')",
+        (_now(),),
+    )
+    await pool.commit()
+    return cursor.rowcount
+
+
 # ── Outreach Mailer Agent (F6) ────────────────────────────────────────────────
 
 async def insert_email_cadence(
@@ -676,16 +730,24 @@ async def insert_email_cadence(
     job_id: str,
     candidate_id: str,
 ) -> str:
-    """Insert a new email_cadences row with status=pending_discovery. Returns cadence id."""
+    """Insert a new email_cadences row with status=pending_discovery. Returns cadence id.
+
+    Uses INSERT OR IGNORE so re-dispatching after a daemon crash doesn't raise
+    a UNIQUE violation — the existing row's id is returned instead.
+    """
     cadence_id = _new_id()
     now = _now()
     await pool.execute(
-        "INSERT INTO email_cadences (id, job_id, candidate_id, status, created_at, updated_at) "
+        "INSERT OR IGNORE INTO email_cadences (id, job_id, candidate_id, status, created_at, updated_at) "
         "VALUES (?, ?, ?, 'pending_discovery', ?, ?)",
         (cadence_id, job_id, candidate_id, now, now),
     )
     await pool.commit()
-    return cadence_id
+    async with pool.execute(
+        "SELECT id FROM email_cadences WHERE job_id = ?", (job_id,)
+    ) as cursor:
+        row = await cursor.fetchone()
+    return row[0]
 
 
 async def update_email_cadence(
@@ -729,7 +791,16 @@ async def insert_email_drafts(
     candidate_id: str,
     drafts: list[dict],
 ) -> None:
-    """Batch insert email_drafts rows (one per day)."""
+    """Batch insert email_drafts rows (one per day).
+
+    Deletes any existing 'draft' rows for the cadence first so that
+    re-dispatching after a daemon restart replaces rather than duplicates them.
+    Rows already in sent/approved/scheduled/manually_sent status are left alone.
+    """
+    await pool.execute(
+        "DELETE FROM email_drafts WHERE cadence_id = ? AND status = 'draft'",
+        (cadence_id,),
+    )
     now = _now()
     for d in drafts:
         draft_id = _new_id()

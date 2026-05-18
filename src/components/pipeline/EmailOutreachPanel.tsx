@@ -23,7 +23,13 @@ const DAY_SUBLABELS: Record<number, string> = { 1: 'Intro', 3: 'Value add', 7: '
 
 export function EmailOutreachPanel({ cadence: initialCadence, candidateId, mode = 'manual', onCadenceUpdated }: Props) {
   const [cadence, setCadence]               = useState(initialCadence)
-  const [drafts, setDrafts]                 = useState<EmailDraftSummary[]>(initialCadence.drafts)
+  // Deduplicate by dayNumber — keep the last entry per day in case the daemon
+  // re-ran and inserted duplicate rows before the DB-level fix was applied.
+  const [drafts, setDrafts] = useState<EmailDraftSummary[]>(() => {
+    const seen = new Map<number, EmailDraftSummary>()
+    for (const d of initialCadence.drafts) seen.set(d.dayNumber, d)
+    return [1, 3, 7].flatMap(day => seen.has(day) ? [seen.get(day)!] : [])
+  })
   const [activeTab, setActiveTab]           = useState('1')
   const [isApproving, setIsApproving]       = useState(false)
   const [isOverriding, setIsOverriding]     = useState(false)

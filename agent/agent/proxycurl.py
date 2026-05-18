@@ -45,9 +45,8 @@ async def search_employees(
         exa     = _exa_client(api_key)
         results = exa.search(
             query,
-            category="person",
+            category="people",
             num_results=1,
-            use_autoprompt=False,
         )
 
         if not results.results:
