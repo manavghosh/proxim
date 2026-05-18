@@ -22,6 +22,7 @@ export function OutreachNoteSelector({ target, candidateId, jobId, onStatusChang
   const [regenerating, setRegenerating] = useState(false)
   const [retrying,     setRetrying]     = useState(false)
   const [resultStatus, setResultStatus] = useState<OutreachStatus | null>(null)
+  const [sendError,    setSendError]    = useState<string | null>(null)
 
   const effectiveStatus = resultStatus ?? target.status
 
@@ -112,13 +113,23 @@ export function OutreachNoteSelector({ target, candidateId, jobId, onStatusChang
 
   async function handleSend() {
     setSending(true)
+    setSendError(null)
     try {
       const result = await selectAndSendNote(
         target.id, candidateId, activeTab, editedText || undefined
       )
       setResultStatus(result.status)
       onStatusChange(result.status)
-    } finally { setSending(false) }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      // Surface a readable message — strip the leading status code if present
+      const readable = msg.replace(/^\d+:\s*/, '')
+      let parsed: { error?: string } | null = null
+      try { parsed = JSON.parse(readable) } catch { /* not JSON */ }
+      setSendError(parsed?.error ?? 'Failed to send connection request. Please try again.')
+    } finally {
+      setSending(false)
+    }
   }
 
   return (
@@ -173,6 +184,13 @@ export function OutreachNoteSelector({ target, candidateId, jobId, onStatusChang
         <Send className="w-3 h-3 mr-1.5" />
         Send connection request
       </Button>
+
+      {sendError && (
+        <div className="flex items-start gap-2 rounded-lg bg-red-950/40 border border-red-800/40 px-3 py-2 text-xs text-red-400">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+          <span>{sendError}</span>
+        </div>
+      )}
     </div>
   )
 }

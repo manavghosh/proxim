@@ -41,6 +41,7 @@ export async function POST(
         id: outreachTargets.id, candidateId: outreachTargets.candidateId,
         status: outreachTargets.status, noteA: outreachTargets.noteA,
         noteB: outreachTargets.noteB, sentAt: outreachTargets.sentAt,
+        linkedinUrl: outreachTargets.linkedinUrl,
       })
       .from(outreachTargets)
       .where(and(eq(outreachTargets.id, targetId), eq(outreachTargets.candidateId, candidateId)))
@@ -78,12 +79,25 @@ export async function POST(
       return NextResponse.json({ status: 'queued', message: 'Daily limit reached. Sends tomorrow.' })
     }
 
-    // 5. Call LinkedIn Invitations API
+    // 5. Call LinkedIn Invitations API — invitee profile ID is the last path
+    //    segment of the LinkedIn URL, e.g. /in/caiosabenca → caiosabenca
+    const profileId = (target.linkedinUrl ?? '').replace(/\/$/, '').split('/').pop() ?? ''
+    if (!profileId) {
+      return NextResponse.json({ error: 'No LinkedIn profile URL on this target' }, { status: 422 })
+    }
+
     const accessToken = prefs.linkedin_access_token ?? ''
     const liRes = await fetch(LI_INVITATIONS, {
       method:  'POST',
       headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: resolvedNote }),
+      body: JSON.stringify({
+        invitee: {
+          'com.linkedin.voyager.growth.invitation.InviteeProfile': {
+            profileId,
+          },
+        },
+        message: resolvedNote,
+      }),
     })
 
     if (liRes.status === 429) {
