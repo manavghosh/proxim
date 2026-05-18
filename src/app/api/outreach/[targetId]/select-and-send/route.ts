@@ -79,9 +79,14 @@ export async function POST(
       return NextResponse.json({ status: 'queued', message: 'Daily limit reached. Sends tomorrow.' })
     }
 
-    // 5. Call LinkedIn Invitations API — invitee profile ID is the last path
-    //    segment of the LinkedIn URL, e.g. /in/caiosabenca → caiosabenca
-    const profileId = (target.linkedinUrl ?? '').replace(/\/$/, '').split('/').pop() ?? ''
+    // 5. Call LinkedIn Invitations API.
+    //    Extract the vanity name from the URL:
+    //      https://linkedin.com/in/caiosabenca          → caiosabenca
+    //      https://linkedin.com/in/caiosabenca/         → caiosabenca
+    //      https://linkedin.com/in/caiosabenca?foo=bar  → caiosabenca
+    const rawUrl = target.linkedinUrl ?? ''
+    const profileId = new URL(rawUrl.startsWith('http') ? rawUrl : `https://linkedin.com${rawUrl}`)
+      .pathname.replace(/\/$/, '').split('/').pop() ?? ''
     if (!profileId) {
       return NextResponse.json({ error: 'No LinkedIn profile URL on this target' }, { status: 422 })
     }
@@ -110,7 +115,9 @@ export async function POST(
     }
 
     if (!liRes.ok) {
-      return NextResponse.json({ error: 'LinkedIn API error', liStatus: liRes.status }, { status: 502 })
+      const liBody = await liRes.text()
+      console.error('[select-and-send] LinkedIn error', liRes.status, profileId, liBody)
+      return NextResponse.json({ error: 'LinkedIn API error', liStatus: liRes.status, liBody: liBody.slice(0, 500) }, { status: 502 })
     }
 
     const liData = await liRes.json()
