@@ -95,6 +95,11 @@ export default function ApplicationsPage() {
     }
   }
 
+  const handleBuildComplete = (_jobId: string) => {
+    // Refresh the jobs list so "Resume ready" / "View Resume" appear without a manual page reload.
+    loadJobs(selectedGrades)
+  }
+
   const handleViewResume = (jobId: string) => {
     setPdfPreview({ jobId, type: 'resume' })
   }
@@ -163,6 +168,7 @@ export default function ApplicationsPage() {
                 onMarkSubmitted={handleMarkSubmitted}
                 onMoveToRejected={handleMoveToRejected}
                 onRetryResume={handleRetryResume}
+                onBuildComplete={handleBuildComplete}
                 onViewResume={handleViewResume}
                 onViewCoverLetter={handleViewCoverLetter}
                 isPending={pendingId === job.id}

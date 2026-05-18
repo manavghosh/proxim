@@ -12,6 +12,8 @@ interface Props {
   autoOpen?: boolean
   /** Called once when the pipeline job transitions to failed status. */
   onBuildFailed?: () => void
+  /** Called once when the pipeline job transitions to completed status. */
+  onBuildComplete?: () => void
   /** Called whenever the running state changes so the parent can disable Retry. */
   onRunningChange?: (running: boolean) => void
 }
@@ -50,7 +52,7 @@ function formatTime(iso: string): string {
 // Inline expand showing the resume_builder progress for one job. Mirrors the
 // Pipeline page's PipelineLogPane in look-and-feel; lazy-resolves the latest
 // pipeline_job_id for the job, then polls /api/pipeline/{id}/logs.
-export function BuildProgressPane({ jobId, autoOpen = false, onBuildFailed, onRunningChange }: Props) {
+export function BuildProgressPane({ jobId, autoOpen = false, onBuildFailed, onBuildComplete, onRunningChange }: Props) {
   const [open, setOpen] = useState(autoOpen)
   const [pipelineJobId, setPipelineJobId] = useState<string | null>(null)
   const [pipelineStatus, setPipelineStatus] = useState<string | null>(null)
@@ -97,6 +99,7 @@ export function BuildProgressPane({ jobId, autoOpen = false, onBuildFailed, onRu
         setPipelineStatus(res.status)
         if (!res.pipelineJobId) setError('No build has run for this job yet.')
         if (res.status === 'failed') onBuildFailed?.()
+        if (res.status === 'completed') onBuildComplete?.()
       })
       .catch(() => setError('Failed to look up build job.'))
       .finally(() => setLoadingLookup(false))
@@ -146,6 +149,8 @@ export function BuildProgressPane({ jobId, autoOpen = false, onBuildFailed, onRu
                 },
               ])
             }
+          } else if (data.jobStatus === 'completed') {
+            onBuildComplete?.()
           }
         }
       } finally {

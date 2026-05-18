@@ -37,6 +37,7 @@ interface Props {
   onMarkSubmitted: (jobId: string) => void
   onMoveToRejected: (jobId: string) => void
   onRetryResume: (jobId: string) => void
+  onBuildComplete?: (jobId: string) => void
   onViewResume?: (jobId: string) => void
   onViewCoverLetter?: (jobId: string) => void
   isPending: boolean
@@ -49,6 +50,7 @@ export function JobCard({
   onMarkSubmitted,
   onMoveToRejected,
   onRetryResume,
+  onBuildComplete,
   onViewResume,
   onViewCoverLetter,
   isPending,
@@ -239,6 +241,7 @@ export function JobCard({
           jobId={job.id}
           autoOpen={isApproved || isResumeFailed}
           onBuildFailed={() => setLocalResumeFailed(true)}
+          onBuildComplete={() => onBuildComplete?.(job.id)}
           onRunningChange={setBuildRunning}
         />
       )}

@@ -108,6 +108,32 @@ async def validate_inputs(state: ResumeBuilderState) -> dict:
         registry = ArchetypeRegistry()
         registry.get_archetype(archetype, arch_conf)  # validates
 
+        # Look for an existing cover letter from a previous successful version —
+        # on retry runs we skip re-generating if one already exists.
+        existing_cl_path = ""
+        if hasattr(pool, 'execute'):
+            async with pool.execute(
+                "SELECT cover_letter_pdf_path FROM resume_versions "
+                "WHERE job_id = ? AND cover_letter_pdf_path IS NOT NULL "
+                "AND generation_status = 'completed' "
+                "ORDER BY created_at DESC LIMIT 1",
+                (state.job_id,)
+            ) as cur:
+                cl_row = await cur.fetchone()
+            if cl_row and cl_row[0]:
+                existing_cl_path = cl_row[0]
+        else:
+            async with pool.acquire() as conn:
+                cl_row = await conn.fetchrow(
+                    "SELECT cover_letter_pdf_path FROM resume_versions "
+                    "WHERE job_id = $1 AND cover_letter_pdf_path IS NOT NULL "
+                    "AND generation_status = 'completed' "
+                    "ORDER BY created_at DESC LIMIT 1",
+                    state.job_id
+                )
+            if cl_row and cl_row['cover_letter_pdf_path']:
+                existing_cl_path = cl_row['cover_letter_pdf_path']
+
         await _log(pool, state.pipeline_job_id, "validate_inputs",
                    f"Generating resume for {title} @ {company}")
 
@@ -119,6 +145,7 @@ async def validate_inputs(state: ResumeBuilderState) -> dict:
             "archetype": archetype,
             "archetype_confidence": arch_conf,
             "base_cv_hash": base_cv_hash,
+            "cover_letter_pdf_path": existing_cl_path,
         }
     except Exception as e:
         logger.error("validate_inputs_failed", error=str(e))
@@ -248,6 +275,15 @@ async def generate_cover_letter(state: ResumeBuilderState) -> dict:
     """Generate a cover letter tailored to the archetype."""
     if state.error:
         return {}
+    # Reuse cover letter from a previous successful run — skip generation.
+    if state.cover_letter_pdf_path:
+        pool = await _make_pool()
+        try:
+            await _log(pool, state.pipeline_job_id, "generate_cover_letter",
+                       "Cover letter reused from previous version")
+        finally:
+            await _close_pool(pool)
+        return {}
     pool = await _make_pool()
     try:
         from agent.config import settings
@@ -315,18 +351,22 @@ async def render_pdf(state: ResumeBuilderState) -> dict:
         os.makedirs(version_dir, exist_ok=True)
 
         resume_path = os.path.join(version_dir, "resume.pdf")
-        cl_path = os.path.join(version_dir, "cover_letter.pdf")
 
         job = {"id": state.job_id, "title": state.job_title, "company": state.job_company}
         render_resume(pr_dict, arch_config, job, resume_path)
 
-        cl_dict = {}
-        if state.cover_letter:
-            try:
-                cl_dict = json.loads(state.cover_letter)
-            except Exception:
-                pass
-        render_cover_letter(cl_dict, job, cl_path, profile=state.parsed_profile)
+        # Reuse existing cover letter PDF if no new one was generated this run.
+        if state.cover_letter_pdf_path and not state.cover_letter:
+            cl_path = state.cover_letter_pdf_path
+        else:
+            cl_path = os.path.join(version_dir, "cover_letter.pdf")
+            cl_dict = {}
+            if state.cover_letter:
+                try:
+                    cl_dict = json.loads(state.cover_letter)
+                except Exception:
+                    pass
+            render_cover_letter(cl_dict, job, cl_path, profile=state.parsed_profile)
 
         await _log(pool, state.pipeline_job_id, "render_pdf",
                    f"PDFs rendered: v{version_n}")
