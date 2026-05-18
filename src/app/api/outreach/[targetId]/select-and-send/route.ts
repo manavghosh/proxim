@@ -82,8 +82,9 @@ export async function POST(
     // 5a. Manual send — user confirmed they sent it themselves on LinkedIn.
     if (manual === true) {
       const sentAt = new Date()
+      const sentAtStr = sentAt.toISOString() as unknown as Date
       await db.update(outreachTargets)
-        .set({ status: 'sent', selectedNote, editedNote: editedNote ?? null, sentAt })
+        .set({ status: 'sent', selectedNote, editedNote: editedNote ?? null, sentAt: sentAtStr })
         .where(eq(outreachTargets.id, targetId))
       return NextResponse.json({ targetId, status: 'sent', sentAt: sentAt.toISOString(), manual: true })
     }
@@ -136,11 +137,12 @@ export async function POST(
     const liData = await liRes.json()
     const invitationId = String(liData.id ?? '')
     const sentAt = new Date()
+    const sentAtStr = sentAt.toISOString() as unknown as Date
 
     // 6. Mark sent
     await db.update(outreachTargets)
       .set({ status: 'sent', selectedNote, editedNote: editedNote ?? null,
-             sentAt, linkedinInvitationId: invitationId })
+             sentAt: sentAtStr, linkedinInvitationId: invitationId })
       .where(eq(outreachTargets.id, targetId))
 
     return NextResponse.json({ targetId, status: 'sent', sentAt: sentAt.toISOString() })

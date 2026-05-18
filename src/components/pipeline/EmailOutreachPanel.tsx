@@ -32,6 +32,7 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, mode 
   })
   const [activeTab, setActiveTab]           = useState('1')
   const [isApproving, setIsApproving]       = useState(false)
+  const [approveError, setApproveError]     = useState<string | null>(null)
   const [isOverriding, setIsOverriding]     = useState(false)
   const [isCancelling, setIsCancelling]     = useState(false)
   const [isStarting, setIsStarting]         = useState(false)
@@ -50,11 +51,14 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, mode 
 
   async function handleApprove() {
     setIsApproving(true)
+    setApproveError(null)
     try {
       const result = await approveCadence(cadence.id, candidateId)
       const updated: EmailCadenceSummary = { ...cadence, status: result.status, approvedAt: result.approvedAt, drafts }
       setCadence(updated)
       onCadenceUpdated(updated)
+    } catch (e) {
+      setApproveError(e instanceof Error ? e.message.replace(/^\d+:\s*/, '') : 'Failed to approve. Please try again.')
     } finally { setIsApproving(false) }
   }
 
@@ -167,6 +171,10 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, mode 
               data-testid="approve-cadence-btn" className="w-full bg-blue-600 hover:bg-blue-700 text-white">
               Approve Drafts
             </Button>
+          )}
+
+          {approveError && (
+            <p className="text-xs text-red-400 text-center">{approveError}</p>
           )}
 
           {/* Manual: approved → Start countdown (enabled after Day 1 Gmail opened) */}

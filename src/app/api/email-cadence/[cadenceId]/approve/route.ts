@@ -41,10 +41,11 @@ export async function POST(
     }
 
     const now = new Date()
+    const nowStr = now.toISOString() as unknown as Date
 
     const [updated] = await db
       .update(emailCadences)
-      .set({ status: 'approved', approvedAt: now })
+      .set({ status: 'approved', approvedAt: nowStr })
       .where(and(eq(emailCadences.id, cadenceId), eq(emailCadences.status, 'pending_approval')))
       .returning({ id: emailCadences.id, status: emailCadences.status, approvedAt: emailCadences.approvedAt })
 
@@ -55,7 +56,7 @@ export async function POST(
     // Schedule Day 1 immediately; Day 3 and Day 7 approved (scheduled by daemon after Day 1 sends)
     await db
       .update(emailDrafts)
-      .set({ isApproved: true, status: 'scheduled', scheduledSendAt: now })
+      .set({ isApproved: true, status: 'scheduled', scheduledSendAt: nowStr })
       .where(and(eq(emailDrafts.cadenceId, cadenceId), eq(emailDrafts.dayNumber, 1)))
 
     await db
