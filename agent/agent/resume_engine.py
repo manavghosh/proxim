@@ -17,6 +17,37 @@ def _get_api_key(settings) -> str:
     return settings.anthropic_api_key
 
 
+def _fix_json_newlines(s: str) -> str:
+    """Escape raw newlines/CRs inside JSON string values.
+
+    Claude (via LiteLLM's json_object translation) sometimes emits literal
+    newline bytes inside string values instead of the \\n escape sequence.
+    json.loads rejects these with 'Unterminated string'.  Walk the JSON
+    character-by-character, tracking whether we're inside a string, and
+    replace bare 0x0A / 0x0D with their escaped forms.
+    """
+    result: list[str] = []
+    in_string = False
+    escaped = False
+    for ch in s:
+        if escaped:
+            result.append(ch)
+            escaped = False
+        elif ch == '\\':
+            result.append(ch)
+            escaped = True
+        elif ch == '"':
+            result.append(ch)
+            in_string = not in_string
+        elif in_string and ch == '\n':
+            result.append('\\n')
+        elif in_string and ch == '\r':
+            result.append('\\r')
+        else:
+            result.append(ch)
+    return ''.join(result)
+
+
 def _call_llm(prompt: str, settings) -> str:
     import litellm
     response = litellm.completion(
@@ -25,11 +56,16 @@ def _call_llm(prompt: str, settings) -> str:
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
         temperature=0.2,
-        max_tokens=4096,
+        max_tokens=8192,
     )
-    raw = response.choices[0].message.content or ""
+    choice = response.choices[0]
+    finish_reason = getattr(choice, 'finish_reason', 'unknown')
+    if finish_reason == 'length':
+        logger.warning("llm_truncated_by_max_tokens", finish_reason=finish_reason)
+    raw = choice.message.content or ""
     raw = re.sub(r'^```(?:json)?\s*\n?', '', raw.strip())
     raw = re.sub(r'\n?```\s*$', '', raw).strip()
+    raw = _fix_json_newlines(raw)
     return raw
 
 
@@ -78,9 +114,22 @@ JD: {str(job.get('jd_raw', ''))[:2000]}
   "coherence_ok": false
 }}"""
 
-    raw = _call_llm(prompt, settings)
-    parsed = json.loads(raw)
-    return PersonalisedResume.model_validate(parsed)
+    last_exc: Exception = RuntimeError("no attempts made")
+    for attempt in range(3):
+        raw = ""
+        try:
+            raw = _call_llm(prompt, settings)
+            parsed = json.loads(raw)
+            return PersonalisedResume.model_validate(parsed)
+        except (json.JSONDecodeError, ValueError) as exc:
+            last_exc = exc
+            logger.warning(
+                "personalise_json_failed",
+                attempt=attempt + 1,
+                error=str(exc),
+                raw_prefix=raw[:400],
+            )
+    raise last_exc
 
 
 def self_review(
