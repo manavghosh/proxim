@@ -50,6 +50,7 @@ export interface Preferences {
   gmail_token_expiry?: string
   // Email outreach mode (F6)
   email_outreach_mode?: 'agentic' | 'manual'
+  email_resume_attachment?: 'tailored' | 'original'
 }
 
 export type OutreachStatus =
