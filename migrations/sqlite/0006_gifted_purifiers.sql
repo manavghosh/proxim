@@ -1,0 +1,1 @@
+ALTER TABLE `candidates` ADD `base_resume_pdf_path` text;

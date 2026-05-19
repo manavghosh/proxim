@@ -75,6 +75,7 @@ export const candidates = sqliteTable('candidates', {
   parsedProfile:  text({ mode: 'json' }).$type<ParsedProfile | null>(),
   parseStatus:    text().default('pending').notNull(),
   preferences:    text({ mode: 'json' }).$type<Preferences>().default({} as Preferences).notNull(),
+  baseResumePdfPath: text(),
   createdAt:      text().$defaultFn(now).notNull(),
   updatedAt:      text().$defaultFn(now).$onUpdateFn(now).notNull(),
 })
