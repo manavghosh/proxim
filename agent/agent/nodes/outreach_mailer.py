@@ -26,6 +26,7 @@ logger = structlog.get_logger(__name__)
 class OutreachMailerState(TypedDict):
     job_id: str
     candidate_id: str
+    candidate_name: str
     company: str
     job_title: str
     archetype: str
@@ -126,21 +127,34 @@ def _api_key(settings) -> str:
 async def litellm_generate(state: OutreachMailerState, settings) -> EmailDraftOutput:
     import json
 
-    hm_name = state.get("hiring_manager_name") or "the hiring manager"
+    candidate_name = state.get("candidate_name") or "the candidate"
+    hm_name        = state.get("hiring_manager_name") or ""
+
+    # Build greeting and salutation instructions based on what we know
+    if hm_name:
+        hm_first           = hm_name.split()[0]
+        to_line            = f"You are writing to: {hm_name}"
+        greeting_instruction = f"Start with 'Hi {hm_first},' or 'Dear {hm_first},'"
+    else:
+        to_line              = "You are writing to the hiring manager (name unknown)"
+        greeting_instruction = "Start with 'Dear Hiring Manager,' or 'Hi there,'"
+
     prompt = (
-        f"You are the job seeker writing directly to a hiring manager. "
-        f"Write in FIRST PERSON as the candidate — use 'I', 'my', 'I've', never 'the candidate' or 'they'.\n\n"
+        f"You are {candidate_name}, a job seeker writing directly to a hiring manager. "
+        f"Write in FIRST PERSON as {candidate_name} — use 'I', 'my', 'I've', never 'the candidate' or 'they'.\n\n"
+        f"Your name: {candidate_name}\n"
         f"You are applying for: {state['job_title']} at {state['company']}\n"
         f"Your professional profile: {state['archetype']}\n"
-        f"You are writing to: {hm_name}\n\n"
-        "Write 3 emails in first person from the candidate directly to the hiring manager:\n"
-        "- day1_body: Introduce yourself (not 'a candidate'), mention something specific about "
-        f"{state['company']}, why you applied, max 150 words. Start with 'Hi {hm_name.split()[0]},' or 'Dear {hm_name.split()[0]},'.\n"
+        f"{to_line}\n\n"
+        "Write 3 emails in first person:\n"
+        f"- day1_body: Introduce yourself as {candidate_name}, mention something specific about "
+        f"{state['company']}, why you applied, max 150 words. {greeting_instruction}. "
+        f"Sign off with your name ({candidate_name}).\n"
         "- day3_body: Share a specific insight or proof point from YOUR experience relevant to their work, "
         "max 100 words. Do NOT use: 'following up', 'checking in', 'just following', 'just checking'.\n"
         "- day7_body: Gentle, low-pressure close from YOU to them, max 80 words. "
         "No pressure phrases like 'last chance', 'urgent', 'final follow-up'.\n"
-        "- subject: one concise subject line\n\n"
+        f"- subject: one concise subject line (include your name: {candidate_name})\n\n"
         'Return ONLY valid JSON: {"subject": "...", "day1_body": "...", "day3_body": "...", "day7_body": "..."}'
     )
 

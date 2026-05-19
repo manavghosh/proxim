@@ -319,11 +319,19 @@ async def _dispatch_job(pool, job: dict) -> None:
                                                      error=f'Cadence {cadence_id} not found')
                     return
 
+        # Fetch candidate name so the LLM can use it in the email body/subject
+        async with pool.execute(
+            "SELECT name FROM candidates WHERE id = ?", (cand_id,)
+        ) as _cur:
+            _cand_row = await _cur.fetchone()
+        candidate_name = _cand_row[0] if _cand_row else ""
+
         config = RunnableConfig(configurable={"pool": pool, "settings": _settings})
 
         state: OutreachMailerState = {
             "job_id": job_id,
             "candidate_id": cand_id,
+            "candidate_name": candidate_name,
             "company": company,
             "job_title": job_title,
             "archetype": archetype,
