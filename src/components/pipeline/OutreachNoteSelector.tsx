@@ -184,7 +184,7 @@ export function OutreachNoteSelector({ target, candidateId, jobId, onStatusChang
         {(['A', 'B'] as const).map(tab => (
           <TabsContent key={tab} value={tab} forceMount
             className={tab !== activeTab ? 'hidden' : ''}>
-            <div className="rounded-lg border border-[#1e3a5f] bg-[#0d1829] p-3 text-xs text-[#94a3b8] leading-relaxed min-h-[60px]">
+            <div className="rounded-lg border border-[#1e3a5f] bg-[#0d1829] p-3 text-xs text-[#94a3b8] leading-relaxed min-h-[80px] whitespace-pre-line">
               {tab === 'A' ? target.noteA : target.noteB}
             </div>
           </TabsContent>
@@ -195,7 +195,7 @@ export function OutreachNoteSelector({ target, candidateId, jobId, onStatusChang
       <div className="space-y-1">
         <Textarea
           className="text-xs bg-[#0d1829] border-[#1e3a5f] text-[#cbd5e1] resize-none placeholder:text-[#334155]"
-          rows={2}
+          rows={5}
           placeholder="Edit note (optional)…"
           value={editedText}
           onChange={e => setEditedText(e.target.value)}
