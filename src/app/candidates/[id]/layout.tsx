@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
 import { CandidateSidebar } from '@/components/layout/CandidateSidebar'
-import { NavigationLoader } from '@/components/layout/NavigationLoader'
 import { db } from '@/db'
 import { candidates } from '@/db/schema'
 import { eq } from 'drizzle-orm'
@@ -23,7 +22,6 @@ export default async function CandidateLayout({
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <NavigationLoader />
       <CandidateSidebar candidateId={id} candidateName={name} />
       <div className="flex-1 flex flex-col overflow-hidden">
         {children}
