@@ -652,8 +652,9 @@ async def _outreach_send_once(pool) -> None:
         refresh_token = prefs.get("gmail_refresh_token", "") if prefs else ""
 
         try:
+            service = gmail_client.build_service(access_token, refresh_token)
             result = gmail_client.send_email(
-                service=None,
+                service=service,
                 to=draft["hiring_manager_email"],
                 subject=draft["subject"],
                 body_html=draft["body_html"],
