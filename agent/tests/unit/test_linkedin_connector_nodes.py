@@ -306,8 +306,9 @@ async def test_determine_target_roles_falls_back_on_llm_failure():
     with patch("agent.nodes.linkedin_connector.litellm.acompletion", new=AsyncMock(side_effect=Exception("timeout"))):
         roles = await determine_target_roles("AI Architect", "Acme Corp", "Agentic Systems Architect")
 
+    # Fallback must be generic — no AI-specific hardcoding
     assert len(roles) >= 3
-    assert any("Chief AI Officer" in r or "Chief Technology Officer" in r for r in roles)
+    assert any("Hiring Manager" in r or "Talent Acquisition" in r or "Recruiter" in r for r in roles)
 
 
 @pytest.mark.asyncio

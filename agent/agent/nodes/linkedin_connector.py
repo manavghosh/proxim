@@ -120,19 +120,25 @@ async def check_dnc_node(state: LinkedInConnectorState, config: RunnableConfig) 
 async def determine_target_roles(job_title: str, company: str, archetype: str) -> list[str]:
     """Use the LLM to determine 3-5 ideal contact roles for this specific job.
 
-    Replaces the static DISCOVERY_ROLES list — the LLM adapts to company
-    type, job seniority, and archetype so the most relevant contacts are
-    tried first.  Falls back to a sensible default list on any failure.
+    The LLM reasons from the job title and company context — NOT from the
+    candidate's archetype — so the output adapts to any function:
+      'VP of Sales' job   → Sales Director, Head of Sales, VP Sales…
+      'AI Architect' job  → Head of AI, CTO, VP Engineering…
+      'CFO' job           → CEO, Finance Director, Board Member…
+
+    Falls back to a generic 3-role list that works for any job type.
     """
     prompt = (
-        f"A candidate is applying for: '{job_title}' at '{company}'.\n"
-        f"Candidate archetype: {archetype}.\n\n"
-        f"Who are the ideal LinkedIn contacts to approach at this company?\n"
-        f"Consider the company type — large enterprise vs startup will differ.\n"
-        f"For AI/tech roles target AI/engineering leadership first.\n"
-        f"Always include HR/Talent Acquisition as a fallback.\n"
-        f"Give 3-5 specific job titles, ordered from most valuable (hiring manager) "
-        f"to least (recruiter).\n"
+        f"A candidate is applying for the role: '{job_title}' at '{company}'.\n\n"
+        f"Who at this company would make the hiring decision for this role, "
+        f"or be the most valuable LinkedIn contact to approach?\n\n"
+        f"Reason from the job title and function — not from any specific industry bias.\n"
+        f"Consider: who manages people in this function? Who owns budget for this role? "
+        f"Who would be the direct manager or skip-level manager?\n\n"
+        f"Give 3-5 specific job titles ordered from most valuable (direct hiring manager) "
+        f"to least (HR/recruiter as last resort). "
+        f"Be specific to the job function — a Sales role needs Sales leadership, "
+        f"a Finance role needs Finance leadership, a Tech role needs Tech leadership.\n\n"
         f'Return JSON: {{"roles": ["Role 1", "Role 2", "Role 3"]}}'
     )
     try:
@@ -148,18 +154,15 @@ async def determine_target_roles(job_title: str, company: str, archetype: str) -
         data  = json.loads(raw)
         roles = [str(r) for r in data.get("roles", []) if r][:5]
         if roles:
-            logger.info("linkedin.roles_determined", roles=roles, company=company)
+            logger.info("linkedin.roles_determined", job_title=job_title,
+                        roles=roles, company=company)
             return roles
     except Exception as exc:
         logger.warning("linkedin.role_determination_failed", error=str(exc)[:200])
 
-    return [
-        "Chief AI Officer",
-        "Chief Technology Officer",
-        "Head of Artificial Intelligence",
-        "Vice President of Engineering",
-        "Talent Acquisition Manager",
-    ]
+    # Generic fallback — works for any job function; does NOT assume AI/tech context.
+    # Recruiter and Talent Acquisition are universal last resorts.
+    return ["Hiring Manager", "Talent Acquisition Manager", "Recruiter"]
 
 
 # ── Node: extract_hiring_team ─────────────────────────────────────────────────
