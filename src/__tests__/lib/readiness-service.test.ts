@@ -8,6 +8,7 @@ const base: Candidate = {
   candidateId: null,
   baseCvMd: null,
   baseCvHash: null,
+  baseResumePdfPath: null,
   parsedProfile: null,
   parseStatus: 'pending',
   preferences: {},

@@ -79,6 +79,7 @@ export const candidates = pgTable('candidates', {
   candidateId: uuid(),
   baseCvMd: text(),
   baseCvHash: varchar({ length: 64 }),
+  baseResumePdfPath: text(),
   parsedProfile: jsonb().$type<ParsedProfile>(),
   parseStatus: parseStatusEnum().default('pending').notNull(),
   preferences: jsonb().$type<Preferences>().default({}).notNull(),

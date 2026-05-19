@@ -71,6 +71,13 @@
       "when": 1779022222054,
       "tag": "0009_last_doorman",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1779157118196,
+      "tag": "0010_panoramic_lilandra",
+      "breakpoints": true
     }
   ]
 }
