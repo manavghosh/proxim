@@ -52,6 +52,7 @@ class LinkedInConnectorState(TypedDict):
     # Input
     job_id:               str
     candidate_id:         str
+    candidate_name:       str
     company:              str
     job_title:            str
     archetype:            str
@@ -177,13 +178,32 @@ async def enrich_profile_node(state: LinkedInConnectorState, config: RunnableCon
 
     enrichment = await proxycurl.enrich_profile(linkedin_url=profile_url, api_key=api_key)
 
+    # Extract the person's REAL current title from the enrichment headline.
+    # search_employees stores the search-role as title; we override it here
+    # with the actual LinkedIn designation so notes reference the correct role.
+    real_title = ""
+    if enrichment:
+        headline = enrichment.get("headline") or ""
+        # Headline format: "Head of AI at Company" or "VP Engineering | LinkedIn"
+        real_title = headline.split("|")[0].split(" at ")[0].strip()
+    if not real_title:
+        # Fall back to the first experience line that looks like a title
+        exps = (enrichment or {}).get("experiences", [])
+        if exps:
+            real_title = exps[0].get("title", "").split(" at ")[0].strip()
+    if not real_title:
+        real_title = contact.get("title", "")
+
     await update_outreach_target(
         pool,
         state["outreach_target_id"],
         status="generating",
+        title=real_title,
         enrichment_json=enrichment or {},
     )
-    return {"enrichment": enrichment, "status": "generating"}
+    # Propagate real title into contact so generate_notes_node sees it
+    updated_contact = {**contact, "title": real_title}
+    return {"enrichment": enrichment, "status": "generating", "contact": updated_contact}
 
 
 # ── Node: generate_notes ──────────────────────────────────────────────────────
@@ -207,29 +227,44 @@ async def generate_notes_node(state: LinkedInConnectorState, config: RunnableCon
     # Build personalisation context
     experiences = enrichment.get("experiences", [])
     education   = enrichment.get("education", [])
-    tenure_hook = ""
-    if experiences:
-        exp = experiences[0]
-        start = exp.get("starts_at") or {}
-        year  = start.get("year", "")
-        tenure_hook = f"role since {year}" if year else exp.get("title", "")
 
-    edu_hook = ""
-    if education:
-        school = (education[0].get("school") or {}).get("name", "")
-        edu_hook = f"alma mater: {school}" if school else ""
-
+    # Real current title — enrich_profile_node already updated contact["title"]
+    # with the Exa headline; fall back to first experience line if blank.
     _TITLE_EXPANSIONS = {"CAIO": "Chief AI Officer"}
-    raw_title = contact.get('title', 'leader') or 'leader'
-    contact_title = _TITLE_EXPANSIONS.get(raw_title.strip().upper(), raw_title)
+    raw_title = contact.get("title") or ""
+    if not raw_title and experiences:
+        raw_title = experiences[0].get("title", "").split(" at ")[0].strip()
+    contact_title = _TITLE_EXPANSIONS.get(raw_title.strip().upper(), raw_title) or "leader"
+
+    # Personalisation hook from experience or education
+    hook = ""
+    if experiences:
+        exp_title = experiences[0].get("title", "")
+        hook = f"their experience: {exp_title[:80]}" if exp_title else ""
+    if not hook and education:
+        school = (education[0].get("school") or {}).get("name", "")
+        hook = f"their alma mater: {school}" if school else ""
+
+    # Get candidate's first name for the closure
+    candidate_name = state.get("candidate_name", "")
+    first_name = contact.get("name", "").split()[0] or "there"
 
     prompt = (
-        f"Contact: {contact.get('name', 'the contact')}, {contact_title} "
+        f"Contact: {contact.get('name', 'the contact')}, actual role: '{contact_title}' "
         f"at {state['company']}.\n"
-        f"Personalisation hooks: {tenure_hook}. {edu_hook}.\n"
-        f"My archetype: {state['archetype']}. Applied job: {state['job_title']}.\n"
-        f"Generate two connection notes (note_a and note_b), each ≤300 characters, "
-        f"each using at least one hook above. Never mention the job posting."
+        f"Personalisation hook: {hook or 'their work at ' + state['company']}.\n"
+        f"My archetype: {state['archetype']}.\n\n"
+        f"Generate two LinkedIn connection note variants (note_a, note_b).\n"
+        f"STRICT FORMAT for each note (use literal \\n for newlines in JSON):\n"
+        f"  Hi {first_name},\\n\\n[1-2 sentences referencing their actual role "
+        f"'{contact_title}' and the personalisation hook — no job mention]"
+        f"\\n\\nThanks,\\n{candidate_name or 'Manav Ghosh'}\n\n"
+        f"RULES:\n"
+        f"- Max 300 characters total (including newlines)\n"
+        f"- Use their ACTUAL role '{contact_title}' — never invent a title\n"
+        f"- note_a and note_b must be distinct in wording\n"
+        f"- Never mention the job posting\n"
+        f'Return JSON: {{"note_a": "...", "note_b": "..."}}'
     )
 
     await update_outreach_target(pool, state["outreach_target_id"], status="generating")

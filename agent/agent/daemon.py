@@ -101,14 +101,25 @@ async def _dispatch_job(pool, job: dict) -> None:
             "proxycurl_api_key": getattr(_settings_regen, 'exa_api_key', ''),
         })
 
+        async with pool.execute(
+            "SELECT name FROM candidates WHERE id = ?", (cand_id,)
+        ) as _regen_cur:
+            _regen_cand = await _regen_cur.fetchone()
+        regen_candidate_name = _regen_cand[0] if _regen_cand else ""
+
         state: LinkedInConnectorState = {
             "job_id":               job_id,
             "candidate_id":         cand_id,
+            "candidate_name":       regen_candidate_name,
             "company":              target.get("company", ""),
             "job_title":            "",
             "archetype":            "",
             "archetype_confidence": 0.0,
-            "contact":              {"profile_url": target.get("linkedin_url", "")},
+            "contact":              {
+                "profile_url": target.get("linkedin_url", ""),
+                "name":        target.get("name", ""),
+                "title":       target.get("title", ""),
+            },
             "enrichment":           target.get("enrichment_json"),
             "note_a":               None,
             "note_b":               None,
@@ -148,6 +159,13 @@ async def _dispatch_job(pool, job: dict) -> None:
                     target_job_id=job_id, company=company)
 
         target_id = await insert_outreach_target(pool, job_id, cand_id, company)
+
+        async with pool.execute(
+            "SELECT name FROM candidates WHERE id = ?", (cand_id,)
+        ) as _li_cur:
+            _li_row = await _li_cur.fetchone()
+        li_candidate_name = _li_row[0] if _li_row else ""
+
         config    = RunnableConfig(configurable={
             "pool": pool,
             "proxycurl_api_key": getattr(settings, 'exa_api_key', ''),
@@ -156,6 +174,7 @@ async def _dispatch_job(pool, job: dict) -> None:
         state: LinkedInConnectorState = {
             "job_id":               job_id,
             "candidate_id":         cand_id,
+            "candidate_name":       li_candidate_name,
             "company":              company,
             "job_title":            job_title,
             "archetype":            archetype,
