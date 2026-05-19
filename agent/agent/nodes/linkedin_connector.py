@@ -36,14 +36,14 @@ logger = structlog.get_logger(__name__)
 
 DISCOVERY_ROLES = [
     "Chief AI Officer",
-    "CTO",
-    "VP AI",
-    "Head of AI",
-    "VP Engineering",
+    "Chief Technology Officer",
+    "Vice President of Artificial Intelligence",
+    "Vice President of Engineering",
+    "Head of Artificial Intelligence",
     "Engineering Director",
-    "HR Director",
-    "Talent Acquisition",
-    "Recruiter",
+    "Human Resources Director",
+    "Talent Acquisition Manager",
+    "Technical Recruiter",
 ]
 
 # ── State ────────────────────────────────────────────────────────────────────
