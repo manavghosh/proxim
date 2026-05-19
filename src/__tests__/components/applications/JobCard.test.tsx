@@ -27,6 +27,7 @@ function defaultProps() {
     candidateId: 'cand-1',
     onMarkSubmitted: vi.fn(),
     onMoveToRejected: vi.fn(),
+    onGenerateResume: vi.fn(),
     onRetryResume: vi.fn(),
     onViewResume: vi.fn(),
     isPending: false,

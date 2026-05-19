@@ -23,7 +23,7 @@ describe('POST /api/jobs/[jobId]/approve', () => {
     vi.resetModules()
   })
 
-  it('returns 200 with pipelineJobId on success', async () => {
+  it('returns 200 with approved status on success', async () => {
     const { db } = await import('@/db')
     const updateChain = {
       set: vi.fn().mockReturnThis(),
@@ -50,7 +50,7 @@ describe('POST /api/jobs/[jobId]/approve', () => {
     expect(res.status).toBe(200)
     expect(body).toHaveProperty('jobId')
     expect(body).toHaveProperty('status', 'approved')
-    expect(body).toHaveProperty('pipelineJobId')
+    expect(body).not.toHaveProperty('pipelineJobId')
   })
 
   it('returns 409 when already decided (0 rows affected)', async () => {

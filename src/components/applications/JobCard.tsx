@@ -36,6 +36,7 @@ interface Props {
   job: ScoredJob
   onMarkSubmitted: (jobId: string) => void
   onMoveToRejected: (jobId: string) => void
+  onGenerateResume: (jobId: string) => void
   onRetryResume: (jobId: string) => void
   onBuildComplete?: (jobId: string) => void
   onViewResume?: (jobId: string) => void
@@ -49,6 +50,7 @@ export function JobCard({
   job,
   onMarkSubmitted,
   onMoveToRejected,
+  onGenerateResume,
   onRetryResume,
   onBuildComplete,
   onViewResume,
@@ -144,13 +146,15 @@ export function JobCard({
 
       {/* Actions — post-decision tracking only */}
       <div className="flex items-center gap-2 pt-1 flex-wrap">
-        {/* Resume in-flight */}
+        {/* Generate Resume — shown on approved jobs; disabled while a build is running */}
         {isApproved && !localResumeFailed && (
           <Button size="sm" variant="outline"
             className="h-7 text-[11px] border-blue-700/40 text-blue-400 hover:bg-blue-950/30 gap-1"
-            onClick={() => onViewResume?.(job.id)}
-            disabled={isPending}>
-            <FileTextIcon className="w-3 h-3" /> Resume building…
+            onClick={() => onGenerateResume(job.id)}
+            disabled={isPending || buildRunning}
+            isLoading={buildRunning}>
+            <FileTextIcon className="w-3 h-3" />
+            {buildRunning ? 'Building…' : 'Generate Resume'}
           </Button>
         )}
 

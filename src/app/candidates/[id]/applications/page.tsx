@@ -78,6 +78,19 @@ export default function ApplicationsPage() {
     }
   }
 
+  const handleGenerateResume = async (jobId: string) => {
+    setPendingId(jobId)
+    setError(null)
+    try {
+      setJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, status: 'approved' } : j))
+      await triggerResumeGeneration(jobId, candidateId)
+    } catch {
+      setError('Failed to queue resume generation. Please try again.')
+    } finally {
+      setPendingId(null)
+    }
+  }
+
   const handleRetryResume = async (jobId: string) => {
     setPendingId(jobId)
     setError(null)
@@ -167,6 +180,7 @@ export default function ApplicationsPage() {
                 emailOutreachMode={emailOutreachMode}
                 onMarkSubmitted={handleMarkSubmitted}
                 onMoveToRejected={handleMoveToRejected}
+                onGenerateResume={handleGenerateResume}
                 onRetryResume={handleRetryResume}
                 onBuildComplete={handleBuildComplete}
                 onViewResume={handleViewResume}

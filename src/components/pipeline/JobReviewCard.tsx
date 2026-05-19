@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { CheckCircle, XCircle, Bell, BellOff, MapPin, Building2, ExternalLink, Calendar, AlertTriangle } from 'lucide-react'
+import { CheckCircle, XCircle, Bell, BellOff, MapPin, Building2, ExternalLink, Calendar, AlertTriangle, FileTextIcon } from 'lucide-react'
 import { StrengthRiskChips } from './StrengthRiskChips'
 import { ScoreReportPane } from './ScoreReportPane'
 import type { HitlJob } from '@/lib/api'
@@ -58,6 +58,7 @@ interface JobReviewCardProps {
   onReject: (jobId: string) => void
   onSnooze: (jobId: string) => void
   onUnsnooze: (jobId: string) => void
+  onGenerateResume: (jobId: string) => void
   isPending: boolean
   outreachTarget?: OutreachTargetSummary | null
   emailCadence?: EmailCadenceSummary | null
@@ -70,6 +71,7 @@ export function JobReviewCard({
   onReject,
   onSnooze,
   onUnsnooze,
+  onGenerateResume,
   isPending,
   outreachTarget,
   emailCadence,
@@ -194,7 +196,7 @@ export function JobReviewCard({
               data-testid="approve-btn"
             >
               <CheckCircle className="w-3 h-3 mr-1" />
-              Approve &amp; Tailor Resume
+              Approve
             </Button>
             <Button
               size="sm"
@@ -224,6 +226,23 @@ export function JobReviewCard({
               ) : (
                 <><Bell className="w-3 h-3 mr-1" />Snooze 7d</>
               )}
+            </Button>
+          </div>
+        )}
+
+        {/* Generate Resume — shown on approved jobs that don't have a resume yet */}
+        {job.status === 'approved' && (
+          <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[#0d1829]">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-[11px] px-3 border-blue-700/40 text-blue-400 hover:bg-blue-950/30 gap-1"
+              onClick={() => onGenerateResume(job.id)}
+              disabled={isPending}
+              data-testid="generate-resume-btn"
+            >
+              <FileTextIcon className="w-3 h-3" />
+              Generate Resume
             </Button>
           </div>
         )}

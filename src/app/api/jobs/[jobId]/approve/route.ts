@@ -61,16 +61,7 @@ export async function POST(
       decidedAt: new Date(),
     })
 
-    const [pjob] = await db
-      .insert(pipelineJobs)
-      .values({
-        jobType: 'resume_builder',
-        candidateId,
-        payload: { job_id: jobId, candidate_id: candidateId },
-      })
-      .returning({ id: pipelineJobs.id })
-
-    // Enqueue LinkedIn connector in parallel with resume builder
+    // Enqueue LinkedIn connector
     await db.insert(pipelineJobs).values({
       jobType: 'linkedin_connector',
       candidateId,
@@ -101,7 +92,6 @@ export async function POST(
     return NextResponse.json({
       jobId,
       status: 'approved',
-      pipelineJobId: pjob.id,
       checkpointId,
     })
   } catch (e) {

@@ -35,6 +35,7 @@ const makeProps = (overrides: Partial<HitlJob> = {}) => ({
   onReject: vi.fn(),
   onSnooze: vi.fn(),
   onUnsnooze: vi.fn(),
+  onGenerateResume: vi.fn(),
   isPending: false,
 })
 

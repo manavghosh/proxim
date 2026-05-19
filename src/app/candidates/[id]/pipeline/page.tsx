@@ -19,6 +19,7 @@ import {
   startJobStream,
   updatePreferences,
   getPreferences,
+  triggerResumeGeneration,
   type HitlJob,
 } from '@/lib/api'
 import { Workflow } from 'lucide-react'
@@ -148,21 +149,9 @@ export default function PipelinePage() {
   const handleApprove = async (jobId: string) => {
     setPending(jobId, true)
     try {
-      const res = await approveJob(jobId, candidateId)
+      await approveJob(jobId, candidateId)
       setJobs(prev => prev.map(j => j.id === jobId ? { ...j, status: 'approved' } : j))
-      // Push the returned pipelineJobId so the log pane below streams the
-      // resume_builder graph for this approval. The pane keeps the most
-      // recent build active and auto-scrolls.
-      if (res.pipelineJobId) {
-        setResumeBuilderJobIds((prev) => [...prev, res.pipelineJobId])
-        // Scroll to the log pane immediately — don't wait for the first log entry.
-        setTimeout(() => {
-          if (typeof logPaneRef.current?.scrollIntoView === 'function') {
-            logPaneRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
-          }
-        }, 100)
-      }
-      showToast('Job approved — resume generation queued', 'success')
+      showToast('Job approved — LinkedIn outreach queued', 'success')
     } catch (e: unknown) {
       if (e instanceof Error && e.message.startsWith('409')) {
         showToast('Already decided — refreshing…', 'info')
@@ -170,6 +159,26 @@ export default function PipelinePage() {
       } else {
         showToast('Failed to approve job', 'error')
       }
+    } finally {
+      setPending(jobId, false)
+    }
+  }
+
+  const handleGenerateResume = async (jobId: string) => {
+    setPending(jobId, true)
+    try {
+      const res = await triggerResumeGeneration(jobId, candidateId)
+      if (res.pipelineJobId) {
+        setResumeBuilderJobIds((prev) => [...prev, res.pipelineJobId])
+        setTimeout(() => {
+          if (typeof logPaneRef.current?.scrollIntoView === 'function') {
+            logPaneRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }
+        }, 100)
+      }
+      showToast('Resume generation queued', 'success')
+    } catch {
+      showToast('Failed to queue resume generation', 'error')
     } finally {
       setPending(jobId, false)
     }
@@ -296,6 +305,7 @@ export default function PipelinePage() {
                 onReject={handleReject}
                 onSnooze={handleSnooze}
                 onUnsnooze={handleUnsnooze}
+                onGenerateResume={handleGenerateResume}
                 isPending={pendingJobIds.has(job.id)}
               />
             ))}
