@@ -98,5 +98,5 @@ async def test_archetype_registry_returns_5_archetypes():
 async def test_archetype_confidence_fallback():
     from agent.archetype_registry import ArchetypeRegistry
     registry = ArchetypeRegistry()
-    config = registry.get_archetype("Enterprise CAIO", confidence=0.4)
+    config = registry.get_archetype("Enterprise Chief AI Officer", confidence=0.4)
     assert config.name == "Agentic Systems Architect"

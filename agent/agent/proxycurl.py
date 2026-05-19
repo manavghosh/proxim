@@ -54,8 +54,9 @@ async def search_employees(
             return None
 
         hit = results.results[0]
-        # Extract LinkedIn public_id from the URL if present
-        url    = hit.url or ""
+        raw_url = hit.url or ""
+        # Normalise to www.linkedin.com — bare linkedin.com redirects can cause 404s
+        url = raw_url.replace("https://linkedin.com/", "https://www.linkedin.com/", 1)
         logger.info(
             "exa.employee_found",
             company=company_name,

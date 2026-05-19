@@ -34,7 +34,7 @@ GATE_FAIL_THRESHOLD: float = 2.5
 MAX_RETRIES: int = 2
 
 ARCHETYPES = [
-    "Enterprise CAIO",
+    "Enterprise Chief AI Officer",
     "Startup CTO/VP",
     "Agentic Systems Architect",
     "GCC AI Practice Head",
@@ -132,7 +132,7 @@ Evaluate across exactly 10 dimensions. Return JSON matching the schema below.
 5. interview_probability (weight 3): Estimated callback likelihood given profile strength.
 6. thought_leadership (weight 2): Do OSS projects, patents, publishing amplify fit?
 7. geography (weight 2): Is remote/hybrid feasible from Bengaluru?
-8. growth_trajectory (weight 2): Visible path toward CAIO/CTO level?
+8. growth_trajectory (weight 2): Visible path toward Chief AI Officer/CTO level?
 9. domain_resonance (weight 2): Problem domain alignment with candidate interest?
 10. hiring_urgency (weight 1): Speed signals — posting recency, urgency language.
 

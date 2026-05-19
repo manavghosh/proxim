@@ -39,7 +39,7 @@ async def build_queries(state: DiscoveryState) -> dict:
     geo: list[str] = prefs.get("geographic_preference", [])
 
     base_queries = seniority_levels[:8] if seniority_levels else [
-        "CAIO", "Chief AI Officer", "VP AI", "Head of AI",
+        "Chief AI Officer", "Head of Artificial Intelligence",
         "Director AI", "AI Practice Head", "LangGraph engineer",
     ]
 

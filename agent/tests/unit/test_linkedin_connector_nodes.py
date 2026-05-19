@@ -134,14 +134,14 @@ async def test_check_dnc_node_passes_through_when_dnc_list_empty(mock_prefs):
 async def test_discover_contact_node_searches_roles_in_priority_order(
     mock_update, mock_search
 ):
-    """First search should be for CAIO — the highest priority title."""
+    """First search should be for Chief AI Officer — the highest priority title."""
     mock_search.return_value = SAMPLE_CONTACT  # match on first call
     mock_update.return_value = None
 
     result = await discover_contact_node(_base_state(status="discovering"), _config())
 
     first_call_role = mock_search.call_args_list[0][1].get("role") or mock_search.call_args_list[0][0][1]
-    assert "CAIO" in first_call_role or "Chief AI" in first_call_role
+    assert "Chief AI" in first_call_role
     assert result["contact"] == SAMPLE_CONTACT
     assert result["status"] == "enriching"
 

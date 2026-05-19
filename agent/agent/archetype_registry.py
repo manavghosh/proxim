@@ -13,7 +13,7 @@ class ArchetypeConfig(BaseModel):
 
 _ARCHETYPES: list[ArchetypeConfig] = [
     ArchetypeConfig(
-        name="Enterprise CAIO",
+        name="Enterprise Chief AI Officer",
         section_order=["summary", "proof_points", "roles", "patents", "education", "skills"],
         lead_proof_point_types=["patent", "published_paper", "board_role"],
         tone="corporate",

@@ -2,7 +2,7 @@
 import pytest
 
 ARCHETYPE_NAMES = [
-    "Enterprise CAIO",
+    "Enterprise Chief AI Officer",
     "Startup CTO/VP",
     "Agentic Systems Architect",
     "GCC AI Practice Head",
@@ -29,7 +29,7 @@ def test_unknown_archetype_falls_back_to_agentic_systems_architect():
 def test_confidence_below_0_6_forces_agentic_systems_architect_default():
     from agent.archetype_registry import ArchetypeRegistry
     registry = ArchetypeRegistry()
-    config = registry.get_archetype("Enterprise CAIO", confidence=0.5)
+    config = registry.get_archetype("Enterprise Chief AI Officer", confidence=0.5)
     assert config.name == DEFAULT_ARCHETYPE
 
 

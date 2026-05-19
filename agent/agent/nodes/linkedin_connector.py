@@ -219,8 +219,12 @@ async def generate_notes_node(state: LinkedInConnectorState, config: RunnableCon
         school = (education[0].get("school") or {}).get("name", "")
         edu_hook = f"alma mater: {school}" if school else ""
 
+    _TITLE_EXPANSIONS = {"CAIO": "Chief AI Officer"}
+    raw_title = contact.get('title', 'leader') or 'leader'
+    contact_title = _TITLE_EXPANSIONS.get(raw_title.strip().upper(), raw_title)
+
     prompt = (
-        f"Contact: {contact.get('name', 'the contact')}, {contact.get('title', 'leader')} "
+        f"Contact: {contact.get('name', 'the contact')}, {contact_title} "
         f"at {state['company']}.\n"
         f"Personalisation hooks: {tenure_hook}. {edu_hook}.\n"
         f"My archetype: {state['archetype']}. Applied job: {state['job_title']}.\n"
