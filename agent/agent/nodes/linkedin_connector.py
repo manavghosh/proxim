@@ -304,7 +304,6 @@ async def generate_notes_node(state: LinkedInConnectorState, config: RunnableCon
     company_research = state.get("company_research", "")
 
     contact_name   = contact.get("name", "")
-    first_name     = contact_name.split()[0] if contact_name else "there"
     candidate_name = state.get("candidate_name", "")
 
     # Real title from enrich_profile_node; fall back to first experience line
