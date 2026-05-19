@@ -169,6 +169,110 @@ def _parse_profile_text(text: str, title: str) -> dict:
     }
 
 
+# ── LinkedIn JD hiring team extraction ───────────────────────────────────────
+
+import re as _re
+
+_HIRING_ANCHORS = _re.compile(
+    r"(job poster|hiring manager|meet the hiring team|recruiter)",
+    _re.IGNORECASE,
+)
+_LI_PROFILE_RE = _re.compile(r"https?://(?:www\.)?linkedin\.com/in/([\w%-]+)")
+_NAME_LIKE_RE  = _re.compile(r"^[A-Z][a-zA-Z'\-]+(?:\s[A-Z][a-zA-Z'\-]+)+$")
+
+
+def _parse_hiring_team(content: str) -> Optional[dict]:
+    """Parse 'Meet the hiring team' section from Exa page text.
+
+    Handles two common LinkedIn formats:
+      1. Multi-line: 'Meet the hiring team\\nElizabeth Garcia Nichols\\nJob poster'
+      2. Inline:     'Elizabeth Garcia Nichols · Job poster'
+    Returns {"name", "title", "linkedin_url"} or None.
+    """
+    lines = [l.strip() for l in content.splitlines() if l.strip()]
+
+    # Find the anchor line containing hiring-team keywords
+    anchor_idx = None
+    for i, line in enumerate(lines):
+        if _HIRING_ANCHORS.search(line):
+            anchor_idx = i
+            break
+    if anchor_idx is None:
+        return None
+
+    # Check if the anchor line itself is "Name · Job poster" (inline format)
+    name  = ""
+    title = "Job Poster"
+    anchor_line = lines[anchor_idx]
+    if " · " in anchor_line:
+        parts = _re.split(r"\s*·\s*", anchor_line)
+        candidate = parts[0].strip()
+        if _NAME_LIKE_RE.match(candidate):
+            name = candidate
+
+    # Scan ±4 lines around anchor for a standalone name line
+    if not name:
+        window = lines[max(0, anchor_idx - 4): min(len(lines), anchor_idx + 5)]
+        for line in window:
+            if _HIRING_ANCHORS.search(line):
+                continue
+            # "Name · Role" format on a nearby line
+            if " · " in line:
+                parts = _re.split(r"\s*·\s*", line)
+                if _NAME_LIKE_RE.match(parts[0].strip()):
+                    name = parts[0].strip()
+                    break
+            # Standalone name line
+            if _NAME_LIKE_RE.match(line):
+                name = line
+                break
+
+    if not name:
+        return None
+
+    # Extract the first LinkedIn profile URL from full content
+    linkedin_url = ""
+    for m in _LI_PROFILE_RE.finditer(content):
+        url = m.group(0)
+        url = url.replace("https://linkedin.com/", "https://www.linkedin.com/", 1)
+        linkedin_url = url
+        break
+
+    return {"name": name, "title": title, "linkedin_url": linkedin_url}
+
+
+async def extract_hiring_team_from_jd(
+    job_url: str,
+    api_key: str,
+) -> Optional[dict]:
+    """Fetch a LinkedIn JD page via Exa and extract the 'Meet the hiring team' person.
+
+    Returns {"name": str, "title": str, "linkedin_url": str} or None.
+    Never raises — all errors are logged and swallowed.
+    """
+    if not api_key or not job_url:
+        return None
+    try:
+        exa     = _exa_client(api_key)
+        results = exa.get_contents([job_url], text=True)
+        if not results.results:
+            logger.info("exa.jd_no_content", url=job_url)
+            return None
+        content = results.results[0].text or ""
+        person  = _parse_hiring_team(content)
+        if person:
+            logger.info("exa.hiring_team_extracted", url=job_url, name=person["name"])
+        else:
+            logger.info("exa.hiring_team_not_in_content", url=job_url)
+        return person
+    except Exception as exc:
+        msg = str(exc)
+        if "429" in msg or "rate" in msg.lower():
+            raise ProxycurlRateLimitError("Exa rate limit hit") from exc
+        logger.debug("exa.jd_extract_error", url=job_url, error=msg[:100])
+        return None
+
+
 async def research_person(name: str, company: str, api_key: str) -> str:
     """Real-time Exa search for a person's recent professional context.
 

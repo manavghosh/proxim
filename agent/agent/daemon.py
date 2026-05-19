@@ -110,6 +110,7 @@ async def _dispatch_job(pool, job: dict) -> None:
 
         state: LinkedInConnectorState = {
             "job_id":               job_id,
+            "job_url":              "",   # no JD URL in regen context
             "candidate_id":         cand_id,
             "candidate_name":       regen_candidate_name,
             "company":              target.get("company", ""),
@@ -147,8 +148,9 @@ async def _dispatch_job(pool, job: dict) -> None:
 
     elif job['job_type'] == 'linkedin_connector':
         from agent.nodes.linkedin_connector import (
-            LinkedInConnectorState, check_dnc_node, discover_contact_node,
-            enrich_profile_node, research_contact_node, generate_notes_node,
+            LinkedInConnectorState, check_dnc_node, extract_hiring_team_node,
+            discover_contact_node, enrich_profile_node, research_contact_node,
+            generate_notes_node,
         )
         from agent.db import insert_outreach_target, update_pipeline_job_status
         from agent.config import settings
@@ -173,6 +175,13 @@ async def _dispatch_job(pool, job: dict) -> None:
             _li_row = await _li_cur.fetchone()
         li_candidate_name = _li_row[0] if _li_row else ""
 
+        # Fetch the job's LinkedIn URL to extract the actual hiring team from the JD
+        async with pool.execute(
+            "SELECT source_url FROM jobs WHERE id = ?", (job_id,)
+        ) as _src_cur:
+            _src_row = await _src_cur.fetchone()
+        li_source_url = _src_row[0] if _src_row else ""
+
         config    = RunnableConfig(configurable={
             "pool": pool,
             "proxycurl_api_key": getattr(settings, 'exa_api_key', ''),
@@ -180,6 +189,7 @@ async def _dispatch_job(pool, job: dict) -> None:
 
         state: LinkedInConnectorState = {
             "job_id":               job_id,
+            "job_url":              li_source_url,
             "candidate_id":         cand_id,
             "candidate_name":       li_candidate_name,
             "company":              company,
@@ -205,11 +215,16 @@ async def _dispatch_job(pool, job: dict) -> None:
                 await update_pipeline_job_status(pool, job['id'], 'completed')
                 return
 
-            state = {**state, **(await discover_contact_node(state, config))}
-            if state["status"] == "no_contact_found":
-                logger.info("linkedin.no_contact_complete", target_id=target_id)
-                await update_pipeline_job_status(pool, job['id'], 'completed')
-                return
+            # Level 1: try to get the actual job poster from the LinkedIn JD page
+            state = {**state, **(await extract_hiring_team_node(state, config))}
+
+            # Level 2: fall back to AI role search if JD extraction found nobody
+            if not state.get("contact"):
+                state = {**state, **(await discover_contact_node(state, config))}
+                if state["status"] == "no_contact_found":
+                    logger.info("linkedin.no_contact_complete", target_id=target_id)
+                    await update_pipeline_job_status(pool, job['id'], 'completed')
+                    return
 
             state = {**state, **(await enrich_profile_node(state, config))}
             state = {**state, **(await research_contact_node(state, config))}
@@ -348,17 +363,24 @@ async def _dispatch_job(pool, job: dict) -> None:
                                                      error=f'Cadence {cadence_id} not found')
                     return
 
-        # Fetch candidate name so the LLM can use it in the email body/subject
+        # Fetch candidate name + job source URL for targeted email discovery
         async with pool.execute(
             "SELECT name FROM candidates WHERE id = ?", (cand_id,)
         ) as _cur:
             _cand_row = await _cur.fetchone()
         candidate_name = _cand_row[0] if _cand_row else ""
 
+        async with pool.execute(
+            "SELECT source_url FROM jobs WHERE id = ?", (job_id,)
+        ) as _src_cur:
+            _src_row = await _src_cur.fetchone()
+        om_source_url = _src_row[0] if _src_row else ""
+
         config = RunnableConfig(configurable={"pool": pool, "settings": _settings})
 
         state: OutreachMailerState = {
             "job_id": job_id,
+            "job_url": om_source_url,
             "candidate_id": cand_id,
             "candidate_name": candidate_name,
             "company": company,

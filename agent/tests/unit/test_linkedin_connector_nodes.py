@@ -58,13 +58,17 @@ SAMPLE_CONTACT = {
 def _base_state(**overrides) -> LinkedInConnectorState:
     base: LinkedInConnectorState = {
         "job_id":               JOB_ID,
+        "job_url":              "",
         "candidate_id":         CAND_ID,
+        "candidate_name":       "Test Candidate",
         "company":              COMPANY,
         "job_title":            JOB_TITLE,
         "archetype":            ARCHETYPE,
         "archetype_confidence": 0.9,
         "contact":              None,
         "enrichment":           None,
+        "person_research":      "",
+        "company_research":     "",
         "note_a":               None,
         "note_b":               None,
         "generation_attempts":  0,
@@ -367,3 +371,116 @@ async def test_research_contact_node_handles_empty_results():
 
     assert result["person_research"] == ""
     assert result["company_research"] == ""
+
+
+# ── extract_hiring_team_from_jd + extract_hiring_team_node ────────────────────
+
+def test_parse_hiring_team_multiline_format():
+    """Parses multi-line 'Meet the hiring team' section."""
+    from agent.proxycurl import _parse_hiring_team
+    content = "Some intro\nMeet the hiring team\nElizabeth Garcia Nichols\nJob poster · 3rd+"
+    result = _parse_hiring_team(content)
+    assert result is not None
+    assert result["name"] == "Elizabeth Garcia Nichols"
+
+
+def test_parse_hiring_team_inline_format():
+    """Parses inline 'Name · Job poster' format."""
+    from agent.proxycurl import _parse_hiring_team
+    content = "Elizabeth Garcia Nichols · Job poster\nhttps://www.linkedin.com/in/elizabethgn"
+    result = _parse_hiring_team(content)
+    assert result is not None
+    assert result["name"] == "Elizabeth Garcia Nichols"
+    assert "linkedin.com/in/" in result["linkedin_url"]
+
+
+def test_parse_hiring_team_no_anchor_returns_none():
+    """Returns None when no hiring-team keywords are present."""
+    from agent.proxycurl import _parse_hiring_team
+    content = "This is a job at Acme Corp. Great benefits. Apply now."
+    assert _parse_hiring_team(content) is None
+
+
+@pytest.mark.asyncio
+async def test_extract_hiring_team_from_jd_returns_person():
+    """Returns parsed person dict when Exa content contains hiring team."""
+    from agent.proxycurl import extract_hiring_team_from_jd
+
+    mock_result = MagicMock()
+    mock_result.results[0].text = (
+        "Meet the hiring team\nElizabeth Garcia Nichols\nJob poster · 3rd+"
+    )
+    with patch("agent.proxycurl._exa_client") as mock_exa_cls:
+        mock_exa_cls.return_value.get_contents.return_value = mock_result
+        person = await extract_hiring_team_from_jd(
+            "https://www.linkedin.com/jobs/view/123/", "key"
+        )
+
+    assert person is not None
+    assert person["name"] == "Elizabeth Garcia Nichols"
+
+
+@pytest.mark.asyncio
+async def test_extract_hiring_team_from_jd_returns_none_on_error():
+    """Returns None when Exa raises — never propagates the exception."""
+    from agent.proxycurl import extract_hiring_team_from_jd
+
+    with patch("agent.proxycurl._exa_client") as mock_exa_cls:
+        mock_exa_cls.return_value.get_contents.side_effect = Exception("network error")
+        person = await extract_hiring_team_from_jd(
+            "https://www.linkedin.com/jobs/view/123/", "key"
+        )
+
+    assert person is None
+
+
+@pytest.mark.asyncio
+async def test_extract_hiring_team_node_sets_contact_and_seniority():
+    """Sets contact in state and writes JOB_POSTER seniority to DB when person found."""
+    from agent.nodes.linkedin_connector import extract_hiring_team_node
+
+    person = {"name": "Elizabeth Garcia Nichols", "title": "Job Poster", "linkedin_url": ""}
+    with (
+        patch("agent.proxycurl.extract_hiring_team_from_jd", new=AsyncMock(return_value=person)),
+        patch("agent.nodes.linkedin_connector.update_outreach_target", new=AsyncMock()) as mock_update,
+    ):
+        result = await extract_hiring_team_node(
+            _base_state(job_url="https://www.linkedin.com/jobs/view/123/"),
+            _config(),
+        )
+
+    assert result.get("contact") == {
+        "name": "Elizabeth Garcia Nichols",
+        "title": "Job Poster",
+        "profile_url": "",
+    }
+    assert result["status"] == "enriching"
+    mock_update.assert_called_once()
+    call_kwargs = mock_update.call_args.kwargs
+    assert call_kwargs.get("seniority") == "JOB_POSTER"
+
+
+@pytest.mark.asyncio
+async def test_extract_hiring_team_node_returns_empty_when_not_found():
+    """Returns {} so pipeline falls through to discover_contact_node."""
+    from agent.nodes.linkedin_connector import extract_hiring_team_node
+
+    with patch("agent.proxycurl.extract_hiring_team_from_jd", new=AsyncMock(return_value=None)):
+        result = await extract_hiring_team_node(
+            _base_state(job_url="https://www.linkedin.com/jobs/view/123/"),
+            _config(),
+        )
+
+    assert result == {}
+
+
+@pytest.mark.asyncio
+async def test_extract_hiring_team_node_skips_when_no_url():
+    """Returns {} immediately without calling Exa when job_url is empty."""
+    from agent.nodes.linkedin_connector import extract_hiring_team_node
+
+    with patch("agent.proxycurl.extract_hiring_team_from_jd", new=AsyncMock()) as mock_fn:
+        result = await extract_hiring_team_node(_base_state(job_url=""), _config())
+
+    assert result == {}
+    mock_fn.assert_not_called()

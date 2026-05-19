@@ -24,7 +24,8 @@ logger = structlog.get_logger(__name__)
 # ── State ──────────────────────────────────────────────────────────────────────
 
 class OutreachMailerState(TypedDict):
-    job_id: str
+    job_id:  str
+    job_url: str   # LinkedIn JD URL — used for logging/future targeting
     candidate_id: str
     candidate_name: str
     company: str

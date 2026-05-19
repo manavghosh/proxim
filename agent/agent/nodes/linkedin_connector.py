@@ -37,6 +37,7 @@ logger = structlog.get_logger(__name__)
 class LinkedInConnectorState(TypedDict):
     # Input
     job_id:               str
+    job_url:              str   # LinkedIn JD URL — used to extract actual hiring team
     candidate_id:         str
     candidate_name:       str
     company:              str
@@ -159,6 +160,59 @@ async def determine_target_roles(job_title: str, company: str, archetype: str) -
         "Vice President of Engineering",
         "Talent Acquisition Manager",
     ]
+
+
+# ── Node: extract_hiring_team ─────────────────────────────────────────────────
+
+async def extract_hiring_team_node(
+    state: LinkedInConnectorState,
+    config: RunnableConfig,
+) -> dict:
+    """Extract the actual job poster from the LinkedIn JD URL (highest priority).
+
+    Uses Exa content fetch to parse the 'Meet the hiring team' section.
+    On success: writes the person to outreach_targets with seniority='JOB_POSTER'
+                and returns contact + status='enriching', skipping discover_contact.
+    On failure: returns {} so the pipeline falls through to discover_contact_node.
+    """
+    api_key = _px_key(config)
+    pool    = _pool(config)
+    job_url = state.get("job_url", "")
+
+    if not job_url:
+        logger.info("linkedin.hiring_team_skip", reason="no_job_url")
+        return {}
+
+    person = await proxycurl.extract_hiring_team_from_jd(job_url, api_key)
+    if not person or not person.get("name"):
+        logger.info(
+            "linkedin.hiring_team_not_found",
+            company=state["company"],
+            job_url=job_url,
+        )
+        return {}
+
+    contact = {
+        "name":        person["name"],
+        "title":       person["title"],
+        "profile_url": person.get("linkedin_url", ""),
+    }
+    await update_outreach_target(
+        pool,
+        state["outreach_target_id"],
+        status="enriching",
+        name=contact["name"],
+        linkedin_url=contact["profile_url"],
+        title=contact["title"],
+        seniority="JOB_POSTER",
+    )
+    logger.info(
+        "linkedin.hiring_team_found",
+        company=state["company"],
+        name=person["name"],
+        title=person["title"],
+    )
+    return {"contact": contact, "status": "enriching"}
 
 
 # ── Node: discover_contact ────────────────────────────────────────────────────

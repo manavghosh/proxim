@@ -310,30 +310,47 @@ export function JobCard({
             )}
           </div>
 
-          {/* Target profile link — show once we know who the contact is */}
+          {/* Target profile link + contact source badge */}
           {job.outreachTarget?.name && (
-            <div className="flex items-center gap-1.5 mt-1.5">
-              <Link2 className="w-3 h-3 text-[#0A66C2] flex-shrink-0" />
-              {job.outreachTarget.linkedinUrl ? (
-                <a
-                  href={job.outreachTarget.linkedinUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[10px] text-[#60a5fa] hover:underline truncate"
-                >
-                  {job.outreachTarget.name}
-                  {job.outreachTarget.title && (
-                    <span className="text-[#475569]"> · {job.outreachTarget.title}</span>
-                  )}
-                </a>
-              ) : (
-                <span className="text-[10px] text-[#64748b]">
-                  {job.outreachTarget.name}
-                  {job.outreachTarget.title && (
-                    <span className="text-[#475569]"> · {job.outreachTarget.title}</span>
-                  )}
-                </span>
-              )}
+            <div className="flex flex-col gap-1 mt-1.5">
+              <div className="flex items-center gap-1.5">
+                <Link2 className="w-3 h-3 text-[#0A66C2] flex-shrink-0" />
+                {job.outreachTarget.linkedinUrl ? (
+                  <a
+                    href={job.outreachTarget.linkedinUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] text-[#60a5fa] hover:underline truncate"
+                  >
+                    {job.outreachTarget.name}
+                    {job.outreachTarget.title && (
+                      <span className="text-[#475569]"> · {job.outreachTarget.title}</span>
+                    )}
+                  </a>
+                ) : (
+                  <span className="text-[10px] text-[#64748b]">
+                    {job.outreachTarget.name}
+                    {job.outreachTarget.title && (
+                      <span className="text-[#475569]"> · {job.outreachTarget.title}</span>
+                    )}
+                  </span>
+                )}
+              </div>
+              {/* Source badge — transparency about how this contact was identified */}
+              <span
+                className={`self-start text-[9px] font-medium px-1.5 py-0.5 rounded-full border ${
+                  job.outreachTarget.seniority === 'JOB_POSTER'
+                    ? 'bg-emerald-950/50 text-emerald-400 border-emerald-800/40'
+                    : 'bg-amber-950/50 text-amber-400 border-amber-800/40'
+                }`}
+                title={
+                  job.outreachTarget.seniority === 'JOB_POSTER'
+                    ? "Identified from the 'Meet the hiring team' section of the job posting"
+                    : "Found via AI-powered role analysis — not directly from the job posting"
+                }
+              >
+                {job.outreachTarget.seniority === 'JOB_POSTER' ? '📋 From JD' : '✨ AI Match'}
+              </span>
             </div>
           )}
 
