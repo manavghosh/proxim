@@ -6,8 +6,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Paperclip } from 'lucide-react'
+import { Paperclip, FileText } from 'lucide-react'
 import { approveCadence, overrideEmail, startCountdown, cancelCadence, retryCadenceGeneration } from '@/lib/api'
+import { PdfPreviewSheet } from '@/components/applications/PdfPreviewSheet'
 import { EmailDraftCard } from './EmailDraftCard'
 import { ManualSendDraftCard } from './ManualSendDraftCard'
 import type { EmailCadenceSummary, EmailDraftSummary, EmailOutreachMode } from '@/types/candidate'
@@ -15,6 +16,7 @@ import type { EmailCadenceSummary, EmailDraftSummary, EmailOutreachMode } from '
 interface Props {
   cadence: EmailCadenceSummary
   candidateId: string
+  jobId?: string
   mode?: EmailOutreachMode
   attachmentMode?: 'tailored' | 'original'
   onCadenceUpdated: (c: EmailCadenceSummary) => void
@@ -23,7 +25,7 @@ interface Props {
 const DAY_LABELS: Record<number, string> = { 1: 'Day 1', 3: 'Day 3', 7: 'Day 7' }
 const DAY_SUBLABELS: Record<number, string> = { 1: 'Intro', 3: 'Value add', 7: 'Gentle close' }
 
-export function EmailOutreachPanel({ cadence: initialCadence, candidateId, mode = 'manual', attachmentMode = 'tailored', onCadenceUpdated }: Props) {
+export function EmailOutreachPanel({ cadence: initialCadence, candidateId, jobId, mode = 'manual', attachmentMode = 'tailored', onCadenceUpdated }: Props) {
   const [cadence, setCadence]               = useState(initialCadence)
   // Deduplicate by dayNumber — keep the last entry per day in case the daemon
   // re-ran and inserted duplicate rows before the DB-level fix was applied.
@@ -35,6 +37,7 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, mode 
   const [activeTab, setActiveTab]           = useState('1')
   const [isApproving, setIsApproving]       = useState(false)
   const [approveError, setApproveError]     = useState<string | null>(null)
+  const [resumePreviewOpen, setResumePreviewOpen] = useState(false)
   const [isOverriding, setIsOverriding]     = useState(false)
   const [isCancelling, setIsCancelling]     = useState(false)
   const [isStarting, setIsStarting]         = useState(false)
@@ -159,20 +162,50 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, mode 
             ))}
           </Tabs>
 
-          {/* Attachment indicator — shows what resume will be sent with Day 1 */}
+          {/* Attachment indicator + View Resume — shows what will be sent with Day 1 */}
           {cadence.status === 'pending_approval' && (
-            <div className="flex items-center gap-1.5 text-[10px] text-[#475569] px-1">
-              <Paperclip className="w-3 h-3 shrink-0 text-[#60a5fa]" />
-              <span>
-                Day 1 will include{' '}
-                <span className="text-[#93c5fd]">
-                  {attachmentMode === 'original'
-                    ? 'your original resume'
-                    : 'the tailored AI resume for this role'}
+            <div className="rounded-lg border border-[#1e2d4a] bg-[#080f1e] px-3 py-2 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-1.5 text-[10px] text-[#475569] min-w-0">
+                <Paperclip className="w-3 h-3 shrink-0 text-[#60a5fa]" />
+                <span className="truncate">
+                  Day 1 will include{' '}
+                  <span className="text-[#93c5fd]">
+                    {attachmentMode === 'original'
+                      ? 'your original resume'
+                      : 'the tailored AI resume for this role'}
+                  </span>
+                  {' '}as an attachment.
                 </span>
-                {' '}as an attachment.
-              </span>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 text-[10px] shrink-0 border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c] gap-1"
+                onClick={() => setResumePreviewOpen(true)}
+                disabled={attachmentMode === 'tailored' && !jobId}
+              >
+                <FileText className="w-3 h-3" />
+                View
+              </Button>
             </div>
+          )}
+
+          {/* PDF preview sheet */}
+          {resumePreviewOpen && (
+            <PdfPreviewSheet
+              open={resumePreviewOpen}
+              onOpenChange={setResumePreviewOpen}
+              {...(attachmentMode === 'original'
+                ? {
+                    url: `/api/cv/base-pdf?candidateId=${candidateId}`,
+                    title: 'Original Resume',
+                  }
+                : {
+                    jobId: jobId ?? '',
+                    type: 'resume',
+                    title: 'Tailored AI Resume',
+                  })}
+            />
           )}
 
           {/* Agentic: pending_approval → Approve & Send */}

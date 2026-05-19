@@ -10,22 +10,24 @@ import { Button } from '@/components/ui/button'
 import { DownloadIcon } from 'lucide-react'
 
 interface Props {
-  jobId: string
-  type: 'resume' | 'cover-letter'
+  /** Job-scoped tailored PDF — mutually exclusive with `url`. */
+  jobId?: string
+  type?: 'resume' | 'cover-letter'
+  /** Arbitrary PDF URL — used for the candidate's original uploaded resume. */
+  url?: string
+  title?: string
   candidateName?: string
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
-// Renders the latest resume or cover letter PDF inline in a right-side Sheet
-// using an <iframe>. A Download button at the top triggers a browser download
-// of the same file. Both operations hit /api/jobs/{jobId}/resume/latest-pdf —
-// ?download=true forces attachment disposition; omitting it uses inline.
-export function PdfPreviewSheet({ jobId, type, candidateName, open, onOpenChange }: Props) {
-  const baseUrl = `/api/jobs/${jobId}/resume/latest-pdf?type=${type}`
+// Renders a PDF inline in a right-side Sheet using an <iframe>.
+// Pass jobId+type for tailored resumes or url for an arbitrary PDF (e.g. original upload).
+export function PdfPreviewSheet({ jobId, type = 'resume', url, title: titleProp, candidateName, open, onOpenChange }: Props) {
+  const baseUrl = url ?? `/api/jobs/${jobId}/resume/latest-pdf?type=${type}`
   const previewUrl = baseUrl
   const downloadUrl = `${baseUrl}&download=true`
-  const title = type === 'cover-letter' ? 'Cover Letter' : 'Resume'
+  const title = titleProp ?? (type === 'cover-letter' ? 'Cover Letter' : 'Resume')
   const filename = type === 'cover-letter' ? 'cover_letter.pdf' : 'resume.pdf'
 
   return (

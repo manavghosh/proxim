@@ -432,6 +432,7 @@ export function JobCard({
             <EmailOutreachPanel
               cadence={emailCadence}
               candidateId={candidateId}
+              jobId={job.id}
               mode={emailOutreachMode}
               attachmentMode={emailResumeAttachment}
               onCadenceUpdated={setEmailCadence}
