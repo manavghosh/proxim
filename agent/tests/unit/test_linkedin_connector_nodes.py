@@ -135,17 +135,19 @@ async def test_check_dnc_node_passes_through_when_dnc_list_empty(mock_prefs):
 @pytest.mark.asyncio
 @patch("agent.nodes.linkedin_connector.proxycurl.search_employees")
 @patch("agent.nodes.linkedin_connector.update_outreach_target")
-async def test_discover_contact_node_searches_roles_in_priority_order(
+@patch("agent.nodes.linkedin_connector.determine_target_roles", new=AsyncMock(return_value=["Head of Product", "VP Engineering", "Recruiter"]))
+async def test_discover_contact_node_uses_llm_determined_roles(
     mock_update, mock_search
 ):
-    """First search should be for Chief AI Officer — the highest priority title."""
+    """discover_contact_node uses LLM-determined roles, stops on first match."""
     mock_search.return_value = SAMPLE_CONTACT  # match on first call
     mock_update.return_value = None
 
     result = await discover_contact_node(_base_state(status="discovering"), _config())
 
+    # Should have searched using the first LLM-determined role
     first_call_role = mock_search.call_args_list[0][1].get("role") or mock_search.call_args_list[0][0][1]
-    assert "Chief AI" in first_call_role
+    assert first_call_role == "Head of Product"
     assert result["contact"] == SAMPLE_CONTACT
     assert result["status"] == "enriching"
 
