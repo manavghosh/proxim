@@ -283,62 +283,77 @@ async def research_contact_node(state: LinkedInConnectorState, config: RunnableC
 
 # ── Node: generate_notes ──────────────────────────────────────────────────────
 
-_NOTE_SYSTEM = (
-    "You are a professional networking specialist. Generate two distinct, "
-    "personalised LinkedIn connection notes. Each must be under 300 characters, "
-    "use a personalisation hook from the contact's profile, and must NOT mention "
-    "any job posting. Return JSON: {\"note_a\": \"...\", \"note_b\": \"...\"}."
-)
-
 MAX_NOTE_RETRIES = 3
 
 
 async def generate_notes_node(state: LinkedInConnectorState, config: RunnableConfig) -> dict:
-    """Generate two A/B connection note variants with LiteLLM (FR-005/FR-006/FR-007)."""
-    pool       = _pool(config)
-    enrichment = state.get("enrichment") or {}
-    contact    = state.get("contact") or {}
+    """Generate A/B connection notes using real-time research for genuine personalisation.
 
-    # Build personalisation context
-    experiences = enrichment.get("experiences", [])
-    education   = enrichment.get("education", [])
+    Uses three tiers of personalisation context (highest to lowest priority):
+    1. Real-time Exa research (person_research, company_research from research_contact_node)
+    2. Proxycurl enrichment signals (experience, education)
+    3. Basic contact info (name, title, company)
 
-    # Real current title — enrich_profile_node already updated contact["title"]
-    # with the Exa headline; fall back to first experience line if blank.
-    _TITLE_EXPANSIONS = {"CAIO": "Chief AI Officer"}
-    raw_title = contact.get("title") or ""
-    if not raw_title and experiences:
-        raw_title = experiences[0].get("title", "").split(" at ")[0].strip()
-    contact_title = _TITLE_EXPANSIONS.get(raw_title.strip().upper(), raw_title) or "leader"
+    The system prompt and note structure are constructed dynamically per contact
+    — no static templates.
+    """
+    pool             = _pool(config)
+    enrichment       = state.get("enrichment") or {}
+    contact          = state.get("contact") or {}
+    person_research  = state.get("person_research", "")
+    company_research = state.get("company_research", "")
 
-    # Personalisation hook from experience or education
-    hook = ""
-    if experiences:
-        exp_title = experiences[0].get("title", "")
-        hook = f"their experience: {exp_title[:80]}" if exp_title else ""
-    if not hook and education:
-        school = (education[0].get("school") or {}).get("name", "")
-        hook = f"their alma mater: {school}" if school else ""
-
-    # Get candidate's first name for the closure
+    contact_name   = contact.get("name", "")
+    first_name     = contact_name.split()[0] if contact_name else "there"
     candidate_name = state.get("candidate_name", "")
-    first_name = contact.get("name", "").split()[0] or "there"
+
+    # Real title from enrich_profile_node; fall back to first experience line
+    raw_title = contact.get("title", "")
+    if not raw_title:
+        exps = enrichment.get("experiences", [])
+        if exps:
+            raw_title = exps[0].get("title", "").split(" at ")[0].strip()
+    _EXPANSIONS = {"CAIO": "Chief AI Officer"}
+    contact_title = _EXPANSIONS.get(raw_title.strip().upper(), raw_title) or "professional"
+
+    # Build research context block — real-time Exa data takes priority
+    context_parts: list[str] = []
+    if person_research:
+        context_parts.append(f"Recent context about {contact_name}:\n{person_research}")
+    if company_research:
+        context_parts.append(f"Recent news about {state['company']}:\n{company_research}")
+    # Fallback to enrichment signals if Exa research is empty
+    if not context_parts:
+        exps = enrichment.get("experiences", [])
+        edu  = enrichment.get("education", [])
+        if exps and exps[0].get("title"):
+            context_parts.append(f"Known about them: {exps[0]['title']}")
+        elif edu:
+            school = (edu[0].get("school") or {}).get("name", "")
+            if school:
+                context_parts.append(f"Known: studied at {school}")
+    research_block = "\n\n".join(context_parts) if context_parts else "No additional context available."
+
+    # Dynamic system prompt — structure enforced, angle decided by context
+    system = (
+        "You write hyper-personalised LinkedIn connection notes (max 300 chars each).\n"
+        "Each note MUST follow this exact structure (use \\n for newlines in JSON):\n"
+        "  Line 1: 'Hi [FirstName],'\n"
+        "  Line 2: (blank)\n"
+        "  Lines 3-4: 1-2 sentences using REAL context from the research below\n"
+        "  Line 5: (blank)\n"
+        "  Line 6: 'Thanks,'\n"
+        "  Line 7: candidate's name\n\n"
+        "Rules: never mention a job posting; use actual role title; "
+        "note_a and note_b must differ in angle not just wording; max 300 chars total."
+    )
 
     prompt = (
-        f"Contact: {contact.get('name', 'the contact')}, actual role: '{contact_title}' "
-        f"at {state['company']}.\n"
-        f"Personalisation hook: {hook or 'their work at ' + state['company']}.\n"
-        f"My archetype: {state['archetype']}.\n\n"
-        f"Generate two LinkedIn connection note variants (note_a, note_b).\n"
-        f"STRICT FORMAT for each note (use literal \\n for newlines in JSON):\n"
-        f"  Hi {first_name},\\n\\n[1-2 sentences referencing their actual role "
-        f"'{contact_title}' and the personalisation hook — no job mention]"
-        f"\\n\\nThanks,\\n{candidate_name or 'Manav Ghosh'}\n\n"
-        f"RULES:\n"
-        f"- Max 300 characters total (including newlines)\n"
-        f"- Use their ACTUAL role '{contact_title}' — never invent a title\n"
-        f"- note_a and note_b must be distinct in wording\n"
-        f"- Never mention the job posting\n"
+        f"Contact: {contact_name}, {contact_title} at {state['company']}\n"
+        f"Candidate: {candidate_name} — {state['archetype']}\n\n"
+        f"{research_block}\n\n"
+        f"note_a angle: company innovation / recent news\n"
+        f"note_b angle: the person's own expertise or career\n\n"
         f'Return JSON: {{"note_a": "...", "note_b": "..."}}'
     )
 
@@ -350,19 +365,20 @@ async def generate_notes_node(state: LinkedInConnectorState, config: RunnableCon
             "linkedin.generate_notes",
             attempt=attempt,
             candidate_id=state["candidate_id"],
+            has_research=bool(person_research or company_research),
         )
         response = litellm.completion(
             model=_llm_model(),
             api_key=_llm_api_key(),
             messages=[
-                {"role": "system", "content": _NOTE_SYSTEM},
+                {"role": "system", "content": system},
                 {"role": "user",   "content": prompt},
             ],
             response_format={"type": "json_object"},
         )
         raw = response.choices[0].message.content or "{}"
         try:
-            parsed  = json.loads(raw)
+            parsed   = json.loads(raw)
             variants = NoteVariants(**parsed)
             await update_outreach_target(
                 pool,
