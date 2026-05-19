@@ -330,9 +330,13 @@ export function JobCard({
             </div>
           )}
 
-          {/* Notes selector for actionable terminal states */}
-          {job.outreachTarget && (['notes_ready', 'no_contact_found', 'failed'] as OutreachStatus[]).includes(
-            (outreachStatus ?? job.outreachTarget.status) as OutreachStatus
+          {/* Notes selector — show whenever notes exist (noteA/noteB populated),
+              even if status is transient. This covers stale-status cases where
+              the daemon generated notes but then crashed before marking notes_ready. */}
+          {job.outreachTarget && (
+            (['notes_ready', 'no_contact_found', 'failed'] as OutreachStatus[]).includes(
+              (outreachStatus ?? job.outreachTarget.status) as OutreachStatus
+            ) || (!!job.outreachTarget.noteA && !!job.outreachTarget.noteB)
           ) && (
             <div className="mt-2">
               <OutreachNoteSelector
