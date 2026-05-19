@@ -76,7 +76,8 @@ async def _dispatch_job(pool, job: dict) -> None:
     elif job['job_type'] == 'linkedin_note_regen':
         import agent.db as _db_regen
         from agent.nodes.linkedin_connector import (
-            LinkedInConnectorState, enrich_profile_node, generate_notes_node,
+            LinkedInConnectorState, enrich_profile_node,
+            research_contact_node, generate_notes_node,
         )
         from agent.config import settings as _settings_regen
         from langchain_core.runnables import RunnableConfig as _RC
@@ -121,6 +122,8 @@ async def _dispatch_job(pool, job: dict) -> None:
                 "title":       target.get("title", ""),
             },
             "enrichment":           target.get("enrichment_json"),
+            "person_research":      "",
+            "company_research":     "",
             "note_a":               None,
             "note_b":               None,
             "generation_attempts":  0,
@@ -130,6 +133,7 @@ async def _dispatch_job(pool, job: dict) -> None:
         }
         try:
             state = {**state, **(await enrich_profile_node(state, config))}
+            state = {**state, **(await research_contact_node(state, config))}
             state = {**state, **(await generate_notes_node(state, config))}
             logger.info("linkedin_note_regen.complete", target_id=target_id,
                         status=state["status"])
@@ -142,7 +146,10 @@ async def _dispatch_job(pool, job: dict) -> None:
             await _db_regen.update_pipeline_job_status(pool, job['id'], 'failed', error=str(exc))
 
     elif job['job_type'] == 'linkedin_connector':
-        from agent.nodes.linkedin_connector import LinkedInConnectorState, check_dnc_node, discover_contact_node, enrich_profile_node, generate_notes_node
+        from agent.nodes.linkedin_connector import (
+            LinkedInConnectorState, check_dnc_node, discover_contact_node,
+            enrich_profile_node, research_contact_node, generate_notes_node,
+        )
         from agent.db import insert_outreach_target, update_pipeline_job_status
         from agent.config import settings
         from langchain_core.runnables import RunnableConfig
@@ -181,6 +188,8 @@ async def _dispatch_job(pool, job: dict) -> None:
             "archetype_confidence": arch_conf,
             "contact":              None,
             "enrichment":           None,
+            "person_research":      "",
+            "company_research":     "",
             "note_a":               None,
             "note_b":               None,
             "generation_attempts":  0,
@@ -203,6 +212,7 @@ async def _dispatch_job(pool, job: dict) -> None:
                 return
 
             state = {**state, **(await enrich_profile_node(state, config))}
+            state = {**state, **(await research_contact_node(state, config))}
             state = {**state, **(await generate_notes_node(state, config))}
             logger.info("linkedin.connector_complete", target_id=target_id,
                         status=state["status"])
