@@ -564,23 +564,46 @@ async def _outreach_send_once(pool) -> None:
             logger.warning("outreach.rate_limited", candidate_id=candidate_id, draft_id=draft_id)
             continue
 
+        # Load candidate preferences
+        prefs = await _db.get_candidate_preferences(pool, candidate_id)
+
         # Day 1 attachment check
         attachments = None
         if day_number == 1:
-            # Extract job_id from cadence
-            resume = await _db.get_resume_version_for_send(pool, candidate_id, draft.get("job_id", ""))
-            if resume is None:
-                await _db.update_email_cadence(pool, cadence_id, status="attachment_missing")
-                logger.info("outreach.attachment_missing", cadence_id=cadence_id)
-                continue
-            pdf_path = resume.get("resume_pdf_path")
-            cl_path  = resume.get("cover_letter_pdf_path")
-            attachments = [{"path": pdf_path, "filename": "resume.pdf"}] if pdf_path else []
-            if cl_path:
-                attachments.append({"path": cl_path, "filename": "cover_letter.pdf"})
+            attach_mode = (prefs or {}).get("email_resume_attachment", "tailored")
 
-        # Load candidate preferences
-        prefs = await _db.get_candidate_preferences(pool, candidate_id)
+            if attach_mode == "original":
+                async with pool.execute(
+                    "SELECT base_resume_pdf_path FROM candidates WHERE id = ?",
+                    (candidate_id,)
+                ) as cur:
+                    row = await cur.fetchone()
+                base_path = row[0] if row else None
+                if base_path:
+                    attachments = [{"path": base_path, "filename": "resume.pdf"}]
+                    logger.info("outreach.original_resume_attached",
+                                candidate_id=candidate_id)
+                else:
+                    logger.warning("outreach.original_resume_missing_fallback",
+                                   candidate_id=candidate_id)
+
+            if attachments is None:  # tailored mode, or original fallback
+                resume = await _db.get_resume_version_for_send(
+                    pool, candidate_id, draft.get("job_id", ""))
+                if resume is None:
+                    await _db.update_email_cadence(pool, cadence_id,
+                                                   status="attachment_missing")
+                    logger.info("outreach.attachment_missing", cadence_id=cadence_id)
+                    continue
+                pdf_path = resume.get("resume_pdf_path")
+                cl_path  = resume.get("cover_letter_pdf_path")
+                attachments = (
+                    [{"path": pdf_path, "filename": "resume.pdf"}] if pdf_path else []
+                )
+                if cl_path:
+                    attachments.append(
+                        {"path": cl_path, "filename": "cover_letter.pdf"}
+                    )
 
         # Skip auto-send if candidate is using manual mode (default)
         email_mode = (prefs or {}).get("email_outreach_mode", "manual")
