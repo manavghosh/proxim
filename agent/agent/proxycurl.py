@@ -178,7 +178,46 @@ _HIRING_ANCHORS = _re.compile(
     _re.IGNORECASE,
 )
 _LI_PROFILE_RE = _re.compile(r"https?://(?:www\.)?linkedin\.com/in/([\w%-]+)")
-_NAME_LIKE_RE  = _re.compile(r"^[A-Z][a-zA-Z'\-]+(?:\s[A-Z][a-zA-Z'\-]+)+$")
+
+# Words that look like title-case names but are actually job-title components.
+# Prevents "Senior Director" or "Head Engineering" being parsed as person names.
+_JOB_TITLE_WORDS = frozenset([
+    "senior", "junior", "chief", "head", "lead", "director", "manager",
+    "engineer", "architect", "product", "software", "data", "analytics",
+    "global", "regional", "national", "solutions", "services", "platform",
+    "technical", "technology", "operations", "business", "strategy",
+])
+
+
+def _is_person_name(text: str) -> bool:
+    """Return True if *text* looks like a person's full name.
+
+    Criteria:
+    - 2–4 whitespace-separated words (first + last [+ middle/suffix])
+    - Each word starts with a Unicode uppercase letter (handles accented chars)
+    - No word is a known job-title keyword (avoids "Senior Director" etc.)
+    - Words contain only letters, apostrophes, or hyphens
+    """
+    import unicodedata as _uc
+    words = text.split()
+    if not (2 <= len(words) <= 4):
+        return False
+    lower_words = [w.lower().strip("'-") for w in words]
+    if any(w in _JOB_TITLE_WORDS for w in lower_words):
+        return False
+    for word in words:
+        bare = word.strip("'-")
+        if not bare:
+            return False
+        # First char must be Unicode uppercase letter
+        if _uc.category(bare[0]) != "Lu":
+            return False
+        # Remaining chars must be letters, apostrophes, or hyphens
+        for ch in bare[1:]:
+            cat = _uc.category(ch)
+            if not (cat.startswith("L") or ch in "'-"):
+                return False
+    return True
 
 
 def _parse_hiring_team(content: str) -> Optional[dict]:
@@ -205,9 +244,8 @@ def _parse_hiring_team(content: str) -> Optional[dict]:
     title = "Job Poster"
     anchor_line = lines[anchor_idx]
     if " · " in anchor_line:
-        parts = _re.split(r"\s*·\s*", anchor_line)
-        candidate = parts[0].strip()
-        if _NAME_LIKE_RE.match(candidate):
+        candidate = _re.split(r"\s*·\s*", anchor_line)[0].strip()
+        if _is_person_name(candidate):
             name = candidate
 
     # Scan ±4 lines around anchor for a standalone name line
@@ -218,12 +256,12 @@ def _parse_hiring_team(content: str) -> Optional[dict]:
                 continue
             # "Name · Role" format on a nearby line
             if " · " in line:
-                parts = _re.split(r"\s*·\s*", line)
-                if _NAME_LIKE_RE.match(parts[0].strip()):
-                    name = parts[0].strip()
+                candidate = _re.split(r"\s*·\s*", line)[0].strip()
+                if _is_person_name(candidate):
+                    name = candidate
                     break
             # Standalone name line
-            if _NAME_LIKE_RE.match(line):
+            if _is_person_name(line):
                 name = line
                 break
 
@@ -251,6 +289,12 @@ async def extract_hiring_team_from_jd(
     Never raises — all errors are logged and swallowed.
     """
     if not api_key or not job_url:
+        return None
+    # Only attempt extraction for LinkedIn job pages — other sources (Naukri,
+    # IIMJobs, careers pages) don't have a 'Meet the hiring team' section and
+    # would waste an Exa credit for certain-empty results.
+    if "linkedin.com" not in job_url:
+        logger.debug("exa.jd_skip_non_linkedin", url=job_url)
         return None
     try:
         exa     = _exa_client(api_key)

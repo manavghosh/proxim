@@ -180,7 +180,7 @@ async def _dispatch_job(pool, job: dict) -> None:
             "SELECT source_url FROM jobs WHERE id = ?", (job_id,)
         ) as _src_cur:
             _src_row = await _src_cur.fetchone()
-        li_source_url = _src_row[0] if _src_row else ""
+        li_source_url = (_src_row[0] or "") if _src_row else ""
 
         config    = RunnableConfig(configurable={
             "pool": pool,
@@ -374,7 +374,7 @@ async def _dispatch_job(pool, job: dict) -> None:
             "SELECT source_url FROM jobs WHERE id = ?", (job_id,)
         ) as _src_cur:
             _src_row = await _src_cur.fetchone()
-        om_source_url = _src_row[0] if _src_row else ""
+        om_source_url = (_src_row[0] or "") if _src_row else ""
 
         config = RunnableConfig(configurable={"pool": pool, "settings": _settings})
 
