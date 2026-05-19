@@ -247,6 +247,40 @@ async def enrich_profile_node(state: LinkedInConnectorState, config: RunnableCon
     return {"enrichment": enrichment, "status": "generating", "contact": updated_contact}
 
 
+# ── Node: research_contact ────────────────────────────────────────────────────
+
+async def research_contact_node(state: LinkedInConnectorState, config: RunnableConfig) -> dict:
+    """Run real-time Exa research on the contact and their company.
+
+    Fetches:
+    - Person context: recent professional activity, talks, articles
+    - Company context: recent AI announcements, news, strategy
+
+    Results are stored in state and used by generate_notes_node to
+    produce notes that reference real, timely information rather than
+    generic phrases.
+    """
+    api_key = _px_key(config)
+    contact = state.get("contact") or {}
+    name    = contact.get("name", "")
+    company = state["company"]
+
+    person_research  = await proxycurl.research_person(name, company, api_key)
+    company_research = await proxycurl.research_company(company, api_key)
+
+    logger.info(
+        "linkedin.research_complete",
+        contact=name,
+        company=company,
+        has_person=bool(person_research),
+        has_company=bool(company_research),
+    )
+    return {
+        "person_research":  person_research,
+        "company_research": company_research,
+    }
+
+
 # ── Node: generate_notes ──────────────────────────────────────────────────────
 
 _NOTE_SYSTEM = (

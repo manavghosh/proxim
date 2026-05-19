@@ -320,3 +320,50 @@ async def test_determine_target_roles_caps_at_five():
         roles = await determine_target_roles("AI Architect", "Acme", "Agentic Systems Architect")
 
     assert len(roles) <= 5
+
+
+# ── Research Contact Node ─────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_research_contact_node_populates_state():
+    """research_contact_node adds person_research and company_research to state."""
+    from agent.nodes.linkedin_connector import research_contact_node
+    from langchain_core.runnables import RunnableConfig
+
+    config = RunnableConfig(configurable={"pool": None, "proxycurl_api_key": "key"})
+    state = {
+        "contact": {"name": "Jane Doe"},
+        "company": "Acme Corp",
+        "candidate_id": "cand-1",
+        "person_research": "",
+        "company_research": "",
+    }
+
+    with (
+        patch("agent.proxycurl.research_person", new=AsyncMock(return_value="• Jane's recent talk on AI")),
+        patch("agent.proxycurl.research_company", new=AsyncMock(return_value="• Acme launches AI product")),
+    ):
+        result = await research_contact_node(state, config)
+
+    assert result["person_research"] == "• Jane's recent talk on AI"
+    assert result["company_research"] == "• Acme launches AI product"
+
+
+@pytest.mark.asyncio
+async def test_research_contact_node_handles_empty_results():
+    """research_contact_node returns empty strings when Exa finds nothing."""
+    from agent.nodes.linkedin_connector import research_contact_node
+    from langchain_core.runnables import RunnableConfig
+
+    config = RunnableConfig(configurable={"pool": None, "proxycurl_api_key": "key"})
+    state  = {"contact": {"name": "Unknown"}, "company": "X Corp",
+               "candidate_id": "c1", "person_research": "", "company_research": ""}
+
+    with (
+        patch("agent.proxycurl.research_person", new=AsyncMock(return_value="")),
+        patch("agent.proxycurl.research_company", new=AsyncMock(return_value="")),
+    ):
+        result = await research_contact_node(state, config)
+
+    assert result["person_research"] == ""
+    assert result["company_research"] == ""
