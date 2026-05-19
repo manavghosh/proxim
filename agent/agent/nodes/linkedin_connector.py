@@ -35,13 +35,13 @@ logger = structlog.get_logger(__name__)
 # ── Role priority order (FR-001/FR-002) ──────────────────────────────────────
 
 DISCOVERY_ROLES = [
-    "CAIO",
     "Chief AI Officer",
     "CTO",
     "VP AI",
     "Head of AI",
+    "VP Engineering",
     "Engineering Director",
-    "HR",
+    "HR Director",
     "Talent Acquisition",
     "Recruiter",
 ]
