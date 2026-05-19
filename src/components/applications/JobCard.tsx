@@ -245,7 +245,7 @@ export function JobCard({
         <BuildProgressPane
           key={retryCount}
           jobId={job.id}
-          autoOpen={isApproved || isResumeFailed}
+          autoOpen={isResumeFailed || localResumeFailed}
           onBuildFailed={() => setLocalResumeFailed(true)}
           onBuildComplete={() => onBuildComplete?.(job.id)}
           onRunningChange={setBuildRunning}
