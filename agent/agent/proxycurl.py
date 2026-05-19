@@ -338,15 +338,21 @@ async def research_person(name: str, company: str, api_key: str) -> str:
         return ""
 
 
-async def research_company(company: str, api_key: str) -> str:
-    """Real-time Exa search for recent company news and AI direction.
+async def research_company(company: str, api_key: str, job_context: str = "") -> str:
+    """Real-time Exa search for recent company news relevant to the job function.
+
+    Uses job_context (typically the job title) to bias results toward relevant
+    business activity — e.g. "sales growth" for a Sales role, "product launch"
+    for a Product role. Falls back to generic company news if no context given.
 
     Returns bullet-point titles of up to 3 search results, or empty string
     if nothing is found or the API call fails.
     """
     if not api_key or not company:
         return ""
-    query = f"{company} artificial intelligence technology innovation 2025"
+    # Build a query that finds recent company news for the specific job domain
+    context_hint = job_context.strip() if job_context else "strategy leadership innovation"
+    query = f"{company} {context_hint} news 2025"
     try:
         exa     = _exa_client(api_key)
         results = exa.search(query, num_results=3)

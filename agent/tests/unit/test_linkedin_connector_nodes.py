@@ -295,7 +295,7 @@ async def test_determine_target_roles_returns_llm_roles():
     mock_resp.choices[0].message.content = '{"roles": ["VP of AI", "CTO", "Head of Data"]}'
 
     with patch("agent.nodes.linkedin_connector.litellm.acompletion", new=AsyncMock(return_value=mock_resp)):
-        roles = await determine_target_roles("AI Architect", "Acme Corp", "Agentic Systems Architect")
+        roles = await determine_target_roles("AI Architect", "Acme Corp")
 
     assert roles == ["VP of AI", "CTO", "Head of Data"]
 
@@ -306,7 +306,7 @@ async def test_determine_target_roles_falls_back_on_llm_failure():
     from agent.nodes.linkedin_connector import determine_target_roles
 
     with patch("agent.nodes.linkedin_connector.litellm.acompletion", new=AsyncMock(side_effect=Exception("timeout"))):
-        roles = await determine_target_roles("AI Architect", "Acme Corp", "Agentic Systems Architect")
+        roles = await determine_target_roles("AI Architect", "Acme Corp")
 
     # Fallback must be generic — no AI-specific hardcoding
     assert len(roles) >= 3
@@ -324,7 +324,7 @@ async def test_determine_target_roles_caps_at_five():
     )
 
     with patch("agent.nodes.linkedin_connector.litellm.acompletion", new=AsyncMock(return_value=mock_resp)):
-        roles = await determine_target_roles("AI Architect", "Acme", "Agentic Systems Architect")
+        roles = await determine_target_roles("AI Architect", "Acme")
 
     assert len(roles) <= 5
 

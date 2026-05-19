@@ -117,7 +117,7 @@ async def check_dnc_node(state: LinkedInConnectorState, config: RunnableConfig) 
 
 # ── LLM-driven role determination ────────────────────────────────────────────
 
-async def determine_target_roles(job_title: str, company: str, archetype: str) -> list[str]:
+async def determine_target_roles(job_title: str, company: str) -> list[str]:
     """Use the LLM to determine 3-5 ideal contact roles for this specific job.
 
     The LLM reasons from the job title and company context — NOT from the
@@ -231,7 +231,6 @@ async def discover_contact_node(state: LinkedInConnectorState, config: RunnableC
     roles = await determine_target_roles(
         job_title=state["job_title"],
         company=company,
-        archetype=state["archetype"],
     )
 
     for role in roles:
@@ -323,7 +322,11 @@ async def research_contact_node(state: LinkedInConnectorState, config: RunnableC
     company = state["company"]
 
     person_research  = await proxycurl.research_person(name, company, api_key)
-    company_research = await proxycurl.research_company(company, api_key)
+    # Pass job_title so company research focuses on the relevant function
+    # (e.g. "sales growth" for a Sales role, not generic AI/tech news)
+    company_research = await proxycurl.research_company(
+        company, api_key, job_context=state.get("job_title", "")
+    )
 
     logger.info(
         "linkedin.research_complete",
