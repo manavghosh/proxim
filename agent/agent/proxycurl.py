@@ -167,3 +167,45 @@ def _parse_profile_text(text: str, title: str) -> dict:
         "experiences": experiences[:5],
         "education":   education[:3],
     }
+
+
+async def research_person(name: str, company: str, api_key: str) -> str:
+    """Real-time Exa search for a person's recent professional context.
+
+    Returns bullet-point titles of up to 3 search results, or empty string
+    if nothing is found or the API call fails.
+    """
+    if not api_key or not name:
+        return ""
+    query = f"{name} {company} professional insights career"
+    try:
+        exa     = _exa_client(api_key)
+        results = exa.search(query, num_results=3)
+        items   = [r.title for r in results.results if r.title][:3]
+        snippet = "\n".join(f"• {t}" for t in items)
+        logger.info("exa.person_research", name=name, found=len(items))
+        return snippet
+    except Exception as exc:
+        logger.debug("exa.research_person_error", name=name, error=str(exc)[:100])
+        return ""
+
+
+async def research_company(company: str, api_key: str) -> str:
+    """Real-time Exa search for recent company news and AI direction.
+
+    Returns bullet-point titles of up to 3 search results, or empty string
+    if nothing is found or the API call fails.
+    """
+    if not api_key or not company:
+        return ""
+    query = f"{company} artificial intelligence technology innovation 2025"
+    try:
+        exa     = _exa_client(api_key)
+        results = exa.search(query, num_results=3)
+        items   = [r.title for r in results.results if r.title][:3]
+        snippet = "\n".join(f"• {t}" for t in items)
+        logger.info("exa.company_research", company=company, found=len(items))
+        return snippet
+    except Exception as exc:
+        logger.debug("exa.research_company_error", company=company, error=str(exc)[:100])
+        return ""
