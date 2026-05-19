@@ -159,14 +159,18 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, mode 
             ))}
           </Tabs>
 
-          {/* Attachment indicator — visible whenever a send decision is imminent */}
+          {/* Attachment indicator — shows what resume will be sent with Day 1 */}
           {cadence.status === 'pending_approval' && (
             <div className="flex items-center gap-1.5 text-[10px] text-[#475569] px-1">
-              <Paperclip className="w-3 h-3 shrink-0" />
+              <Paperclip className="w-3 h-3 shrink-0 text-[#60a5fa]" />
               <span>
-                {attachmentMode === 'original'
-                  ? 'Attaching: your uploaded original resume'
-                  : 'Attaching: tailored AI resume for this role'}
+                Day 1 will include{' '}
+                <span className="text-[#93c5fd]">
+                  {attachmentMode === 'original'
+                    ? 'your original resume'
+                    : 'the tailored AI resume for this role'}
+                </span>
+                {' '}as an attachment.
               </span>
             </div>
           )}
