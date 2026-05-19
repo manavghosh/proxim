@@ -29,6 +29,7 @@ export default function ApplicationsPage() {
   const [resumeCvHash, setResumeCvHash]     = useState<string | null>(null)
   const [error, setError]                   = useState<string | null>(null)
   const [emailOutreachMode, setEmailOutreachMode] = useState<EmailOutreachMode>('manual')
+  const [emailResumeAttachment, setEmailResumeAttachment] = useState<'tailored' | 'original'>('tailored')
 
   const loadJobs = useCallback(async (grades: Grade[]) => {
     setLoading(true)
@@ -40,6 +41,7 @@ export default function ApplicationsPage() {
       ])
       setJobs(jobsResult.jobs)
       setEmailOutreachMode(prefsResult.preferences.email_outreach_mode ?? 'manual')
+      setEmailResumeAttachment(prefsResult.preferences.email_resume_attachment ?? 'tailored')
     } catch {
       setError('Failed to load jobs. Please refresh.')
     } finally {
@@ -178,6 +180,7 @@ export default function ApplicationsPage() {
                 job={job}
                 candidateId={candidateId}
                 emailOutreachMode={emailOutreachMode}
+                emailResumeAttachment={emailResumeAttachment}
                 onMarkSubmitted={handleMarkSubmitted}
                 onMoveToRejected={handleMoveToRejected}
                 onGenerateResume={handleGenerateResume}

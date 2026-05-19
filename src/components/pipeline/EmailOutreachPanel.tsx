@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Paperclip } from 'lucide-react'
 import { approveCadence, overrideEmail, startCountdown, cancelCadence, retryCadenceGeneration } from '@/lib/api'
 import { EmailDraftCard } from './EmailDraftCard'
 import { ManualSendDraftCard } from './ManualSendDraftCard'
@@ -15,13 +16,14 @@ interface Props {
   cadence: EmailCadenceSummary
   candidateId: string
   mode?: EmailOutreachMode
+  attachmentMode?: 'tailored' | 'original'
   onCadenceUpdated: (c: EmailCadenceSummary) => void
 }
 
 const DAY_LABELS: Record<number, string> = { 1: 'Day 1', 3: 'Day 3', 7: 'Day 7' }
 const DAY_SUBLABELS: Record<number, string> = { 1: 'Intro', 3: 'Value add', 7: 'Gentle close' }
 
-export function EmailOutreachPanel({ cadence: initialCadence, candidateId, mode = 'manual', onCadenceUpdated }: Props) {
+export function EmailOutreachPanel({ cadence: initialCadence, candidateId, mode = 'manual', attachmentMode = 'tailored', onCadenceUpdated }: Props) {
   const [cadence, setCadence]               = useState(initialCadence)
   // Deduplicate by dayNumber — keep the last entry per day in case the daemon
   // re-ran and inserted duplicate rows before the DB-level fix was applied.
@@ -156,6 +158,18 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, mode 
               </TabsContent>
             ))}
           </Tabs>
+
+          {/* Attachment indicator — visible whenever a send decision is imminent */}
+          {cadence.status === 'pending_approval' && (
+            <div className="flex items-center gap-1.5 text-[10px] text-[#475569] px-1">
+              <Paperclip className="w-3 h-3 shrink-0" />
+              <span>
+                {attachmentMode === 'original'
+                  ? 'Attaching: your uploaded original resume'
+                  : 'Attaching: tailored AI resume for this role'}
+              </span>
+            </div>
+          )}
 
           {/* Agentic: pending_approval → Approve & Send */}
           {cadence.status === 'pending_approval' && !isManual && (

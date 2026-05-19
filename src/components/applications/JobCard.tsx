@@ -44,6 +44,7 @@ interface Props {
   isPending: boolean
   candidateId: string
   emailOutreachMode?: EmailOutreachMode
+  emailResumeAttachment?: 'tailored' | 'original'
 }
 
 export function JobCard({
@@ -58,6 +59,7 @@ export function JobCard({
   isPending,
   candidateId,
   emailOutreachMode = 'manual',
+  emailResumeAttachment = 'tailored',
 }: Props) {
   const [emailCadence, setEmailCadence]     = useState<EmailCadenceSummary | null>(job.emailCadence)
   const [outreachStatus, setOutreachStatus] = useState<OutreachStatus | null>(
@@ -431,6 +433,7 @@ export function JobCard({
               cadence={emailCadence}
               candidateId={candidateId}
               mode={emailOutreachMode}
+              attachmentMode={emailResumeAttachment}
               onCadenceUpdated={setEmailCadence}
             />
           )}
