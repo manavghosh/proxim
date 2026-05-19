@@ -32,20 +32,6 @@ def _llm_api_key() -> str:
 
 logger = structlog.get_logger(__name__)
 
-# ── Role priority order (FR-001/FR-002) ──────────────────────────────────────
-
-DISCOVERY_ROLES = [
-    "Chief AI Officer",
-    "Chief Technology Officer",
-    "Vice President of Artificial Intelligence",
-    "Vice President of Engineering",
-    "Head of Artificial Intelligence",
-    "Engineering Director",
-    "Human Resources Director",
-    "Talent Acquisition Manager",
-    "Technical Recruiter",
-]
-
 # ── State ────────────────────────────────────────────────────────────────────
 
 class LinkedInConnectorState(TypedDict):
@@ -128,17 +114,70 @@ async def check_dnc_node(state: LinkedInConnectorState, config: RunnableConfig) 
     return {"status": "discovering"}
 
 
+# ── LLM-driven role determination ────────────────────────────────────────────
+
+async def determine_target_roles(job_title: str, company: str, archetype: str) -> list[str]:
+    """Use the LLM to determine 3-5 ideal contact roles for this specific job.
+
+    Replaces the static DISCOVERY_ROLES list — the LLM adapts to company
+    type, job seniority, and archetype so the most relevant contacts are
+    tried first.  Falls back to a sensible default list on any failure.
+    """
+    prompt = (
+        f"A candidate is applying for: '{job_title}' at '{company}'.\n"
+        f"Candidate archetype: {archetype}.\n\n"
+        f"Who are the ideal LinkedIn contacts to approach at this company?\n"
+        f"Consider the company type — large enterprise vs startup will differ.\n"
+        f"For AI/tech roles target AI/engineering leadership first.\n"
+        f"Always include HR/Talent Acquisition as a fallback.\n"
+        f"Give 3-5 specific job titles, ordered from most valuable (hiring manager) "
+        f"to least (recruiter).\n"
+        f'Return JSON: {{"roles": ["Role 1", "Role 2", "Role 3"]}}'
+    )
+    try:
+        resp = await litellm.acompletion(
+            model=_llm_model(),
+            api_key=_llm_api_key(),
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+            temperature=0.2,
+            max_tokens=200,
+        )
+        raw   = resp.choices[0].message.content or "{}"
+        data  = json.loads(raw)
+        roles = [str(r) for r in data.get("roles", []) if r][:5]
+        if roles:
+            logger.info("linkedin.roles_determined", roles=roles, company=company)
+            return roles
+    except Exception as exc:
+        logger.warning("linkedin.role_determination_failed", error=str(exc)[:200])
+
+    return [
+        "Chief AI Officer",
+        "Chief Technology Officer",
+        "Head of Artificial Intelligence",
+        "Vice President of Engineering",
+        "Talent Acquisition Manager",
+    ]
+
+
 # ── Node: discover_contact ────────────────────────────────────────────────────
 
 async def discover_contact_node(state: LinkedInConnectorState, config: RunnableConfig) -> dict:
-    """Search for a hiring manager via Proxycurl employee search (FR-001/FR-002)."""
+    """Search for a hiring manager using LLM-determined roles (adaptive per job)."""
     pool    = _pool(config)
     api_key = _px_key(config)
     company = state["company"]
 
     await update_outreach_target(pool, state["outreach_target_id"], status="discovering")
 
-    for role in DISCOVERY_ROLES:
+    roles = await determine_target_roles(
+        job_title=state["job_title"],
+        company=company,
+        archetype=state["archetype"],
+    )
+
+    for role in roles:
         logger.info("proxycurl.employee_search", company=company, role=role)
         contact = await proxycurl.search_employees(
             company_name=company, role=role, api_key=api_key

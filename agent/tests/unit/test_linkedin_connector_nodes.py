@@ -276,3 +276,47 @@ async def test_generate_notes_node_marks_failed_after_3_retries(mock_llm, mock_u
 
     assert mock_llm.call_count == 3
     assert result["status"] == "failed"
+
+
+# ── determine_target_roles ────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_determine_target_roles_returns_llm_roles():
+    """LLM response is parsed into a list of role strings."""
+    from agent.nodes.linkedin_connector import determine_target_roles
+
+    mock_resp = MagicMock()
+    mock_resp.choices[0].message.content = '{"roles": ["VP of AI", "CTO", "Head of Data"]}'
+
+    with patch("agent.nodes.linkedin_connector.litellm.acompletion", new=AsyncMock(return_value=mock_resp)):
+        roles = await determine_target_roles("AI Architect", "Acme Corp", "Agentic Systems Architect")
+
+    assert roles == ["VP of AI", "CTO", "Head of Data"]
+
+
+@pytest.mark.asyncio
+async def test_determine_target_roles_falls_back_on_llm_failure():
+    """Falls back to sensible defaults when LLM call raises an exception."""
+    from agent.nodes.linkedin_connector import determine_target_roles
+
+    with patch("agent.nodes.linkedin_connector.litellm.acompletion", new=AsyncMock(side_effect=Exception("timeout"))):
+        roles = await determine_target_roles("AI Architect", "Acme Corp", "Agentic Systems Architect")
+
+    assert len(roles) >= 3
+    assert any("Chief AI Officer" in r or "Chief Technology Officer" in r for r in roles)
+
+
+@pytest.mark.asyncio
+async def test_determine_target_roles_caps_at_five():
+    """Never returns more than 5 roles regardless of LLM output."""
+    from agent.nodes.linkedin_connector import determine_target_roles
+
+    mock_resp = MagicMock()
+    mock_resp.choices[0].message.content = (
+        '{"roles": ["R1","R2","R3","R4","R5","R6","R7"]}'
+    )
+
+    with patch("agent.nodes.linkedin_connector.litellm.acompletion", new=AsyncMock(return_value=mock_resp)):
+        roles = await determine_target_roles("AI Architect", "Acme", "Agentic Systems Architect")
+
+    assert len(roles) <= 5
