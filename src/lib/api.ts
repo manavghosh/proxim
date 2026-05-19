@@ -394,6 +394,19 @@ export async function getOutreachTarget(
   return request(`/api/outreach/${targetId}${qs(candidateId)}`)
 }
 
+export async function uploadBasePdf(
+  candidateId: string,
+  file: File,
+): Promise<{ path: string; filename: string }> {
+  const formData = new FormData()
+  formData.append('file', file)
+  // No Content-Type header — browser sets multipart boundary automatically
+  return request(`/api/cv/upload-pdf?candidateId=${encodeURIComponent(candidateId)}`, {
+    method: 'POST',
+    body: formData,
+  })
+}
+
 export async function selectAndSendNote(
   targetId: string,
   candidateId: string,
