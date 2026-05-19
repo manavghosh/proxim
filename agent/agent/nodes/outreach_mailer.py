@@ -130,34 +130,48 @@ async def litellm_generate(state: OutreachMailerState, settings) -> EmailDraftOu
     candidate_name = state.get("candidate_name") or "the candidate"
     hm_name        = state.get("hiring_manager_name") or ""
 
-    # Build greeting and salutation instructions based on what we know
+    # Build greeting based on whether we know the hiring manager's name
     if hm_name:
-        hm_first           = hm_name.split()[0]
-        to_line            = f"You are writing to: {hm_name}"
-        greeting_instruction = f"Start with 'Hi {hm_first},' or 'Dear {hm_first},'"
+        hm_first = hm_name.split()[0]
+        recipient_line   = f"Recipient: {hm_name}"
+        greeting_instruction = (
+            f"Open with 'Hi {hm_first},' or 'Dear {hm_first},' on its own line."
+        )
     else:
-        to_line              = "You are writing to the hiring manager (name unknown)"
-        greeting_instruction = "Start with 'Dear Hiring Manager,' or 'Hi there,'"
+        recipient_line   = "Recipient: Hiring Manager (name not known)"
+        greeting_instruction = (
+            "Open with 'Dear Hiring Manager,' or 'Hi there,' on its own line. "
+            "NEVER write 'Dear the Hiring Manager' — it is grammatically incorrect."
+        )
 
     prompt = (
-        f"You are {candidate_name}, a job seeker writing directly to a hiring manager. "
-        f"Write in FIRST PERSON as {candidate_name} — use 'I', 'my', 'I've', never 'the candidate' or 'they'.\n\n"
-        f"Your name: {candidate_name}\n"
-        f"You are applying for: {state['job_title']} at {state['company']}\n"
-        f"Your professional profile: {state['archetype']}\n"
-        f"{to_line}\n\n"
-        "Write 3 emails in first person:\n"
-        f"- day1_body: Introduce yourself as {candidate_name}, mention something specific about "
-        f"{state['company']}, why you applied, max 150 words. {greeting_instruction}. "
-        f"End with a closing line such as 'Best regards,\\n{candidate_name}' or 'Thanks,\\n{candidate_name}'.\n"
-        "- day3_body: Share a specific insight or proof point from YOUR experience relevant to their work, "
-        f"max 100 words. End with 'Best,\\n{candidate_name}'. "
-        "Do NOT use: 'following up', 'checking in', 'just following', 'just checking'.\n"
-        "- day7_body: Gentle, low-pressure close from YOU to them, max 80 words. "
-        f"End with 'Best regards,\\n{candidate_name}'. "
-        "No pressure phrases like 'last chance', 'urgent', 'final follow-up'.\n"
-        f"- subject: one concise subject line (include your name: {candidate_name})\n\n"
-        'Return ONLY valid JSON: {"subject": "...", "day1_body": "...", "day3_body": "...", "day7_body": "..."}'
+        f"You are {candidate_name}, a job seeker writing cold outreach emails to a hiring manager.\n"
+        f"Write in FIRST PERSON — use 'I', 'my', never 'the candidate'.\n\n"
+        f"Candidate name : {candidate_name}\n"
+        f"Role applying  : {state['job_title']} at {state['company']}\n"
+        f"Your profile   : {state['archetype']}\n"
+        f"{recipient_line}\n\n"
+        "FORMATTING RULES (strictly follow):\n"
+        "1. Separate every paragraph with a blank line (\\n\\n).\n"
+        "2. The greeting must be on its own line, followed by a blank line.\n"
+        "3. The sign-off must be on its own line after a blank line.\n"
+        "4. Never write walls of text — each email must have at least 2 paragraphs.\n\n"
+        "Write 3 emails:\n\n"
+        f"day1_body — max 150 words:\n"
+        f"  {greeting_instruction}\n"
+        f"  Paragraph 1: Introduce yourself as {candidate_name} and why you're reaching out.\n"
+        f"  Paragraph 2: One specific reason you're excited about {state['company']}.\n"
+        f"  Sign-off: blank line, then 'Best regards,' on one line, '{candidate_name}' on the next.\n\n"
+        "day3_body — max 100 words:\n"
+        f"  Paragraph 1: One concrete proof point or insight from YOUR experience.\n"
+        f"  Sign-off: blank line, then 'Best,' on one line, '{candidate_name}' on the next.\n"
+        "  Do NOT use: 'following up', 'checking in', 'just following', 'just checking'.\n\n"
+        "day7_body — max 80 words:\n"
+        f"  Paragraph 1: Gentle, low-pressure close. No urgency or pressure phrases.\n"
+        f"  Sign-off: blank line, then 'Best regards,' on one line, '{candidate_name}' on the next.\n\n"
+        f"subject — one concise line referencing the role and {candidate_name}.\n\n"
+        'Return ONLY valid JSON: {"subject": "...", "day1_body": "...", "day3_body": "...", "day7_body": "..."}\n'
+        "All newlines inside JSON strings must be escaped as \\n."
     )
 
     resp = await litellm.acompletion(
@@ -329,9 +343,15 @@ async def write_cadence_checkpoint_node(state: OutreachMailerState, config) -> O
         pixel = f'<img src="{tracking_host}/api/track/open/{draft_id_placeholder}" width="1" height="1" alt="">'
         return body_html + pixel
 
-    day1_html = state["day1_body"] or ""
-    day3_html = state["day3_body"] or ""
-    day7_html = state["day7_body"] or ""
+    def _to_html(text: str) -> str:
+        """Convert plain-text email to HTML: double newlines → paragraph break."""
+        import html as _html
+        escaped = _html.escape(text)
+        return escaped.replace('\n\n', '<br><br>').replace('\n', '<br>')
+
+    day1_html = _to_html(state["day1_body"] or "")
+    day3_html = _to_html(state["day3_body"] or "")
+    day7_html = _to_html(state["day7_body"] or "")
 
     drafts = [
         {

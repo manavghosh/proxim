@@ -131,10 +131,13 @@ export function OutreachNoteSelector({ target, candidateId, jobId, onStatusChang
       try { parsed = JSON.parse(readable) } catch { /* not JSON */ }
       // LinkedIn API partner restriction — fall back to manual flow
       const liBody = parsed?.liBody ?? ''
+      const errText = parsed?.error ?? ''
       if (liBody.includes('ACCESS_DENIED') || liBody.includes('NO_VERSION')) {
         setShowManual(true)
+      } else if (errText.includes('notes_ready') || errText.includes('generating')) {
+        setSendError('Notes are still being generated — wait a moment and try again.')
       } else {
-        setSendError(parsed?.error ?? 'Failed to send. Please try again.')
+        setSendError(errText || 'Failed to send. Please try again.')
       }
     } finally {
       setSending(false)
