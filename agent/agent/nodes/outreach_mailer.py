@@ -220,48 +220,114 @@ async def litellm_self_review(draft: EmailDraftOutput, settings) -> SelfReviewRe
 
 # ── Nodes ──────────────────────────────────────────────────────────────────────
 
+# ── Domain extraction ─────────────────────────────────────────────────────────
+
+# Generic words that don't form the email domain of a company
+_DOMAIN_STOPWORDS = frozenset([
+    "technologies", "technology", "tech", "software", "systems", "solutions",
+    "services", "service", "consulting", "consultancy", "group", "global",
+    "india", "pvt", "private", "limited", "ltd", "inc", "corp", "corporation",
+    "bpm", "labs", "lab", "digital", "ai", "data", "analytics", "cloud",
+    "innovations", "innovation", "enterprises", "enterprise", "international",
+    "and", "the", "of", "for", "co", "llc", "plc",
+])
+
+
+def _company_to_domain(company: str) -> str:
+    """Extract the most likely email domain from a company name.
+
+    Strips generic corporate suffixes so:
+      'Aurigo Software Technologies' → 'aurigo.com'
+      'Automation Anywhere'          → 'automationanywhere.com'
+      'Tata Consultancy Services'    → 'tataconsultancy.com'
+    """
+    normalized = re.sub(r"[^a-z0-9\s]", "", company.lower()).split()
+    meaningful  = [w for w in normalized if w not in _DOMAIN_STOPWORDS and len(w) > 1]
+    if not meaningful:
+        meaningful = normalized[:1]
+    if len(meaningful) == 1:
+        return f"{meaningful[0]}.com"
+    return f"{''.join(meaningful[:2])}.com"
+
+
 async def discover_email_node(state: OutreachMailerState, config) -> OutreachMailerState:
-    """Hunter.io two-pass email discovery."""
-    pool = config["configurable"]["pool"]
+    """Hunter.io email discovery — uses LinkedIn contact name when available.
+
+    Pass 1 (targeted): if the LinkedIn connector already discovered a contact
+    for this job, uses their name + company domain in Hunter.io Email Finder
+    for a precise, person-level lookup.
+
+    Pass 2 (fallback): Hunter.io Domain Search — returns the highest-confidence
+    personal email at the company domain.
+    """
+    pool     = config["configurable"]["pool"]
     settings = config["configurable"]["settings"]
     cadence_id = state["cadence_id"]
-    company = state["company"]
+    company    = state["company"]
+    job_id     = state["job_id"]
 
-    # Extract domain from company (simple heuristic)
-    domain = re.sub(r"[^a-z0-9]", "", company.lower().split()[0]) + ".com"
+    domain = _company_to_domain(company)
+
+    # ── Look up LinkedIn-discovered contact for Pass 1 ────────────────────────
+    hiring_manager_name = state.get("hiring_manager_name") or ""
+    if not hiring_manager_name and job_id:
+        async with pool.execute(
+            "SELECT name, title FROM outreach_targets "
+            "WHERE job_id = ? AND name IS NOT NULL AND name != '' "
+            "ORDER BY created_at DESC LIMIT 1",
+            (job_id,)
+        ) as cur:
+            row = await cur.fetchone()
+        if row and row[0]:
+            hiring_manager_name = row[0]
+            logger.info(
+                "outreach_mailer.using_linkedin_contact",
+                job_id=job_id,
+                contact_name=hiring_manager_name,
+                contact_title=row[1],
+            )
 
     await update_email_cadence(pool, cadence_id, status="discovering")
-    logger.info("outreach_mailer.discovery_start", cadence_id=cadence_id, domain=domain,
-                has_manager_name=bool(state.get("hiring_manager_name")))
+    logger.info(
+        "outreach_mailer.discovery_start",
+        cadence_id=cadence_id,
+        domain=domain,
+        has_manager_name=bool(hiring_manager_name),
+    )
 
     discovered_email = None
     email_confidence = None
-    email_source = None
+    email_source     = None
 
-    # Pass 1 — Email Finder (if hiring manager name available)
-    if state.get("hiring_manager_name"):
-        name_parts = state["hiring_manager_name"].split(" ", 1)
+    # Pass 1 — Email Finder (person-level, high precision)
+    if hiring_manager_name:
+        name_parts = hiring_manager_name.split(" ", 1)
         first_name = name_parts[0]
-        last_name = name_parts[1] if len(name_parts) > 1 else ""
+        last_name  = name_parts[1] if len(name_parts) > 1 else ""
         result = await hunter_io.find_email(domain, first_name, last_name, settings.hunter_api_key)
         if result and result.get("score", 0) >= 70:
             discovered_email = result["email"]
             email_confidence = result["score"]
-            email_source = "finder"
+            email_source     = "finder"
+            logger.info(
+                "outreach_mailer.email_found_by_name",
+                contact=hiring_manager_name,
+                email=discovered_email,
+                confidence=email_confidence,
+            )
 
-    # Pass 2 — Domain Search fallback
+    # Pass 2 — Domain Search fallback (generic, lower precision)
     if not discovered_email:
         results = await hunter_io.domain_search(domain, settings.hunter_api_key)
         if results:
-            best = results[0]
+            best       = results[0]
             confidence = best.get("confidence", 0)
-            email_val = best.get("value") or best.get("email")
+            email_val  = best.get("value") or best.get("email")
             if confidence >= 70 and email_val:
                 discovered_email = email_val
                 email_confidence = confidence
-                email_source = "domain_search"
+                email_source     = "domain_search"
             elif email_val:
-                # Low confidence — surface for candidate override
                 await update_email_cadence(
                     pool, cadence_id,
                     status="low_confidence",
@@ -282,12 +348,22 @@ async def discover_email_node(state: OutreachMailerState, config) -> OutreachMai
         email_source=email_source,
         status="generating",
     )
+    logger.info(
+        "outreach_mailer.email_discovered",
+        cadence_id=cadence_id,
+        email=discovered_email,
+        confidence=email_confidence,
+        source=email_source,
+    )
 
-    logger.info("outreach_mailer.email_discovered",
-                cadence_id=cadence_id, email=discovered_email, confidence=email_confidence, source=email_source)
-
-    return {**state, "discovered_email": discovered_email,
-            "email_confidence": email_confidence, "email_source": email_source, "status": "generating"}
+    return {
+        **state,
+        "hiring_manager_name": hiring_manager_name or state.get("hiring_manager_name"),
+        "discovered_email":    discovered_email,
+        "email_confidence":    email_confidence,
+        "email_source":        email_source,
+        "status":              "generating",
+    }
 
 
 async def generate_emails_node(state: OutreachMailerState, config) -> OutreachMailerState:
