@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import type { CandidateState, Preferences, PipelineReadiness } from '@/types/candidate'
 import { LinkedInConnectCard } from '@/components/settings/LinkedInConnectCard'
 import { EmailOutreachModeCard } from '@/components/settings/EmailOutreachModeCard'
+import { ResumeAttachmentCard } from '@/components/settings/ResumeAttachmentCard'
 
 export default function SettingsPage() {
   const { id: candidateId } = useParams<{ id: string }>()
@@ -172,6 +173,10 @@ export default function SettingsPage() {
                 candidateId={candidateId}
                 flash={gmailFlash}
               />
+            </section>
+
+            <section className="bg-[#0d1f3c] border border-[#1e3a5f] rounded-xl p-5">
+              <ResumeAttachmentCard candidateId={candidateId} />
             </section>
           </div>
         </div>
