@@ -58,8 +58,10 @@ class LinkedInConnectorState(TypedDict):
     archetype:            str
     archetype_confidence: float
     # Discovery
-    contact:    Optional[dict]
-    enrichment: Optional[dict]
+    contact:          Optional[dict]
+    enrichment:       Optional[dict]
+    person_research:  str
+    company_research: str
     # Generation
     note_a:              Optional[str]
     note_b:              Optional[str]
