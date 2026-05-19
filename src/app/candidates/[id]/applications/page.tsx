@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import { getJobs, markSubmitted, rejectJob, getResumeVersions, triggerResumeGeneration, getPreferences } from '@/lib/api'
 import type { ScoredJob, ResumeVersion } from '@/lib/api'
-import type { EmailOutreachMode } from '@/types/candidate'
+import type { EmailOutreachMode, OutreachStatus, EmailCadenceStatus } from '@/types/candidate'
 import { Topbar } from '@/components/layout/Topbar'
 import { CandidateSwitcher } from '@/components/layout/CandidateSwitcher'
 import { JobCard } from '@/components/applications/JobCard'
@@ -30,6 +30,7 @@ export default function ApplicationsPage() {
   const [error, setError]                   = useState<string | null>(null)
   const [emailOutreachMode, setEmailOutreachMode] = useState<EmailOutreachMode>('manual')
   const [emailResumeAttachment, setEmailResumeAttachment] = useState<'tailored' | 'original'>('tailored')
+  const [livePolling, setLivePolling]       = useState(false)
 
   const loadJobs = useCallback(async (grades: Grade[]) => {
     setLoading(true)
@@ -49,7 +50,34 @@ export default function ApplicationsPage() {
     }
   }, [candidateId])
 
+  // Silent refresh — no loading spinner, just updates job data in place
+  const silentRefresh = useCallback(async (grades: Grade[]) => {
+    try {
+      const jobsResult = await getJobs(candidateId, grades.length > 0 ? grades : [...ALL_GRADES])
+      setJobs(jobsResult.jobs)
+    } catch { /* ignore silent refresh errors */ }
+  }, [candidateId])
+
   useEffect(() => { loadJobs(selectedGrades) }, [selectedGrades, loadJobs])
+
+  // Auto-poll every 5 s while any approved job has pending outreach/email data
+  useEffect(() => {
+    const OUTREACH_TRANSIENT = new Set<OutreachStatus>(['pending', 'discovering', 'enriching', 'generating'])
+    const EMAIL_TRANSIENT    = new Set<EmailCadenceStatus>(['pending_discovery', 'discovering', 'generating'])
+
+    const needsPolling = jobs.some(j => {
+      if (!['approved', 'resume_ready', 'submitted'].includes(j.status)) return false
+      const outreachLive = !j.outreachTarget || OUTREACH_TRANSIENT.has(j.outreachTarget.status as OutreachStatus)
+      const emailLive    = !j.emailCadence   || EMAIL_TRANSIENT.has(j.emailCadence.status as EmailCadenceStatus)
+      return outreachLive || emailLive
+    })
+
+    setLivePolling(needsPolling)
+    if (!needsPolling || loading) return
+
+    const interval = setInterval(() => silentRefresh(selectedGrades), 5000)
+    return () => clearInterval(interval)
+  }, [jobs, loading, selectedGrades, silentRefresh])
 
   const handleMarkSubmitted = async (jobId: string) => {
     setPendingId(jobId)
@@ -147,7 +175,20 @@ export default function ApplicationsPage() {
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      <Topbar title="Applications" actions={<CandidateSwitcher candidateId={candidateId} />} />
+      <Topbar
+        title="Applications"
+        actions={
+          <div className="flex items-center gap-3">
+            {livePolling && (
+              <span className="flex items-center gap-1.5 text-[10px] text-emerald-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Live
+              </span>
+            )}
+            <CandidateSwitcher candidateId={candidateId} />
+          </div>
+        }
+      />
       <main className="flex-1 overflow-y-auto p-6 bg-[#0d1829]">
         {error && (
           <div className="mb-4 px-4 py-3 bg-[#450a0a] border border-[#7f1d1d] rounded-lg text-[12px] text-[#fca5a5] flex items-center justify-between gap-3">

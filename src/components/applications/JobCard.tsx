@@ -260,23 +260,30 @@ export function JobCard({
               LinkedIn Outreach
             </span>
 
-            {/* No outreach yet → Start */}
+            {/* No outreach yet — daemon queued, show animated waiting state */}
             {!job.outreachTarget && (
-              <Button size="sm" variant="outline"
-                className="h-6 text-[10px] border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c] gap-1"
-                isLoading={liStarting}
-                onClick={async () => {
-                  setLiStarting(true)
-                  try {
-                    await retryLinkedIn(job.id, candidateId)
-                    setOutreachStatus('discovering')
-                  } finally { setLiStarting(false) }
-                }}>
-                Start
-              </Button>
+              <span className="flex items-center gap-1.5 text-[10px] text-[#475569] animate-pulse">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                Searching for contact…
+              </span>
             )}
 
-            {/* Transient state (daemon was killed mid-run) → Retry */}
+            {/* Transient state — show phase label + Retry as fallback */}
+            {job.outreachTarget && LINKEDIN_TRANSIENT.includes(
+              (outreachStatus ?? job.outreachTarget.status) as OutreachStatus
+            ) && (
+              <>
+                <span className="flex items-center gap-1.5 text-[10px] text-[#475569] animate-pulse">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                  {(outreachStatus ?? job.outreachTarget.status) === 'discovering'  && 'Discovering contact…'}
+                  {(outreachStatus ?? job.outreachTarget.status) === 'enriching'    && 'Enriching profile…'}
+                  {(outreachStatus ?? job.outreachTarget.status) === 'generating'   && 'Generating notes…'}
+                  {(outreachStatus ?? job.outreachTarget.status) === 'pending'      && 'Starting…'}
+                </span>
+              </>
+            )}
+
+            {/* Retry — only show when outreach target exists and is in transient state (for manual retry) */}
             {job.outreachTarget && LINKEDIN_TRANSIENT.includes(
               (outreachStatus ?? job.outreachTarget.status) as OutreachStatus
             ) && (
@@ -358,10 +365,28 @@ export function JobCard({
               Email
             </span>
 
-            {/* No cadence yet → Start */}
+            {/* No cadence yet — daemon queued, show animated waiting state */}
+            {!emailCadence && (
+              <span className="flex items-center gap-1.5 text-[10px] text-[#475569] animate-pulse">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                Finding email…
+              </span>
+            )}
+
+            {/* Email transient — show phase + keep Retry */}
+            {emailCadence && EMAIL_TRANSIENT.includes(emailCadence.status) && (
+              <span className="flex items-center gap-1.5 text-[10px] text-[#475569] animate-pulse">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                {emailCadence.status === 'pending_discovery' && 'Starting…'}
+                {emailCadence.status === 'discovering'       && 'Discovering email…'}
+                {emailCadence.status === 'generating'        && 'Drafting emails…'}
+              </span>
+            )}
+
+            {/* No cadence yet — also keep Start button as manual override */}
             {!emailCadence && (
               <Button size="sm" variant="outline"
-                className="h-6 text-[10px] border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c] gap-1"
+                className="h-6 text-[10px] border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c] gap-1 ml-1"
                 isLoading={emStarting}
                 onClick={async () => {
                   setEmStarting(true)
