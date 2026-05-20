@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { and, eq, ne, notInArray, inArray } from 'drizzle-orm'
+import { and, eq, ne, notInArray, inArray, or } from 'drizzle-orm'
 import { db } from '@/db'
 import { jobs, hitlCheckpoints, outreachTargets, emailCadences, emailDrafts } from '@/db/schema'
 import type { OutreachTargetSummary, OutreachStatus, EmailCadenceSummary, EmailCadenceStatus, EmailDraftSummary, EmailDraftStatus } from '@/types/candidate'
@@ -10,7 +10,7 @@ type JobStatus = 'awaiting' | 'approved' | 'rejected' | 'snoozed' | 'discovered'
 // (approved/rejected/snoozed/resume_*/submitted) lives on the Applications
 // page. Pre-decision (`discovered`, `score_failed`) lives in the pipeline log.
 const EXCLUDED_STATUSES: JobStatus[] = [
-  'discovered', 'score_failed', 'rejected',
+  'discovered', 'rejected',
   'approved', 'snoozed', 'submitted', 'resume_ready', 'resume_failed',
 ]
 
@@ -74,6 +74,7 @@ export async function GET(
         archetype: jobs.archetype,
         archetypeConfidence: jobs.archetypeConfidence,
         createdAt: jobs.createdAt,
+        jobErrorMessage:     jobs.errorMessage,
         hitlCheckpointId: hitlCheckpoints.id,
         hitlStatus: hitlCheckpoints.status,
         hitlSnoozedUntil: hitlCheckpoints.snoozedUntil,
@@ -109,8 +110,13 @@ export async function GET(
       .where(
         and(
           eq(jobs.candidateId, candidateId),
-          ne(jobs.grade, 'F'),
-          notInArray(jobs.status, EXCLUDED_STATUSES)
+          or(
+            eq(jobs.status, 'score_failed'),
+            and(
+              ne(jobs.grade, 'F'),
+              notInArray(jobs.status, EXCLUDED_STATUSES)
+            )
+          )
         )
       )
       .orderBy(jobs.createdAt)
@@ -144,11 +150,13 @@ export async function GET(
       }
     }
 
-    // Always exclude F-grade as a safety net (DB WHERE also handles this)
-    let filtered = rows.filter(r => r.grade !== 'F')
+    // Always exclude F-grade as a safety net (DB WHERE also handles this).
+    // score_failed jobs have grade=null — keep them regardless.
+    let filtered = rows.filter(r => r.status === 'score_failed' || r.grade !== 'F')
 
-    // Apply grade filter (multi-select set built above)
-    filtered = filtered.filter(r => r.grade != null && gradesAllowed.has(r.grade as ValidGrade))
+    // Apply grade filter (multi-select set built above).
+    // score_failed jobs have no grade yet so they bypass the grade filter.
+    filtered = filtered.filter(r => r.status === 'score_failed' || (r.grade != null && gradesAllowed.has(r.grade as ValidGrade)))
 
     // Apply sort
     if (sort === 'score') {
@@ -182,6 +190,8 @@ export async function GET(
       reportMd: r.reportMd,
       archetype: r.archetype,
       archetypeConfidence: r.archetypeConfidence,
+      createdAt:           r.createdAt,
+      errorMessage:        r.jobErrorMessage ?? null,
       hitlCheckpoint: r.hitlCheckpointId
         ? {
             id: r.hitlCheckpointId,

@@ -176,6 +176,13 @@ export async function resetFailedJobs(candidateId: string): Promise<{ reset: num
   return request(`/api/jobs/reset-failed${qs(candidateId)}`, { method: 'POST' })
 }
 
+export async function retryScoring(
+  jobId: string,
+  candidateId: string,
+): Promise<{ pipelineJobId: string; status: string }> {
+  return request(`/api/jobs/${jobId}/retry-scoring${qs(candidateId)}`, { method: 'POST' })
+}
+
 // ── Scoring Batch ────────────────────────────────────────────────────────────
 
 export interface ReadyToScoreResponse {
@@ -282,6 +289,7 @@ export interface HitlJob {
   hitlCheckpoint: HitlCheckpointSummary | null
   outreachTarget: OutreachTargetSummary | null
   emailCadence: EmailCadenceSummary | null
+  errorMessage: string | null
 }
 
 export async function getCandidateJobs(

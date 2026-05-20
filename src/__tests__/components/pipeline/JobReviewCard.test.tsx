@@ -26,6 +26,7 @@ const baseJob: HitlJob = {
   },
   outreachTarget: null,
   emailCadence: null,
+  errorMessage: null,
 }
 
 const makeProps = (overrides: Partial<HitlJob> = {}) => ({
