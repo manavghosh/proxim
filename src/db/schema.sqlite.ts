@@ -257,6 +257,7 @@ export const emailCadences = sqliteTable('email_cadences', {
   replyDetectedAt:    text(),
   bounceDetectedAt:   text(),
   errorMessage:       text(),
+  retryCount:         integer().notNull().default(0),
   createdAt:          text().$defaultFn(now).notNull(),
   updatedAt:          text().$defaultFn(now).$onUpdateFn(now).notNull(),
 }, (table) => [
