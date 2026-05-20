@@ -66,6 +66,10 @@ _FORBIDDEN = [
     "i came across your job posting",
 ]
 
+_REQUIRED_GREETING  = "dear "
+_FORBIDDEN_GREETING = ("hi ", "hello ", "hey ")
+_REQUIRED_SIGNOFF   = ("kind regards", "warm regards")
+
 
 class NoteVariants(BaseModel):
     note_a: str
@@ -79,6 +83,13 @@ class NoteVariants(BaseModel):
         for phrase in _FORBIDDEN:
             if phrase in v.lower():
                 raise ValueError(f"Forbidden phrase detected: '{phrase}'")
+        lower = v.lower()
+        if not lower.startswith(_REQUIRED_GREETING):
+            raise ValueError("Note must open with 'Dear [FirstName],'")
+        if any(lower.startswith(g) for g in _FORBIDDEN_GREETING):
+            raise ValueError("Casual greeting not allowed — use 'Dear'")
+        if not any(s in lower for s in _REQUIRED_SIGNOFF):
+            raise ValueError("Note must close with 'Kind regards,' or 'Warm regards,'")
         return v
 
 
@@ -413,26 +424,34 @@ async def generate_notes_node(state: LinkedInConnectorState, config: RunnableCon
                 context_parts.append(f"Known: studied at {school}")
     research_block = "\n\n".join(context_parts) if context_parts else "No additional context available."
 
-    # Dynamic system prompt — structure enforced, angle decided by context
+    # Dynamic system prompt — professional structure enforced, angle decided by context
     system = (
-        "You write hyper-personalised LinkedIn connection notes (max 300 chars each).\n"
-        "Each note MUST follow this exact structure (use \\n for newlines in JSON):\n"
-        "  Line 1: 'Hi [FirstName],'\n"
-        "  Line 2: (blank)\n"
-        "  Lines 3-4: 1-2 sentences using REAL context from the research below\n"
-        "  Line 5: (blank)\n"
-        "  Line 6: 'Thanks,'\n"
-        "  Line 7: candidate's name\n\n"
-        "Rules: never mention a job posting; use actual role title; "
-        "note_a and note_b must differ in angle not just wording; max 300 chars total."
+        "You write professional LinkedIn connection notes (max 300 chars each).\n"
+        "Each note MUST follow this exact four-part structure (use \\n for newlines in JSON):\n"
+        "  Part 1: 'Dear [FirstName],' — formal greeting, never 'Hi'\n"
+        "  Part 2: (blank line)\n"
+        "  Part 3: Two sentences:\n"
+        "    Sentence 1 — self-introduction: 'I am [CandidateName], [one-line professional summary based on archetype].'\n"
+        "    Sentence 2 — personalised context: one concrete fact from the research about the company or the person (no hallucination; if no real fact, reference the company's industry/function).\n"
+        "  Part 4: (blank line)\n"
+        "  Part 5: Closing intent: 'I would welcome the opportunity to connect and explore any openings where my experience may be of value.'\n"
+        "  Part 6: (blank line)\n"
+        "  Part 7: Sign-off — note_a uses 'Kind regards,' and note_b uses 'Warm regards,'\n"
+        "  Part 8: candidate's full name\n\n"
+        "Hard rules:\n"
+        "- Never mention a job posting or application\n"
+        "- Never invent facts; if research is thin, keep sentence 2 general but truthful\n"
+        "- note_a and note_b must differ in the personalised context angle (company vs person)\n"
+        "- Greeting must be 'Dear', closing must be 'Kind regards,' or 'Warm regards,'\n"
+        "- Total note length must not exceed 300 chars"
     )
 
     prompt = (
         f"Contact: {contact_name}, {contact_title} at {state['company']}\n"
         f"Candidate: {candidate_name} — {state['archetype']}\n\n"
         f"{research_block}\n\n"
-        f"note_a angle: company innovation / recent news\n"
-        f"note_b angle: the person's own expertise or career\n\n"
+        f"note_a angle: company's recent initiatives or industry direction\n"
+        f"note_b angle: the contact's own expertise or career trajectory\n\n"
         f'Return JSON: {{"note_a": "...", "note_b": "..."}}'
     )
 
