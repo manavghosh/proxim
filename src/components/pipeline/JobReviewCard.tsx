@@ -11,6 +11,7 @@ import type { HitlJob } from '@/lib/api'
 import type { OutreachTargetSummary, EmailCadenceSummary } from '@/types/candidate'
 import { OutreachStatusBadge } from './OutreachStatusBadge'
 import { EmailCadenceStatusBadge } from './EmailCadenceStatusBadge'
+import { EmailNotFoundPanel } from './EmailNotFoundPanel'
 
 const GRADE_STYLES: Record<string, string> = {
   A: 'bg-emerald-950/60 text-emerald-400 border-emerald-700',
@@ -62,6 +63,7 @@ interface JobReviewCardProps {
   isPending: boolean
   outreachTarget?: OutreachTargetSummary | null
   emailCadence?: EmailCadenceSummary | null
+  onUpdate: () => void
 }
 
 export function JobReviewCard({
@@ -75,6 +77,7 @@ export function JobReviewCard({
   isPending,
   outreachTarget,
   emailCadence,
+  onUpdate,
 }: JobReviewCardProps) {
   const [reportOpen, setReportOpen] = useState(false)
 
@@ -263,13 +266,26 @@ export function JobReviewCard({
         {/* F6 Email cadence status */}
         {emailCadence && job.status === 'approved' && (
           <div
-            className="mt-2 flex items-center gap-2"
+            className="mt-2"
             data-testid="email-outreach-section"
           >
-            <span className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase shrink-0">
-              Email
-            </span>
-            <EmailCadenceStatusBadge status={emailCadence.status} />
+            {(emailCadence.status === 'email_not_found' || emailCadence.status === 'low_confidence') ? (
+              <EmailNotFoundPanel
+                jobId={job.id}
+                candidateId={_candidateId}
+                cadence={emailCadence}
+                company={job.company ?? ''}
+                outreachTarget={outreachTarget ?? null}
+                onUpdate={onUpdate}
+              />
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase shrink-0">
+                  Email
+                </span>
+                <EmailCadenceStatusBadge status={emailCadence.status} />
+              </div>
+            )}
           </div>
         )}
       </CardContent>
