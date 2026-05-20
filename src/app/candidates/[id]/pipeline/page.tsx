@@ -307,6 +307,7 @@ export default function PipelinePage() {
                 onUnsnooze={handleUnsnooze}
                 onGenerateResume={handleGenerateResume}
                 isPending={pendingJobIds.has(job.id)}
+                onUpdate={() => loadJobs(selectedGrades, sort)}
               />
             ))}
           </div>

@@ -442,6 +442,10 @@ export function JobCard({
                           setEmailCadence({ ...emailCadence, status: body.currentStatus as EmailCadenceStatus })
                         }
                       } catch { /* ignore JSON parse failure */ }
+                    } else if (e instanceof Error && e.message.startsWith('429')) {
+                      if (emailCadence) {
+                        setEmailCadence({ ...emailCadence, retryCount: 2 })
+                      }
                     }
                   } finally { setEmStarting(false) }
                 }}>
