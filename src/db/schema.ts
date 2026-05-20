@@ -147,6 +147,7 @@ export const jobs = pgTable('jobs', {
   score10d:            jsonb().$type<Score10D>(),
   grade:               varchar({ length: 1 }),
   reportMd:            text(),
+  errorMessage:        text(),
   archetype:           text(),
   archetypeConfidence: numeric({ precision: 3, scale: 2 }),
   createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),

@@ -127,6 +127,7 @@ export const jobs = sqliteTable('jobs', {
   score10d:            text({ mode: 'json' }).$type<Score10D>(),
   grade:               text(),
   reportMd:            text(),
+  errorMessage:   text(),
   archetype:           text(),
   archetypeConfidence: real(),
   createdAt:      text().$defaultFn(now).notNull(),
