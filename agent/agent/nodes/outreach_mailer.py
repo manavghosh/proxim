@@ -126,7 +126,8 @@ def _api_key(settings) -> str:
     return settings.anthropic_api_key
 
 
-async def litellm_generate(state: OutreachMailerState, settings) -> EmailDraftOutput:
+async def litellm_generate(state: OutreachMailerState, settings,
+                           candidate_profile: str = "") -> EmailDraftOutput:
     import json
 
     candidate_name = state.get("candidate_name") or "the candidate"
@@ -146,12 +147,14 @@ async def litellm_generate(state: OutreachMailerState, settings) -> EmailDraftOu
             "NEVER write 'Dear the Hiring Manager' — it is grammatically incorrect."
         )
 
+    profile_line = candidate_profile if candidate_profile else state['archetype']
+
     prompt = (
         f"You are {candidate_name}, a job seeker writing cold outreach emails to a hiring manager.\n"
         f"Write in FIRST PERSON — use 'I', 'my', never 'the candidate'.\n\n"
         f"Candidate name : {candidate_name}\n"
         f"Role applying  : {state['job_title']} at {state['company']}\n"
-        f"Your profile   : {state['archetype']}\n"
+        f"Your profile   :\n{profile_line}\n"
         f"{recipient_line}\n\n"
         "FORMATTING RULES (strictly follow):\n"
         "1. Separate every paragraph with a blank line (\\n\\n).\n"
@@ -375,16 +378,44 @@ async def discover_email_node(state: OutreachMailerState, config) -> OutreachMai
 
 async def generate_emails_node(state: OutreachMailerState, config) -> OutreachMailerState:
     """LiteLLM generation + self-review loop (max 3 attempts)."""
+    import json as _json
     pool = config["configurable"]["pool"]
     settings = config["configurable"]["settings"]
     cadence_id = state["cadence_id"]
     attempts = state.get("generation_attempts", 0)
     max_attempts = 3
 
+    # Load candidate's parsed profile so emails reference real facts —
+    # years of experience, actual roles, real skills — not guessed from archetype.
+    candidate_profile = ""
+    try:
+        async with pool.execute(
+            "SELECT parsed_profile FROM candidates WHERE id = ?",
+            (state["candidate_id"],)
+        ) as _cur:
+            _row = await _cur.fetchone()
+        if _row and _row[0]:
+            _p = _json.loads(_row[0]) if isinstance(_row[0], str) else _row[0]
+            _parts = []
+            if _p.get("summary"):
+                _parts.append(_p["summary"][:300])
+            _roles = _p.get("roles", [])
+            if _roles:
+                _parts.append("Recent roles: " + " | ".join(
+                    f"{r.get('title','')} at {r.get('company','')} ({r.get('dates','')})"
+                    for r in _roles[:4]
+                ))
+            _skills = _p.get("skills", [])[:10]
+            if _skills:
+                _parts.append("Key skills: " + ", ".join(_skills))
+            candidate_profile = "\n".join(_parts)
+    except Exception:
+        pass  # fall back to archetype label
+
     while attempts < max_attempts:
         attempts += 1
         try:
-            draft = await litellm_generate(state, settings)
+            draft = await litellm_generate(state, settings, candidate_profile=candidate_profile)
             d1_wc = _word_count(draft.day1_body)
             d3_wc = _word_count(draft.day3_body)
             d7_wc = _word_count(draft.day7_body)
