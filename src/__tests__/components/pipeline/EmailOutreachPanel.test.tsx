@@ -36,6 +36,7 @@ const makeCadence = (overrides: Partial<EmailCadenceSummary> = {}): EmailCadence
   approvedAt: null,
   replyDetectedAt: null,
   bounceDetectedAt: null,
+  retryCount: 0,
   drafts: [makeDraft(1), makeDraft(3), makeDraft(7)],
   ...overrides,
 })

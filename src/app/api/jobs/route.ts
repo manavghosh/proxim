@@ -45,6 +45,7 @@ export async function GET(request: Request) {
         cadenceApprovedAt:      emailCadences.approvedAt,
         cadenceReplyAt:         emailCadences.replyDetectedAt,
         cadenceBounceAt:        emailCadences.bounceDetectedAt,
+        cadenceRetryCount:      emailCadences.retryCount,
         // F5 outreach
         outreachId:           outreachTargets.id,
         outreachStatus:       outreachTargets.status,
@@ -138,6 +139,7 @@ export async function GET(request: Request) {
         approvedAt:         j.cadenceApprovedAt ? String(j.cadenceApprovedAt) : null,
         replyDetectedAt:    j.cadenceReplyAt ? String(j.cadenceReplyAt) : null,
         bounceDetectedAt:   j.cadenceBounceAt ? String(j.cadenceBounceAt) : null,
+        retryCount:         j.cadenceRetryCount ?? 0,
         drafts:             draftsByC[j.cadenceId] ?? [],
       } satisfies EmailCadenceSummary) : null,
     }))

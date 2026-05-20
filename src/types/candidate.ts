@@ -109,6 +109,7 @@ export interface EmailCadenceSummary {
   approvedAt: string | null
   replyDetectedAt: string | null
   bounceDetectedAt: string | null
+  retryCount: number
   drafts: EmailDraftSummary[]
 }
 

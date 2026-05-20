@@ -100,6 +100,7 @@ export async function GET(
         cadenceApprovedAt:      emailCadences.approvedAt,
         cadenceReplyAt:         emailCadences.replyDetectedAt,
         cadenceBounceAt:        emailCadences.bounceDetectedAt,
+        cadenceRetryCount:      emailCadences.retryCount,
       })
       .from(jobs)
       .leftJoin(hitlCheckpoints, eq(hitlCheckpoints.jobId, jobs.id))
@@ -215,6 +216,7 @@ export async function GET(
             approvedAt:         r.cadenceApprovedAt ? String(r.cadenceApprovedAt) : null,
             replyDetectedAt:    r.cadenceReplyAt ? String(r.cadenceReplyAt) : null,
             bounceDetectedAt:   r.cadenceBounceAt ? String(r.cadenceBounceAt) : null,
+            retryCount:         r.cadenceRetryCount ?? 0,
             drafts:             draftsByC[r.cadenceId] ?? [],
           } satisfies EmailCadenceSummary)
         : null,

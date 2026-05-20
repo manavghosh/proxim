@@ -410,7 +410,7 @@ export function JobCard({
                   try {
                     await startEmailOutreach(job.id, candidateId)
                     setEmailCadence({ id: '', status: 'pending_discovery', hiringManagerEmail: null,
-                      emailConfidence: null, approvedAt: null, replyDetectedAt: null, bounceDetectedAt: null, drafts: [] })
+                      emailConfidence: null, approvedAt: null, replyDetectedAt: null, bounceDetectedAt: null, retryCount: 0, drafts: [] })
                   } finally { setEmStarting(false) }
                 }}>
                 Start
@@ -432,7 +432,7 @@ export function JobCard({
                   try {
                     await startEmailOutreach(job.id, candidateId)
                     setEmailCadence({ id: '', status: 'pending_discovery', hiringManagerEmail: null,
-                      emailConfidence: null, approvedAt: null, replyDetectedAt: null, bounceDetectedAt: null, drafts: [] })
+                      emailConfidence: null, approvedAt: null, replyDetectedAt: null, bounceDetectedAt: null, retryCount: 0, drafts: [] })
                   } catch (e) {
                     // 409 means server moved past transient state while UI was stale — sync local state so UI self-corrects
                     if (e instanceof Error && e.message.startsWith('409')) {
