@@ -13,6 +13,7 @@ import litellm
 from pydantic import BaseModel, field_validator, model_validator
 
 from agent import hunter_io
+from agent.proxycurl import find_company_domain as _find_company_domain
 from agent.db_sqlite import (
     insert_email_drafts,
     update_email_cadence,
@@ -267,7 +268,12 @@ async def discover_email_node(state: OutreachMailerState, config) -> OutreachMai
     company    = state["company"]
     job_id     = state["job_id"]
 
-    domain = _company_to_domain(company)
+    # Resolve the real company email domain via Exa web search.
+    # _company_to_domain() always guesses .com which is wrong for Australian
+    # (.com.au), UK (.co.uk), Indian (.in) and other non-US companies.
+    exa_api_key = getattr(settings, 'exa_api_key', '')
+    real_domain = await _find_company_domain(company, exa_api_key)
+    domain = real_domain or _company_to_domain(company)
 
     # ── Look up LinkedIn-discovered contact for Pass 1 ────────────────────────
     hiring_manager_name = state.get("hiring_manager_name") or ""

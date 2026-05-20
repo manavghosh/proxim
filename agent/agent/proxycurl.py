@@ -79,6 +79,72 @@ async def search_employees(
         return None
 
 
+async def find_company_domain(company: str, api_key: str) -> Optional[str]:
+    """Find a company's real email domain via global Exa web search.
+
+    Searches for the company's official website and extracts the root domain,
+    correctly handling all country TLDs: .com.au (Australia), .co.uk (UK),
+    .in (India), .de (Germany), .sg (Singapore), etc.
+
+    Falls back to None so callers can use _company_to_domain() as last resort.
+    """
+    if not api_key or not company:
+        return None
+
+    # Domains to skip — not the company's own site
+    _SKIP = frozenset([
+        "linkedin.com", "glassdoor.com", "indeed.com", "naukri.com",
+        "wikipedia.org", "facebook.com", "twitter.com", "youtube.com",
+        "ambitionbox.com", "crunchbase.com", "bloomberg.com", "reuters.com",
+        "techcrunch.com", "iimjobs.com", "monster.com", "seek.com.au",
+        "jobstreet.com", "timesjobs.com", "shine.com",
+    ])
+    # Country-code TLDs that form two-part suffixes (.com.au, .co.uk, .net.in)
+    _CC_TLDS = frozenset([
+        "au", "uk", "in", "nz", "za", "sg", "de", "fr", "jp", "cn",
+        "ca", "br", "mx", "es", "it", "nl", "se", "no", "dk", "fi",
+        "pl", "ru", "hk", "tw", "kr", "ae", "sa", "eg", "ng", "ke",
+    ])
+
+    query = f"{company} official website"
+    try:
+        exa     = _exa_client(api_key)
+        results = exa.search(query, num_results=5)
+        for hit in results.results:
+            url = hit.url or ""
+            if not url:
+                continue
+            try:
+                from urllib.parse import urlparse as _up
+                netloc = _up(url).netloc.lower()
+                if netloc.startswith("www."):
+                    netloc = netloc[4:]
+                if any(skip in netloc for skip in _SKIP):
+                    continue
+                parts = netloc.split(".")
+                if len(parts) < 2:
+                    continue
+                # Country TLD → keep last 3 parts (e.g. commbank.com.au)
+                # Standard TLD → keep last 2 parts (e.g. barclays.com)
+                domain = (
+                    ".".join(parts[-3:]) if parts[-1] in _CC_TLDS and len(parts) >= 3
+                    else ".".join(parts[-2:])
+                )
+                logger.info("exa.company_domain_found",
+                            company=company, domain=domain)
+                return domain
+            except Exception:
+                continue
+        logger.info("exa.company_domain_not_found", company=company)
+        return None
+    except Exception as exc:
+        msg = str(exc)
+        if "429" in msg or "rate" in msg.lower():
+            raise ProxycurlRateLimitError("Exa rate limit hit") from exc
+        logger.debug("exa.find_domain_error", company=company, error=msg[:100])
+        return None
+
+
 async def search_person_profile(
     name: str,
     company: str,
