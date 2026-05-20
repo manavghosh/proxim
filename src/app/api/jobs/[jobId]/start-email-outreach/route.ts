@@ -21,13 +21,13 @@ export async function POST(
 
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
-    // Check no cadence already exists in an active state
-    const [existing] = await db.select({ id: emailCadences.id, status: emailCadences.status })
+    const [existing] = await db
+      .select({ id: emailCadences.id, status: emailCadences.status, retryCount: emailCadences.retryCount })
       .from(emailCadences)
       .where(eq(emailCadences.jobId, jobId))
       .limit(1)
 
-    const RESTARTABLE = ['failed', 'cancelled', 'email_not_found', 'pending_discovery', 'discovering', 'generating']
+    const RESTARTABLE = ['failed', 'cancelled', 'email_not_found', 'low_confidence', 'pending_discovery', 'discovering', 'generating']
     if (existing && !RESTARTABLE.includes(existing.status)) {
       return NextResponse.json(
         { error: 'Email outreach already running', currentStatus: existing.status },
@@ -35,7 +35,21 @@ export async function POST(
       )
     }
 
-    // Queue outreach_mailer — daemon will create the cadence + run full flow
+    if (existing && existing.retryCount >= 2) {
+      return NextResponse.json(
+        { error: 'Max retries reached', retryCount: existing.retryCount },
+        { status: 429 }
+      )
+    }
+
+    // Increment retry counter on the existing cadence before queueing
+    if (existing) {
+      await db
+        .update(emailCadences)
+        .set({ retryCount: existing.retryCount + 1 })
+        .where(eq(emailCadences.id, existing.id))
+    }
+
     const [pj] = await db
       .insert(pipelineJobs)
       .values({
