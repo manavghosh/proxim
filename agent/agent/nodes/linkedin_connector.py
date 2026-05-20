@@ -195,7 +195,10 @@ async def extract_hiring_team_node(
         )
         return {}
 
-    # If Exa extracted a name but no LinkedIn URL, search for their profile by name
+    # If Exa extracted a name but no LinkedIn URL, do a global web search to find
+    # their profile. Global search (no category filter) is more reliable than
+    # category="people" because it searches the entire web — news, company bios,
+    # conference pages — all of which may link to the person's LinkedIn /in/ profile.
     linkedin_url = person.get("linkedin_url", "")
     if not linkedin_url:
         logger.info(
@@ -203,13 +206,12 @@ async def extract_hiring_team_node(
             name=person["name"],
             company=state["company"],
         )
-        found = await proxycurl.search_employees(
-            company_name=state["company"],
-            role=person["name"],          # search by person's name, not a role title
+        linkedin_url = await proxycurl.search_person_profile(
+            name=person["name"],
+            company=state["company"],
             api_key=api_key,
-        )
-        if found and found.get("profile_url"):
-            linkedin_url = found["profile_url"]
+        ) or ""
+        if linkedin_url:
             logger.info("linkedin.hiring_team_profile_found",
                         name=person["name"], url=linkedin_url)
 

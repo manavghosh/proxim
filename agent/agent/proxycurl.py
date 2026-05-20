@@ -79,6 +79,44 @@ async def search_employees(
         return None
 
 
+async def search_person_profile(
+    name: str,
+    company: str,
+    api_key: str,
+) -> Optional[str]:
+    """Find a specific person's LinkedIn profile URL via global web search.
+
+    Uses an unrestricted Exa search (no category filter) so results come
+    from the entire web — news articles, company bios, conference pages, etc.
+    Any result containing a linkedin.com/in/ URL is used.
+
+    This is more reliable than category="people" when the person isn't
+    prominently indexed in Exa's LinkedIn-specific people index.
+    Returns the normalised profile URL or None.
+    """
+    if not api_key or not name:
+        return None
+    query = f"{name} {company} LinkedIn profile"
+    try:
+        exa = _exa_client(api_key)
+        # Global search — no category restriction
+        results = exa.search(query, num_results=5)
+        for hit in results.results:
+            url = hit.url or ""
+            if "linkedin.com/in/" in url:
+                url = url.replace("https://linkedin.com/", "https://www.linkedin.com/", 1)
+                logger.info("exa.person_profile_found", name=name, url=url)
+                return url
+        logger.info("exa.person_profile_not_found", name=name, company=company)
+        return None
+    except Exception as exc:
+        msg = str(exc)
+        if "429" in msg or "rate" in msg.lower():
+            raise ProxycurlRateLimitError("Exa rate limit hit") from exc
+        logger.debug("exa.search_person_error", name=name, error=msg[:100])
+        return None
+
+
 async def enrich_profile(
     linkedin_url: str,
     api_key: str,
