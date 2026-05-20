@@ -13,11 +13,12 @@ import {
 import { LazyScoreReportPane } from '@/components/applications/LazyScoreReportPane'
 import { BuildProgressPane } from '@/components/applications/BuildProgressPane'
 import { EmailCadenceStatusBadge } from '@/components/pipeline/EmailCadenceStatusBadge'
+import { EmailNotFoundPanel } from '@/components/pipeline/EmailNotFoundPanel'
 import { EmailOutreachPanel } from '@/components/pipeline/EmailOutreachPanel'
 import { OutreachNoteSelector } from '@/components/pipeline/OutreachNoteSelector'
 import { OutreachStatusBadge } from '@/components/pipeline/OutreachStatusBadge'
 import type { ScoredJob, EmailCadenceSummary } from '@/lib/api'
-import { retryLinkedIn, startEmailOutreach } from '@/lib/api'
+import { retryLinkedIn, startEmailOutreach, getEmailCadence } from '@/lib/api'
 import type { OutreachTargetSummary, OutreachStatus, EmailOutreachMode, EmailCadenceStatus } from '@/types/candidate'
 
 const LINKEDIN_TRANSIENT: OutreachStatus[] = ['pending', 'discovering', 'enriching', 'generating']
@@ -417,11 +418,10 @@ export function JobCard({
               </Button>
             )}
 
-            {/* Transient or terminal-failed state → Retry */}
+            {/* Transient or failed/cancelled → bare Retry (not email_not_found/low_confidence) */}
             {emailCadence && (
               EMAIL_TRANSIENT.includes(emailCadence.status) ||
               emailCadence.status === 'failed' ||
-              emailCadence.status === 'email_not_found' ||
               emailCadence.status === 'cancelled'
             ) && (
               <Button size="sm" variant="outline"
@@ -434,7 +434,6 @@ export function JobCard({
                     setEmailCadence({ id: '', status: 'pending_discovery', hiringManagerEmail: null,
                       emailConfidence: null, approvedAt: null, replyDetectedAt: null, bounceDetectedAt: null, retryCount: 0, drafts: [] })
                   } catch (e) {
-                    // 409 means server moved past transient state while UI was stale — sync local state so UI self-corrects
                     if (e instanceof Error && e.message.startsWith('409')) {
                       try {
                         const body = JSON.parse(e.message.replace(/^\d+:\s*/, ''))
@@ -454,11 +453,31 @@ export function JobCard({
               </Button>
             )}
 
-            {/* Badge only for non-transient states */}
-            {emailCadence && !EMAIL_TRANSIENT.includes(emailCadence.status) && (
+            {/* Badge only for non-transient, non-failure states */}
+            {emailCadence &&
+              !EMAIL_TRANSIENT.includes(emailCadence.status) &&
+              emailCadence.status !== 'email_not_found' &&
+              emailCadence.status !== 'low_confidence' && (
               <EmailCadenceStatusBadge status={emailCadence.status} />
             )}
           </div>
+
+          {/* email_not_found / low_confidence → full action panel */}
+          {emailCadence && (emailCadence.status === 'email_not_found' || emailCadence.status === 'low_confidence') && (
+            <EmailNotFoundPanel
+              jobId={job.id}
+              candidateId={candidateId}
+              cadence={emailCadence}
+              company={job.company ?? ''}
+              outreachTarget={job.outreachTarget ?? null}
+              onUpdate={async () => {
+                try {
+                  const updated = await getEmailCadence(emailCadence.id, candidateId)
+                  setEmailCadence(updated)
+                } catch { /* stale — leave as-is */ }
+              }}
+            />
+          )}
 
           {/* Hiring manager email — show as soon as it's discovered */}
           {emailCadence?.hiringManagerEmail && (
