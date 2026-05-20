@@ -10,6 +10,7 @@ import { GradeFilterDropdown, ALL_GRADES } from '@/components/applications/Grade
 import type { Grade } from '@/components/applications/GradeFilterDropdown'
 import { PipelineSortControl } from '@/components/pipeline/PipelineSortControl'
 import { PipelineLogPane } from '@/components/dashboard/PipelineLogPane'
+import { ScoreFailedSection } from '@/components/pipeline/ScoreFailedSection'
 import {
   getCandidateJobs,
   approveJob,
@@ -59,6 +60,7 @@ export default function PipelinePage() {
   // approve pushes its returned `pipelineJobId` so the log pane streams every
   // build that's currently in flight.
   const [resumeBuilderJobIds, setResumeBuilderJobIds] = useState<string[]>([])
+  const [retryJobIds, setRetryJobIds] = useState<string[]>([])
   const logPaneRef = useRef<HTMLDivElement>(null)
 
   const showToast = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
@@ -246,6 +248,9 @@ export default function PipelinePage() {
     return acc
   }, {} as Partial<Record<Grade, number>>)
 
+  const scoredJobs = jobs.filter(j => j.status !== 'score_failed')
+  const failedJobs = jobs.filter(j => j.status === 'score_failed')
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -279,7 +284,7 @@ export default function PipelinePage() {
               <Skeleton key={i} className="h-40 w-full rounded-xl bg-[#0d1829]" />
             ))}
           </div>
-        ) : jobs.length === 0 ? (
+        ) : scoredJobs.length === 0 && failedJobs.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center py-20">
             <Workflow className="w-10 h-10 text-[#1e2d4a] mb-4" />
             <p className="text-[13px] text-[#64748b] mb-4">
@@ -296,7 +301,7 @@ export default function PipelinePage() {
           </div>
         ) : (
           <div className="space-y-3 max-w-3xl">
-            {jobs.map(job => (
+            {scoredJobs.map(job => (
               <JobReviewCard
                 key={job.id}
                 job={job}
@@ -313,13 +318,24 @@ export default function PipelinePage() {
           </div>
         )}
 
+        {failedJobs.length > 0 && (
+          <ScoreFailedSection
+            jobs={failedJobs}
+            candidateId={candidateId}
+            onRetried={(pjId) => {
+              setRetryJobIds(prev => [...prev, pjId])
+              loadJobs(selectedGrades, sort)
+            }}
+          />
+        )}
+
         {/* Live log pane for resume_builder runs queued from this page's
             Approve clicks. Hidden until the first approval; stays visible for
             the rest of the session so the user can watch each tailored
             resume build in sequence. */}
-        {resumeBuilderJobIds.length > 0 && (
+        {(resumeBuilderJobIds.length > 0 || retryJobIds.length > 0) && (
           <div ref={logPaneRef} className="max-w-3xl mt-6">
-            <PipelineLogPane chainJobIds={resumeBuilderJobIds} />
+            <PipelineLogPane chainJobIds={[...resumeBuilderJobIds, ...retryJobIds]} />
           </div>
         )}
       </div>
