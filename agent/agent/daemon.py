@@ -404,9 +404,8 @@ async def _dispatch_job(pool, job: dict) -> None:
         try:
             if job['job_type'] == 'outreach_mailer':
                 state = {**state, **(await discover_email_node(state, config))}
-                if state["status"] in ("email_not_found", "low_confidence"):
-                    await update_pipeline_job_status(pool, pj_id, 'completed')
-                    return
+            # Always generate drafts — even when no email found, so a manual
+            # override can proceed to pending_approval without a second wait.
             state = {**state, **(await generate_emails_node(state, config))}
             if state["status"] == "failed":
                 await update_pipeline_job_status(pool, pj_id, 'failed',

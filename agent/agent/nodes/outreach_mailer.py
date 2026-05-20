@@ -468,7 +468,11 @@ async def write_cadence_checkpoint_node(state: OutreachMailerState, config) -> O
     ]
 
     await insert_email_drafts(pool, cadence_id, state["candidate_id"], drafts)
-    await update_email_cadence(pool, cadence_id, status="pending_approval")
+    # Use the discovery outcome to set the correct terminal status.
+    # discovered_email is set only when discovery succeeded with sufficient confidence.
+    # When no email was found, state["status"] is already "email_not_found".
+    final_status = "pending_approval" if state.get("discovered_email") else state.get("status", "email_not_found")
+    await update_email_cadence(pool, cadence_id, status=final_status)
 
     logger.info("outreach_mailer.cadence_checkpoint_written", cadence_id=cadence_id)
     return {**state, "status": "pending_approval"}
