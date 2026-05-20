@@ -182,10 +182,16 @@ _LI_PROFILE_RE = _re.compile(r"https?://(?:www\.)?linkedin\.com/in/([\w%-]+)")
 # Words that look like title-case names but are actually job-title components.
 # Prevents "Senior Director" or "Head Engineering" being parsed as person names.
 _JOB_TITLE_WORDS = frozenset([
+    # Job-title components
     "senior", "junior", "chief", "head", "lead", "director", "manager",
     "engineer", "architect", "product", "software", "data", "analytics",
     "global", "regional", "national", "solutions", "services", "platform",
     "technical", "technology", "operations", "business", "strategy",
+    # Page section headers that are NOT person names
+    "job", "description", "about", "role", "position", "opportunity",
+    "opening", "vacancy", "responsibilities", "requirements", "qualifications",
+    "benefits", "skills", "experience", "overview", "summary", "details",
+    "apply", "section", "information", "profile", "poster",
 ])
 
 

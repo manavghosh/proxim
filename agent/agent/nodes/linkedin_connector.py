@@ -195,10 +195,28 @@ async def extract_hiring_team_node(
         )
         return {}
 
+    # If Exa extracted a name but no LinkedIn URL, search for their profile by name
+    linkedin_url = person.get("linkedin_url", "")
+    if not linkedin_url:
+        logger.info(
+            "linkedin.hiring_team_searching_profile",
+            name=person["name"],
+            company=state["company"],
+        )
+        found = await proxycurl.search_employees(
+            company_name=state["company"],
+            role=person["name"],          # search by person's name, not a role title
+            api_key=api_key,
+        )
+        if found and found.get("profile_url"):
+            linkedin_url = found["profile_url"]
+            logger.info("linkedin.hiring_team_profile_found",
+                        name=person["name"], url=linkedin_url)
+
     contact = {
         "name":        person["name"],
         "title":       person["title"],
-        "profile_url": person.get("linkedin_url", ""),
+        "profile_url": linkedin_url,
     }
     await update_outreach_target(
         pool,
