@@ -23,7 +23,7 @@ export function EmailNotFoundPanel({ jobId, candidateId, cadence, company, outre
   const [cancelling, setCancelling] = useState(false)
   const [retrying, setRetrying]     = useState(false)
   const [retryMaxed, setRetryMaxed] = useState((cadence.retryCount ?? 0) >= 2)
-  const [retryCount]                = useState(cadence.retryCount ?? 0)
+  const retryCount                  = cadence.retryCount ?? 0
   const [error, setError]           = useState<string | null>(null)
 
   const isLowConfidence = cadence.status === 'low_confidence'
@@ -72,6 +72,11 @@ export function EmailNotFoundPanel({ jobId, candidateId, cadence, company, outre
     } finally {
       setRetrying(false)
     }
+  }
+
+  function handleCancel() {
+    setShowInput(false)
+    setEmailValue('')
   }
 
   return (
@@ -135,7 +140,7 @@ export function EmailNotFoundPanel({ jobId, candidateId, cadence, company, outre
             className="h-7 text-[11px] bg-[#060d1f] border-[#2d4a6e] text-[#f1f5f9] flex-1"
             onKeyDown={e => {
               if (e.key === 'Enter') void handleSave()
-              if (e.key === 'Escape') { setShowInput(false); setEmailValue('') }
+              if (e.key === 'Escape') void handleCancel()
             }}
           />
           <Button
@@ -151,7 +156,7 @@ export function EmailNotFoundPanel({ jobId, candidateId, cadence, company, outre
             size="sm"
             variant="ghost"
             className="h-7 text-[10px] text-[#475569] shrink-0"
-            onClick={() => { setShowInput(false); setEmailValue('') }}
+            onClick={handleCancel}
           >
             Cancel
           </Button>
