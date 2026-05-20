@@ -316,12 +316,19 @@ async def update_job_score(
 async def mark_job_score_failed(
     pool: asyncpg.Pool,
     job_id: str,
+    error_message: str = "",
 ) -> None:
     async with pool.acquire() as conn:
-        await conn.execute(
-            "UPDATE jobs SET status = 'score_failed', updated_at = NOW() WHERE id = $1",
-            job_id,
-        )
+        if error_message:
+            await conn.execute(
+                "UPDATE jobs SET status = 'score_failed', error_message = $1, updated_at = NOW() WHERE id = $2",
+                error_message[:500], job_id,
+            )
+        else:
+            await conn.execute(
+                "UPDATE jobs SET status = 'score_failed', updated_at = NOW() WHERE id = $1",
+                job_id,
+            )
 
 
 # ── HITL Snooze Resurface (F4) ────────────────────────────────────────────────

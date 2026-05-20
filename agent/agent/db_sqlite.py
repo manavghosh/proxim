@@ -374,11 +374,18 @@ async def update_job_score(
 async def mark_job_score_failed(
     pool: aiosqlite.Connection,
     job_id: str,
+    error_message: str = "",
 ) -> None:
-    await pool.execute(
-        "UPDATE jobs SET status = 'score_failed', updated_at = ? WHERE id = ?",
-        (_now(), job_id),
-    )
+    if error_message:
+        await pool.execute(
+            "UPDATE jobs SET status = 'score_failed', error_message = ?, updated_at = ? WHERE id = ?",
+            (error_message[:500], _now(), job_id),
+        )
+    else:
+        await pool.execute(
+            "UPDATE jobs SET status = 'score_failed', updated_at = ? WHERE id = ?",
+            (_now(), job_id),
+        )
     await pool.commit()
 
 

@@ -157,7 +157,9 @@ async def score_and_report_batch(state: ScoringState) -> dict:
                 failed += 1
                 logger.error("score_job_error", job_id=job.get("id"), error=str(e))
                 try:
-                    await mark_job_score_failed(pool, job["id"])
+                    from agent.scoring_engine import _friendly_score_error
+                    friendly = _friendly_score_error(e, job)
+                    await mark_job_score_failed(pool, job["id"], error_message=friendly)
                 except Exception:
                     pass
                 is_rate_limit = "rate" in str(e).lower() or "429" in str(e)

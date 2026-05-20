@@ -42,6 +42,27 @@ ARCHETYPES = [
 ]
 
 
+def _friendly_score_error(exc: Exception, job: dict) -> str:
+    """Map a scoring exception to a plain-English reason for the UI."""
+    from pydantic import ValidationError as _PydanticError
+    jd = (job.get("jd_raw") or "").strip()
+    if not jd:
+        return "No job description found — try re-importing with a direct job URL"
+    s = str(exc).lower()
+    if "finish_reason=length" in s:
+        return "Job description was too long to process"
+    if "rate" in s or "429" in s:
+        return "Scoring rate limit reached — click Retry in a few minutes"
+    if "empty response" in s:
+        return "No job description found — try re-importing with a direct job URL"
+    if isinstance(exc, (KeyError, _PydanticError)) or any(
+        k in str(exc) for k in ["weighted", "gate", "growth_trajectory", "company_stage",
+                                  "role_level_match", "ai_stack_alignment"]
+    ):
+        return "Job description was too short or malformed to score"
+    return "Scoring failed unexpectedly — click Retry to try again"
+
+
 def truncate_jd(jd_text: str, max_words: int = 4000) -> str:
     """Truncate JD to max_words for prompt construction."""
     words = jd_text.split()
