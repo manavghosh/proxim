@@ -397,6 +397,32 @@ async def generate_notes_node(state: LinkedInConnectorState, config: RunnableCon
     contact_name   = contact.get("name", "")
     candidate_name = state.get("candidate_name", "")
 
+    # Load candidate's parsed profile so the LLM uses real facts (years of
+    # experience, skills) rather than guessing from the archetype label alone.
+    import json as _json
+    candidate_summary = ""
+    try:
+        async with pool.execute(
+            "SELECT parsed_profile FROM candidates WHERE id = ?",
+            (state["candidate_id"],)
+        ) as _cur:
+            _row = await _cur.fetchone()
+        if _row and _row[0]:
+            _profile = _json.loads(_row[0]) if isinstance(_row[0], str) else _row[0]
+            _roles = _profile.get("roles", [])
+            _skills = _profile.get("skills", [])[:8]
+            # Derive total years from first and last role dates when available
+            _summary_parts = []
+            if _profile.get("summary"):
+                _summary_parts.append(_profile["summary"][:200])
+            if _roles:
+                _summary_parts.append(f"Roles: {', '.join(r.get('title','') + ' at ' + r.get('company','') for r in _roles[:3])}")
+            if _skills:
+                _summary_parts.append(f"Key skills: {', '.join(_skills)}")
+            candidate_summary = "\n".join(_summary_parts)
+    except Exception:
+        pass  # fall back to archetype label only
+
     # Real title from enrich_profile_node; fall back to first experience line
     raw_title = contact.get("title", "")
     if not raw_title:
@@ -446,9 +472,14 @@ async def generate_notes_node(state: LinkedInConnectorState, config: RunnableCon
         "- Total note length must not exceed 300 chars"
     )
 
+    candidate_context = (
+        f"Candidate: {candidate_name} — {state['archetype']}\n"
+        + (f"Profile:\n{candidate_summary}\n" if candidate_summary else "")
+    )
+
     prompt = (
         f"Contact: {contact_name}, {contact_title} at {state['company']}\n"
-        f"Candidate: {candidate_name} — {state['archetype']}\n\n"
+        f"{candidate_context}\n"
         f"{research_block}\n\n"
         f"note_a angle: company's recent initiatives or industry direction\n"
         f"note_b angle: the contact's own expertise or career trajectory\n\n"
