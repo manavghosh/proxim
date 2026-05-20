@@ -66,8 +66,8 @@ _FORBIDDEN = [
     "i came across your job posting",
 ]
 
-_REQUIRED_GREETING  = "dear "
-_FORBIDDEN_GREETING = ("hi ", "hello ", "hey ")
+_REQUIRED_GREETING  = "hi "
+_FORBIDDEN_GREETING = ("dear ", "hello ", "hey ")
 _REQUIRED_SIGNOFF   = ("kind regards", "warm regards")
 
 
@@ -428,7 +428,7 @@ async def generate_notes_node(state: LinkedInConnectorState, config: RunnableCon
     system = (
         "You write professional LinkedIn connection notes (max 300 chars each).\n"
         "Each note MUST follow this exact four-part structure (use \\n for newlines in JSON):\n"
-        "  Part 1: 'Dear [FirstName],' — formal greeting, never 'Hi'\n"
+        "  Part 1: 'Hi [FirstName],' — always use 'Hi', never 'Dear'\n"
         "  Part 2: (blank line)\n"
         "  Part 3: Two sentences:\n"
         "    Sentence 1 — self-introduction: 'I am [CandidateName], [one-line professional summary based on archetype].'\n"
