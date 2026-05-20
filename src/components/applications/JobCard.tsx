@@ -418,10 +418,9 @@ export function JobCard({
               </Button>
             )}
 
-            {/* Transient or failed/cancelled → bare Retry (not email_not_found/low_confidence) */}
+            {/* Transient or cancelled → bare Retry (failed/email_not_found/low_confidence handled by panel) */}
             {emailCadence && (
               EMAIL_TRANSIENT.includes(emailCadence.status) ||
-              emailCadence.status === 'failed' ||
               emailCadence.status === 'cancelled'
             ) && (
               <Button size="sm" variant="outline"
@@ -462,8 +461,12 @@ export function JobCard({
             )}
           </div>
 
-          {/* email_not_found / low_confidence → full action panel */}
-          {emailCadence && (emailCadence.status === 'email_not_found' || emailCadence.status === 'low_confidence') && (
+          {/* email_not_found / low_confidence / failed → full action panel */}
+          {emailCadence && (
+            emailCadence.status === 'email_not_found' ||
+            emailCadence.status === 'low_confidence' ||
+            emailCadence.status === 'failed'
+          ) && (
             <EmailNotFoundPanel
               jobId={job.id}
               candidateId={candidateId}
@@ -492,7 +495,6 @@ export function JobCard({
           {emailCadence && (
             emailCadence.status === 'pending_approval' ||
             emailCadence.status === 'active' ||
-            emailCadence.status === 'low_confidence' ||
             emailCadence.status === 'replied' ||
             emailCadence.status === 'bounced' ||
             emailCadence.status === 'auth_expired' ||

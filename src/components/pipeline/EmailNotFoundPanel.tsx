@@ -17,8 +17,11 @@ interface Props {
 }
 
 export function EmailNotFoundPanel({ jobId, candidateId, cadence, company, outreachTarget, onUpdate }: Props) {
+  // Bug 4: pre-fill with the low-confidence email so the user can confirm or replace it
   const [showInput, setShowInput]   = useState(false)
-  const [emailValue, setEmailValue] = useState('')
+  const [emailValue, setEmailValue] = useState(
+    cadence.status === 'low_confidence' ? (cadence.hiringManagerEmail ?? '') : ''
+  )
   const [saving, setSaving]         = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [retrying, setRetrying]     = useState(false)
@@ -26,10 +29,11 @@ export function EmailNotFoundPanel({ jobId, candidateId, cadence, company, outre
   const retryCount                  = cadence.retryCount ?? 0
   const [error, setError]           = useState<string | null>(null)
 
-  const isLowConfidence = cadence.status === 'low_confidence'
-  const message = isLowConfidence
-    ? `Email found but could not be verified for ${company}`
-    : `No email found for ${company}`
+  // Bug 2: message variant for each triggering status
+  const message =
+    cadence.status === 'low_confidence' ? `Email found but could not be verified for ${company}` :
+    cadence.status === 'failed'         ? `Email outreach could not be completed for ${company}` :
+                                          `No email found for ${company}`
 
   const emailValid = emailValue.includes('@') && emailValue.includes('.')
 
@@ -40,8 +44,13 @@ export function EmailNotFoundPanel({ jobId, candidateId, cadence, company, outre
     try {
       await overrideEmail(cadence.id, candidateId, emailValue)
       onUpdate()
-    } catch {
-      setError('Failed to save — please try again')
+    } catch (e) {
+      // Bug 5: 409 means the agent is actively running discovery — give a clear message
+      if (e instanceof Error && e.message.startsWith('409')) {
+        setError('Discovery is in progress — please wait a moment and try again')
+      } else {
+        setError('Failed to save — please try again')
+      }
     } finally {
       setSaving(false)
     }

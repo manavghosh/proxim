@@ -35,18 +35,21 @@ export async function POST(
       )
     }
 
-    if (existing && existing.retryCount >= 2) {
+    // Bug 3: restarting after a deliberate Skip (cancelled) is a fresh attempt —
+    // reset the counter so a previous max-retry cycle doesn't block a fresh start.
+    const isFreshStart = existing?.status === 'cancelled'
+
+    if (existing && !isFreshStart && existing.retryCount >= 2) {
       return NextResponse.json(
         { error: 'Max retries reached', retryCount: existing.retryCount },
         { status: 429 }
       )
     }
 
-    // Increment retry counter on the existing cadence before queueing
     if (existing) {
       await db
         .update(emailCadences)
-        .set({ retryCount: existing.retryCount + 1 })
+        .set({ retryCount: isFreshStart ? 1 : existing.retryCount + 1 })
         .where(eq(emailCadences.id, existing.id))
     }
 

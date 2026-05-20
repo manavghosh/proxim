@@ -269,7 +269,7 @@ export function JobReviewCard({
             className="mt-2"
             data-testid="email-outreach-section"
           >
-            {(emailCadence.status === 'email_not_found' || emailCadence.status === 'low_confidence') ? (
+            {(emailCadence.status === 'email_not_found' || emailCadence.status === 'low_confidence' || emailCadence.status === 'failed') ? (
               <EmailNotFoundPanel
                 jobId={job.id}
                 candidateId={_candidateId}
