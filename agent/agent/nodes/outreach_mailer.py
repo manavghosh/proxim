@@ -255,30 +255,48 @@ def _company_to_domain(company: str) -> str:
     return f"{''.join(meaningful[:2])}.com"
 
 
+def _is_plausible_email(email: str) -> bool:
+    """Reject emails that look like LinkedIn URL slugs or are otherwise malformed."""
+    if not email or '@' not in email:
+        return False
+    local = email.split('@')[0].lower()
+    if 'linkedin' in local:
+        return False
+    if len(local) > 40:
+        return False
+    if local.count('-') > 3:
+        return False
+    return True
+
+
 async def discover_email_node(state: OutreachMailerState, config) -> OutreachMailerState:
-    """Hunter.io email discovery — uses LinkedIn contact name when available.
+    """Four-pass email discovery with mandatory verification gate.
 
-    Pass 1 (targeted): if the LinkedIn connector already discovered a contact
-    for this job, uses their name + company domain in Hunter.io Email Finder
-    for a precise, person-level lookup.
+    Every candidate email is verified against the live mail server before
+    being accepted.  Only 'deliverable' results are used; 'risky' results
+    are stored as low_confidence for user review.
 
-    Pass 2 (fallback): Hunter.io Domain Search — returns the highest-confidence
-    personal email at the company domain.
+    Pass 1 — Hunter.io Email Finder (person-level, highest precision)
+    Pass 2 — Exa web search (conference pages, GitHub, company team pages)
+    Pass 3 — Email pattern guessing + verification (infers company pattern
+              from domain search, generates candidates, verifies each)
+    Pass 4 — Hunter.io Domain Search fallback (generic; last resort)
     """
-    pool     = config["configurable"]["pool"]
-    settings = config["configurable"]["settings"]
+    from agent.proxycurl import search_person_email
+
+    pool       = config["configurable"]["pool"]
+    settings   = config["configurable"]["settings"]
     cadence_id = state["cadence_id"]
     company    = state["company"]
     job_id     = state["job_id"]
 
-    # Resolve the real company email domain via Exa web search.
-    # _company_to_domain() always guesses .com which is wrong for Australian
-    # (.com.au), UK (.co.uk), Indian (.in) and other non-US companies.
     exa_api_key = getattr(settings, 'exa_api_key', '')
-    real_domain = await _find_company_domain(company, exa_api_key)
-    domain = real_domain or _company_to_domain(company)
+    hunter_key  = settings.hunter_api_key
 
-    # ── Look up LinkedIn-discovered contact for Pass 1 ────────────────────────
+    real_domain = await _find_company_domain(company, exa_api_key)
+    domain      = real_domain or _company_to_domain(company)
+
+    # Resolve contact name from LinkedIn connector if not already in state
     hiring_manager_name = state.get("hiring_manager_name") or ""
     if not hiring_manager_name and job_id:
         async with pool.execute(
@@ -290,106 +308,128 @@ async def discover_email_node(state: OutreachMailerState, config) -> OutreachMai
             row = await cur.fetchone()
         if row and row[0]:
             hiring_manager_name = row[0]
-            logger.info(
-                "outreach_mailer.using_linkedin_contact",
-                job_id=job_id,
-                contact_name=hiring_manager_name,
-                contact_title=row[1],
-            )
+            logger.info("outreach_mailer.using_linkedin_contact",
+                        job_id=job_id, contact_name=hiring_manager_name, contact_title=row[1])
 
     await update_email_cadence(pool, cadence_id, status="discovering")
-    logger.info(
-        "outreach_mailer.discovery_start",
-        cadence_id=cadence_id,
-        domain=domain,
-        has_manager_name=bool(hiring_manager_name),
-    )
+    logger.info("outreach_mailer.discovery_start", cadence_id=cadence_id,
+                domain=domain, has_manager_name=bool(hiring_manager_name))
 
-    def _is_plausible_email(email: str) -> bool:
-        """Reject emails that look like LinkedIn URL slugs or are otherwise malformed.
+    name_parts = hiring_manager_name.split(" ", 1) if hiring_manager_name else []
+    first_name = name_parts[0] if name_parts else ""
+    last_name  = name_parts[1] if len(name_parts) > 1 else ""
 
-        Hunter.io sometimes constructs an email from the LinkedIn profile slug
-        (e.g. ledwards-recruitment-manager-at-capgemini-linkedin@company.com).
-        These are never real addresses and must be discarded.
-        """
-        if not email or '@' not in email:
-            return False
-        local = email.split('@')[0].lower()
-        if 'linkedin' in local:
-            return False
-        if len(local) > 40:
-            return False
-        if local.count('-') > 3:
-            return False
-        return True
+    # ── Shared verification helper ────────────────────────────────────────────
 
-    discovered_email = None
-    email_confidence = None
-    email_source     = None
+    async def _verify(email: str, source: str, base_confidence: int) -> tuple[str | None, int, str]:
+        """Plausibility check then live verification. Returns (email, conf, src) or (None,0,'')."""
+        if not _is_plausible_email(email):
+            logger.debug("outreach_mailer.email_implausible", email=email, source=source)
+            return None, 0, ""
+        status = await hunter_io.verify_email(email, hunter_key)
+        logger.info("outreach_mailer.email_verification", email=email,
+                    status=status, source=source)
+        if status == "deliverable":
+            return email, max(base_confidence, 90), source
+        if status == "risky":
+            return email, min(base_confidence, 65), source   # cap risky at 65
+        return None, 0, ""   # undeliverable / unknown
 
-    # Pass 1 — Email Finder (person-level, high precision)
+    # Track a risky result in case nothing deliverable is found
+    risky_email: str | None = None
+    risky_conf:  int        = 0
+    risky_src:   str        = ""
+
+    async def _try(email: str, source: str, base_confidence: int) -> tuple[str | None, int, str]:
+        nonlocal risky_email, risky_conf, risky_src
+        e, c, s = await _verify(email, source, base_confidence)
+        if e and c >= 90:
+            return e, c, s
+        if e and c > 0 and not risky_email:   # first risky result wins
+            risky_email, risky_conf, risky_src = e, c, s
+        return None, 0, ""
+
+    # ── Pass 1: Hunter.io Email Finder ────────────────────────────────────────
+    if first_name:
+        result = await hunter_io.find_email(domain, first_name, last_name, hunter_key)
+        if result and result.get("email"):
+            e, c, s = await _try(result["email"], "finder", result.get("score", 70))
+            if e:
+                logger.info("outreach_mailer.email_found", pass_=1, email=e, confidence=c)
+                await _finalise(pool, cadence_id, state, e, c, s, hiring_manager_name)
+                return _success_state(state, e, c, s, hiring_manager_name)
+
+    # ── Pass 2: Exa web search ────────────────────────────────────────────────
     if hiring_manager_name:
-        name_parts = hiring_manager_name.split(" ", 1)
-        first_name = name_parts[0]
-        last_name  = name_parts[1] if len(name_parts) > 1 else ""
-        result = await hunter_io.find_email(domain, first_name, last_name, settings.hunter_api_key)
-        if result and result.get("score", 0) >= 70 and _is_plausible_email(result.get("email", "")):
-            discovered_email = result["email"]
-            email_confidence = result["score"]
-            email_source     = "finder"
-            logger.info(
-                "outreach_mailer.email_found_by_name",
-                contact=hiring_manager_name,
-                email=discovered_email,
-                confidence=email_confidence,
-            )
+        web_email = await search_person_email(hiring_manager_name, company, exa_api_key)
+        if web_email:
+            e, c, s = await _try(web_email, "web_search", 80)
+            if e:
+                logger.info("outreach_mailer.email_found", pass_=2, email=e, confidence=c)
+                await _finalise(pool, cadence_id, state, e, c, s, hiring_manager_name)
+                return _success_state(state, e, c, s, hiring_manager_name)
 
-    # Pass 2 — Domain Search fallback (generic, lower precision)
-    if not discovered_email:
-        results = await hunter_io.domain_search(domain, settings.hunter_api_key)
-        if results:
-            best       = results[0]
-            confidence = best.get("confidence", 0)
-            email_val  = best.get("value") or best.get("email")
-            if confidence >= 70 and email_val and _is_plausible_email(email_val):
-                discovered_email = email_val
-                email_confidence = confidence
-                email_source     = "domain_search"
-            elif email_val and _is_plausible_email(email_val):
-                await update_email_cadence(
-                    pool, cadence_id,
-                    status="low_confidence",
-                    hiring_manager_email=email_val,
-                    email_confidence=confidence,
-                )
-                return {**state, "status": "low_confidence", "discovered_email": email_val,
-                        "email_confidence": confidence, "email_source": "domain_search"}
+    # ── Pass 3: Pattern guessing + verification ───────────────────────────────
+    if first_name:
+        pattern    = await hunter_io.infer_domain_pattern(domain, hunter_key)
+        candidates = hunter_io.generate_email_candidates(first_name, last_name, domain, pattern)
+        logger.info("outreach_mailer.pattern_candidates", domain=domain,
+                    pattern=pattern, count=len(candidates))
+        for candidate in candidates[:5]:           # verify up to 5 patterns
+            e, c, s = await _try(candidate, "pattern_guess", 75)
+            if e:
+                logger.info("outreach_mailer.email_found", pass_=3, email=e, confidence=c)
+                await _finalise(pool, cadence_id, state, e, c, s, hiring_manager_name)
+                return _success_state(state, e, c, s, hiring_manager_name)
 
-    if not discovered_email:
-        await update_email_cadence(pool, cadence_id, status="email_not_found")
-        return {**state, "status": "email_not_found"}
+    # ── Pass 4: Hunter.io Domain Search fallback ──────────────────────────────
+    domain_results = await hunter_io.domain_search(domain, hunter_key)
+    for entry in domain_results[:3]:
+        candidate = entry.get("value") or entry.get("email") or ""
+        if not candidate:
+            continue
+        e, c, s = await _try(candidate, "domain_search", entry.get("confidence", 60))
+        if e:
+            logger.info("outreach_mailer.email_found", pass_=4, email=e, confidence=c)
+            await _finalise(pool, cadence_id, state, e, c, s, hiring_manager_name)
+            return _success_state(state, e, c, s, hiring_manager_name)
 
-    await update_email_cadence(
-        pool, cadence_id,
-        hiring_manager_email=discovered_email,
-        email_confidence=email_confidence,
-        email_source=email_source,
-        status="generating",
-    )
-    logger.info(
-        "outreach_mailer.email_discovered",
-        cadence_id=cadence_id,
-        email=discovered_email,
-        confidence=email_confidence,
-        source=email_source,
-    )
+    # ── Risky fallback — present to user for confirmation ────────────────────
+    if risky_email:
+        logger.info("outreach_mailer.email_risky_fallback",
+                    email=risky_email, confidence=risky_conf, source=risky_src)
+        await update_email_cadence(pool, cadence_id, status="low_confidence",
+                                   hiring_manager_email=risky_email,
+                                   email_confidence=risky_conf)
+        return {**state, "status": "low_confidence",
+                "discovered_email": risky_email,
+                "email_confidence": risky_conf,
+                "email_source":     risky_src}
 
+    # ── Nothing found ─────────────────────────────────────────────────────────
+    logger.info("outreach_mailer.email_not_found", domain=domain)
+    await update_email_cadence(pool, cadence_id, status="email_not_found")
+    return {**state, "status": "email_not_found"}
+
+
+async def _finalise(pool, cadence_id, state, email, confidence, source, name):
+    await update_email_cadence(pool, cadence_id,
+                               hiring_manager_email=email,
+                               email_confidence=confidence,
+                               email_source=source,
+                               status="generating")
+    logger.info("outreach_mailer.email_discovered",
+                cadence_id=cadence_id, email=email,
+                confidence=confidence, source=source)
+
+
+def _success_state(state, email, confidence, source, name):
     return {
         **state,
-        "hiring_manager_name": hiring_manager_name or state.get("hiring_manager_name"),
-        "discovered_email":    discovered_email,
-        "email_confidence":    email_confidence,
-        "email_source":        email_source,
+        "hiring_manager_name": name or state.get("hiring_manager_name"),
+        "discovered_email":    email,
+        "email_confidence":    confidence,
+        "email_source":        source,
         "status":              "generating",
     }
 

@@ -427,6 +427,45 @@ async def extract_hiring_team_from_jd(
         return None
 
 
+async def search_person_email(name: str, company: str, api_key: str) -> str | None:
+    """Search the open web for a person's professional email address via Exa.
+
+    Searches for their name + company across conference registrations, GitHub
+    profiles, company team pages, and other public sources where people
+    voluntarily share their email.  Returns the first plausible email found,
+    or None if nothing is discovered.
+    """
+    import re
+    if not api_key or not name:
+        return None
+
+    EMAIL_RE = re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b')
+    _GENERIC  = frozenset(["noreply", "no-reply", "info", "contact", "support",
+                            "admin", "hello", "team", "careers", "jobs", "hr"])
+
+    query = f'"{name}" {company} email'
+    try:
+        exa     = _exa_client(api_key)
+        results = exa.search(query, num_results=5, use_autoprompt=False)
+        for result in (results.results or []):
+            text = " ".join(filter(None, [
+                result.title or "",
+                getattr(result, "text", "") or "",
+                result.url or "",
+            ]))
+            for match in EMAIL_RE.findall(text):
+                local = match.split("@")[0].lower()
+                if any(g in local for g in _GENERIC):
+                    continue
+                if "linkedin" in local or len(local) > 40 or local.count("-") > 3:
+                    continue
+                logger.info("exa.email_found_in_web", name=name, email=match)
+                return match
+    except Exception as exc:
+        logger.debug("exa.search_email_error", name=name, error=str(exc)[:100])
+    return None
+
+
 async def research_person(name: str, company: str, api_key: str) -> str:
     """Real-time Exa search for a person's recent professional context.
 
