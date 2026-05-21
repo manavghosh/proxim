@@ -71,6 +71,23 @@ _FORBIDDEN_GREETING = ("dear ", "hello ", "hey ")
 _REQUIRED_SIGNOFF   = ("kind regards", "warm regards")
 
 
+def _trim_note(v: str, limit: int = 300) -> str:
+    """Trim a marginally-over-limit note at a word boundary, preserving the sign-off."""
+    if len(v) <= limit:
+        return v
+    lines = v.split('\n')
+    if len(lines) >= 2:
+        signoff    = '\n'.join(lines[-2:])          # "Kind regards,\nManav Ghosh"
+        body       = '\n'.join(lines[:-2])
+        available  = limit - len(signoff) - 1       # -1 for the joining \n
+        if len(body) > available:
+            trimmed = body[:available]
+            last_space = trimmed.rfind(' ')
+            body = trimmed[:last_space] if last_space > available // 2 else trimmed
+        return body + '\n' + signoff
+    return v[:limit]
+
+
 class NoteVariants(BaseModel):
     note_a: str
     note_b: str
@@ -78,16 +95,20 @@ class NoteVariants(BaseModel):
     @field_validator("note_a", "note_b")
     @classmethod
     def validate_note(cls, v: str) -> str:
-        if len(v) > 300:
+        # Soft trim: silently clip notes that are marginally over (≤ 315 chars)
+        # rather than rejecting and triggering an expensive retry.
+        if len(v) > 315:
             raise ValueError(f"Note exceeds 300 chars ({len(v)})")
+        if len(v) > 300:
+            v = _trim_note(v)
         for phrase in _FORBIDDEN:
             if phrase in v.lower():
                 raise ValueError(f"Forbidden phrase detected: '{phrase}'")
         lower = v.lower()
         if not lower.startswith(_REQUIRED_GREETING):
-            raise ValueError("Note must open with 'Dear [FirstName],'")
+            raise ValueError("Note must open with 'Hi [FirstName],'")
         if any(lower.startswith(g) for g in _FORBIDDEN_GREETING):
-            raise ValueError("Casual greeting not allowed — use 'Dear'")
+            raise ValueError("Casual greeting not allowed — use 'Hi'")
         if not any(s in lower for s in _REQUIRED_SIGNOFF):
             raise ValueError("Note must close with 'Kind regards,' or 'Warm regards,'")
         return v
@@ -469,7 +490,7 @@ async def generate_notes_node(state: LinkedInConnectorState, config: RunnableCon
         "- Never invent facts; if research is thin, keep sentence 2 general but truthful\n"
         "- note_a and note_b must differ in the personalised context angle (company vs person)\n"
         "- Greeting must be 'Dear', closing must be 'Kind regards,' or 'Warm regards,'\n"
-        "- Total note length must not exceed 300 chars"
+        "- Total note length must not exceed 275 characters — count carefully and stay under"
     )
 
     candidate_context = (
