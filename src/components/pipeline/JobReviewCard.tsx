@@ -64,6 +64,7 @@ interface JobReviewCardProps {
   outreachTarget?: OutreachTargetSummary | null
   emailCadence?: EmailCadenceSummary | null
   onUpdate: () => void
+  isPendingOutreach?: boolean
 }
 
 export function JobReviewCard({
@@ -78,6 +79,7 @@ export function JobReviewCard({
   outreachTarget,
   emailCadence,
   onUpdate,
+  isPendingOutreach = false,
 }: JobReviewCardProps) {
   const [reportOpen, setReportOpen] = useState(false)
 
@@ -248,6 +250,14 @@ export function JobReviewCard({
               <FileTextIcon className="w-3 h-3" />
               Generate Resume
             </Button>
+          </div>
+        )}
+
+        {/* Outreach pending indicator — shown immediately after approve, clears automatically via SSE */}
+        {isApproved && isPendingOutreach && (
+          <div className="mt-2 flex items-center gap-2 text-[10px] text-[#475569]">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse shrink-0" />
+            Outreach starting…
           </div>
         )}
 
