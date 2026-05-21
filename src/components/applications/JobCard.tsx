@@ -412,6 +412,20 @@ export function JobCard({
                     await startEmailOutreach(job.id, candidateId)
                     setEmailCadence({ id: '', status: 'pending_discovery', hiringManagerEmail: null,
                       emailConfidence: null, approvedAt: null, replyDetectedAt: null, bounceDetectedAt: null, retryCount: 0, drafts: [] })
+                  } catch (e) {
+                    // 409 means outreach is already running — sync local state so the
+                    // correct badge or panel renders instead of the Start button.
+                    if (e instanceof Error && e.message.startsWith('409')) {
+                      try {
+                        const body = JSON.parse(e.message.replace(/^\d+:\s*/, ''))
+                        if (body.currentStatus) {
+                          setEmailCadence({ id: '', status: body.currentStatus as EmailCadenceStatus,
+                            hiringManagerEmail: null, emailConfidence: null, approvedAt: null,
+                            replyDetectedAt: null, bounceDetectedAt: null, retryCount: 0, drafts: [] })
+                        }
+                      } catch { /* ignore parse failure */ }
+                    }
+                    // Other errors: absorb silently — button un-spins, user can retry
                   } finally { setEmStarting(false) }
                 }}>
                 Start
