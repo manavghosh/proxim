@@ -95,9 +95,9 @@ class NoteVariants(BaseModel):
     @field_validator("note_a", "note_b")
     @classmethod
     def validate_note(cls, v: str) -> str:
-        # Soft trim: silently clip notes that are marginally over (≤ 315 chars)
+        # Soft trim: silently clip notes that are marginally over (≤ 340 chars)
         # rather than rejecting and triggering an expensive retry.
-        if len(v) > 315:
+        if len(v) > 340:
             raise ValueError(f"Note exceeds 300 chars ({len(v)})")
         if len(v) > 300:
             v = _trim_note(v)
@@ -182,7 +182,7 @@ async def determine_target_roles(job_title: str, company: str) -> list[str]:
             temperature=0.2,
             max_tokens=200,
         )
-        raw   = resp.choices[0].message.content or "{}"
+        raw   = (resp.choices[0].message.content or "").strip() or "{}"
         data  = json.loads(raw)
         roles = [str(r) for r in data.get("roles", []) if r][:5]
         if roles:
