@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
-import { getJobs, markSubmitted, rejectJob, getResumeVersions, triggerResumeGeneration, getPreferences } from '@/lib/api'
+import { getJobs, markSubmitted, rejectJob, getResumeVersions, triggerResumeGeneration, getPreferences, startJobStream } from '@/lib/api'
 import type { ScoredJob, ResumeVersion } from '@/lib/api'
 import type { EmailOutreachMode, OutreachStatus, EmailCadenceStatus } from '@/types/candidate'
 import { Topbar } from '@/components/layout/Topbar'
@@ -78,6 +78,17 @@ export default function ApplicationsPage() {
     const interval = setInterval(() => silentRefresh(selectedGrades), 5000)
     return () => clearInterval(interval)
   }, [jobs, loading, selectedGrades, silentRefresh])
+
+  // SSE stream subscription — fires immediately when daemon writes any change,
+  // covers the case where user arrives after transients have already cleared.
+  useEffect(() => {
+    const cleanup = startJobStream(
+      candidateId,
+      () => { void silentRefresh(selectedGrades) },
+      () => { /* idle/disconnect — transient polling covers reconnect lag */ }
+    )
+    return cleanup
+  }, [candidateId, selectedGrades, silentRefresh])
 
   const handleMarkSubmitted = async (jobId: string) => {
     setPendingId(jobId)
