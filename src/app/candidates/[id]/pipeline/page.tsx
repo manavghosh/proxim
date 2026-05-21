@@ -24,6 +24,7 @@ import {
   type HitlJob,
 } from '@/lib/api'
 import { Workflow } from 'lucide-react'
+import type { OutreachStatus, EmailCadenceStatus } from '@/types/candidate'
 
 // Pipeline review never includes F-grade jobs (route enforces it), so the
 // available choices are A/B/C/D only.
@@ -61,6 +62,7 @@ export default function PipelinePage() {
   // build that's currently in flight.
   const [resumeBuilderJobIds, setResumeBuilderJobIds] = useState<string[]>([])
   const [retryJobIds, setRetryJobIds] = useState<string[]>([])
+  const [pendingOutreachIds, setPendingOutreachIds] = useState<Set<string>>(new Set())
   const logPaneRef = useRef<HTMLDivElement>(null)
 
   const showToast = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
@@ -126,6 +128,24 @@ export default function PipelinePage() {
     }
   }, [reconnectStream])
 
+  useEffect(() => {
+    if (pendingOutreachIds.size === 0) return
+    const OUTREACH_TRANSIENT = new Set<OutreachStatus>(['pending', 'discovering', 'enriching', 'generating'])
+    const EMAIL_TRANSIENT    = new Set<EmailCadenceStatus>(['pending_discovery', 'discovering', 'generating'])
+    setPendingOutreachIds(prev => {
+      const next = new Set(prev)
+      for (const id of prev) {
+        const job = jobs.find(j => j.id === id)
+        if (!job) { next.delete(id); continue }
+        const outreachDone = job.outreachTarget && !OUTREACH_TRANSIENT.has(job.outreachTarget.status as OutreachStatus)
+        const emailDone    = job.emailCadence   && !EMAIL_TRANSIENT.has(job.emailCadence.status as EmailCadenceStatus)
+        if (outreachDone && emailDone) next.delete(id)
+      }
+      return next
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobs])
+
   const handleGradesChange = (next: Grade[]) => {
     // Filter is session-only on the Pipeline page — every navigation back here
     // resets to "all grades" so the user always sees every reviewable row.
@@ -153,6 +173,7 @@ export default function PipelinePage() {
     try {
       await approveJob(jobId, candidateId)
       setJobs(prev => prev.map(j => j.id === jobId ? { ...j, status: 'approved' } : j))
+      setPendingOutreachIds(prev => new Set([...prev, jobId]))
       showToast('Job approved — LinkedIn outreach queued', 'success')
     } catch (e: unknown) {
       if (e instanceof Error && e.message.startsWith('409')) {
@@ -312,6 +333,7 @@ export default function PipelinePage() {
                 onUnsnooze={handleUnsnooze}
                 onGenerateResume={handleGenerateResume}
                 isPending={pendingJobIds.has(job.id)}
+                isPendingOutreach={pendingOutreachIds.has(job.id)}
                 onUpdate={() => loadJobs(selectedGrades, sort)}
               />
             ))}
