@@ -194,7 +194,23 @@ async def litellm_generate(state: OutreachMailerState, settings,
     )
     raw = _strip_markdown(resp.choices[0].message.content or "")
     data = json.loads(raw)
-    return EmailDraftOutput(**data)
+    draft = EmailDraftOutput(**data)
+
+    # Append a fixed job reference line to all three drafts so the hiring
+    # manager can immediately cross-reference the specific opening.
+    # Uses model_copy to skip word-count validators — reference is a fixed suffix.
+    job_url = (state.get("job_url") or "").strip()
+    if job_url:
+        ref_line = (
+            f"\n\nJob reference: {state['job_title']} at {state['company']}\n{job_url}"
+        )
+        draft = draft.model_copy(update={
+            "day1_body": draft.day1_body + ref_line,
+            "day3_body": draft.day3_body + ref_line,
+            "day7_body": draft.day7_body + ref_line,
+        })
+
+    return draft
 
 
 async def litellm_self_review(draft: EmailDraftOutput, settings) -> SelfReviewResult:
