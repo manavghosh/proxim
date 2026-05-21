@@ -99,6 +99,25 @@ export default function PipelinePage() {
     init()
   }, [candidateId, loadJobs])
 
+  // Pick up any pending import job ID stored by ImportJobsSheet when the user
+  // navigated here from the Dashboard — show the log pane immediately so they
+  // can watch import → scoring progress without refreshing.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const key = `proxim-import-${candidateId}`
+    const pendingId = sessionStorage.getItem(key)
+    if (pendingId) {
+      sessionStorage.removeItem(key)
+      setRetryJobIds([pendingId])
+      setTimeout(() => {
+        if (logPaneRef.current) {
+          logPaneRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      }, 300)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [candidateId])
+
   // SSE stream
   const reconnectStream = useCallback(() => {
     if (streamCleanupRef.current) {
@@ -307,18 +326,32 @@ export default function PipelinePage() {
           </div>
         ) : scoredJobs.length === 0 && failedJobs.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center py-20">
-            <Workflow className="w-10 h-10 text-[#1e2d4a] mb-4" />
-            <p className="text-[13px] text-[#64748b] mb-4">
-              No matching jobs — try a wider filter or run the pipeline
-            </p>
-            <Button
-              size="sm"
-              variant="outline"
-              className="text-[11px] border-[#1e2d4a] text-[#64748b] hover:text-[#94a3b8]"
-              onClick={() => router.push(`/candidates/${candidateId}/dashboard`)}
-            >
-              Run Pipeline →
-            </Button>
+            {retryJobIds.length > 0 ? (
+              <>
+                <div className="w-8 h-8 rounded-full border-2 border-blue-500 border-t-transparent animate-spin mb-4" />
+                <p className="text-[13px] text-[#94a3b8] mb-1 font-medium">
+                  Scoring your jobs…
+                </p>
+                <p className="text-[11px] text-[#475569]">
+                  Scored cards will appear here automatically. Progress is shown below.
+                </p>
+              </>
+            ) : (
+              <>
+                <Workflow className="w-10 h-10 text-[#1e2d4a] mb-4" />
+                <p className="text-[13px] text-[#64748b] mb-4">
+                  No matching jobs — try a wider filter or run the pipeline
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-[11px] border-[#1e2d4a] text-[#64748b] hover:text-[#94a3b8]"
+                  onClick={() => router.push(`/candidates/${candidateId}/dashboard`)}
+                >
+                  Run Pipeline →
+                </Button>
+              </>
+            )}
           </div>
         ) : (
           <div className="space-y-3 max-w-3xl">

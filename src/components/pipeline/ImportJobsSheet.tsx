@@ -35,7 +35,13 @@ export function ImportJobsSheet({ candidateId, onImported, label = '+ Add Jobs' 
       const res = await importJobs(urls, candidateId)
       setResult(res)
       setStatus('success')
-      if (res.imported > 0) onImported?.(res.pipelineJobId ?? '')
+      if (res.imported > 0) {
+        onImported?.(res.pipelineJobId ?? '')
+        // Persist so Pipeline page can show progress when user navigates there
+        if (res.pipelineJobId && typeof window !== 'undefined') {
+          sessionStorage.setItem(`proxim-import-${candidateId}`, res.pipelineJobId)
+        }
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Import failed')
       setStatus('error')
