@@ -11,10 +11,16 @@ function detectSource(url: string): 'linkedin' | 'naukri' | 'manual' {
 }
 
 function normaliseUrl(url: string): string {
-  // Strip LinkedIn tracking params — keep just the base job URL
+  // Strip LinkedIn tracking params — keep just the base job URL.
+  // Alert / search URLs carry currentJobId as a query param — convert to
+  // a direct /jobs/view/{id} URL so the scraper hits the right page.
   try {
     const u = new URL(url)
     if (u.hostname.includes('linkedin.com')) {
+      const currentJobId = u.searchParams.get('currentJobId')
+      if (currentJobId) {
+        return `https://www.linkedin.com/jobs/view/${currentJobId}`
+      }
       return `https://www.linkedin.com${u.pathname.replace(/\/$/, '')}`
     }
     return url.split('?')[0]

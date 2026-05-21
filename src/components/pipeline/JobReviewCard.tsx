@@ -183,6 +183,7 @@ export function JobReviewCard({
             target="_blank"
             rel="noopener noreferrer"
             className="flex-shrink-0 text-[#475569] hover:text-[#93c5fd] transition-colors"
+            title={job.sourceUrl}
           >
             <ExternalLink className="w-4 h-4" />
           </a>
