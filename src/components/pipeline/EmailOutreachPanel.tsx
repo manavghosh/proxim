@@ -6,7 +6,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Paperclip, FileText } from 'lucide-react'
+import { Paperclip, FileText, Pencil, Check, X } from 'lucide-react'
+import { Input } from '@/components/ui/input'
 import { approveCadence, overrideEmail, startCountdown, cancelCadence, retryCadenceGeneration } from '@/lib/api'
 import { PdfPreviewSheet } from '@/components/applications/PdfPreviewSheet'
 import { EmailDraftCard } from './EmailDraftCard'
@@ -40,6 +41,9 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, jobId
   const [resumePreviewOpen, setResumePreviewOpen] = useState(false)
   const [isOverriding, setIsOverriding]     = useState(false)
   const [isCancelling, setIsCancelling]     = useState(false)
+  const [editingEmail, setEditingEmail]     = useState(false)
+  const [emailDraft, setEmailDraft]         = useState('')
+  const [savingEmail, setSavingEmail]       = useState(false)
   const [isStarting, setIsStarting]         = useState(false)
   const [isRetrying, setIsRetrying]         = useState(false)
   const [day1GmailOpened, setDay1GmailOpened] = useState(false)
@@ -103,6 +107,19 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, jobId
     } finally { setIsOverriding(false) }
   }
 
+  async function handleSaveEmail() {
+    if (!emailDraft.includes('@')) return
+    setSavingEmail(true)
+    try {
+      const result = await overrideEmail(cadence.id, candidateId, emailDraft)
+      const updated: EmailCadenceSummary = { ...cadence, status: result.status, hiringManagerEmail: emailDraft }
+      setCadence(updated)
+      onCadenceUpdated(updated)
+      setEditingEmail(false)
+    } catch { /* leave input open so user can retry */ }
+    finally { setSavingEmail(false) }
+  }
+
   const showDraftTabs = (
     cadence.status === 'pending_approval' ||
     cadence.status === 'approved' ||
@@ -124,6 +141,62 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, jobId
   return (
     <div data-testid="email-outreach-panel" className="space-y-3">
       <p className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase">Email Outreach</p>
+
+      {/* Editable recipient email — shown whenever an email address is known */}
+      {cadence.hiringManagerEmail && (
+        <div className="flex items-center gap-2">
+          {!editingEmail ? (
+            <>
+              <span className="text-[10px] text-[#475569] shrink-0">To:</span>
+              <span className="text-[10px] text-[#94a3b8] font-mono truncate flex-1">
+                {cadence.hiringManagerEmail}
+              </span>
+              <Button
+                size="xs"
+                variant="ghost"
+                className="h-5 w-5 p-0 text-[#475569] hover:text-[#93c5fd] shrink-0"
+                onClick={() => { setEmailDraft(cadence.hiringManagerEmail ?? ''); setEditingEmail(true) }}
+                title="Change recipient email"
+              >
+                <Pencil className="w-3 h-3" />
+              </Button>
+            </>
+          ) : (
+            <>
+              <Input
+                autoFocus
+                value={emailDraft}
+                onChange={e => setEmailDraft(e.target.value)}
+                placeholder="recipient@company.com"
+                className="h-6 text-[10px] bg-[#060d1f] border-[#2d4a6e] text-[#f1f5f9] flex-1"
+                onKeyDown={e => {
+                  if (e.key === 'Enter') void handleSaveEmail()
+                  if (e.key === 'Escape') setEditingEmail(false)
+                }}
+              />
+              <Button
+                size="xs"
+                variant="ghost"
+                className="h-5 w-5 p-0 text-emerald-400 hover:text-emerald-300 shrink-0"
+                onClick={handleSaveEmail}
+                disabled={!emailDraft.includes('@') || savingEmail}
+                title="Save"
+              >
+                <Check className="w-3 h-3" />
+              </Button>
+              <Button
+                size="xs"
+                variant="ghost"
+                className="h-5 w-5 p-0 text-[#475569] hover:text-[#94a3b8] shrink-0"
+                onClick={() => setEditingEmail(false)}
+                title="Cancel"
+              >
+                <X className="w-3 h-3" />
+              </Button>
+            </>
+          )}
+        </div>
+      )}
 
       {showDraftTabs && (
         <>

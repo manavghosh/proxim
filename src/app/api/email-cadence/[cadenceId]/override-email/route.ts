@@ -30,6 +30,22 @@ export async function POST(
       return NextResponse.json({ error: 'Cadence not found' }, { status: 404 })
     }
 
+    // For active cadences (drafts already approved/sending), just update the email address —
+    // no status change, no regeneration needed.
+    const ACTIVE_STATUSES = ['pending_approval', 'approved', 'active', 'paused']
+    if (ACTIVE_STATUSES.includes(cadence.status)) {
+      await db
+        .update(emailCadences)
+        .set({ hiringManagerEmail: confirmedEmail, emailSource: 'manual', updatedAt: new Date() })
+        .where(eq(emailCadences.id, cadenceId))
+      return NextResponse.json({
+        cadenceId,
+        status:             cadence.status,
+        hiringManagerEmail: confirmedEmail,
+        emailSource:        'manual',
+      })
+    }
+
     const OVERRIDABLE = ['low_confidence', 'email_not_found', 'failed']
     if (!OVERRIDABLE.includes(cadence.status)) {
       return NextResponse.json(

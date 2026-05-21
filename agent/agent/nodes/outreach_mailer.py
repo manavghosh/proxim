@@ -305,6 +305,24 @@ async def discover_email_node(state: OutreachMailerState, config) -> OutreachMai
         has_manager_name=bool(hiring_manager_name),
     )
 
+    def _is_plausible_email(email: str) -> bool:
+        """Reject emails that look like LinkedIn URL slugs or are otherwise malformed.
+
+        Hunter.io sometimes constructs an email from the LinkedIn profile slug
+        (e.g. ledwards-recruitment-manager-at-capgemini-linkedin@company.com).
+        These are never real addresses and must be discarded.
+        """
+        if not email or '@' not in email:
+            return False
+        local = email.split('@')[0].lower()
+        if 'linkedin' in local:
+            return False
+        if len(local) > 40:
+            return False
+        if local.count('-') > 3:
+            return False
+        return True
+
     discovered_email = None
     email_confidence = None
     email_source     = None
@@ -315,7 +333,7 @@ async def discover_email_node(state: OutreachMailerState, config) -> OutreachMai
         first_name = name_parts[0]
         last_name  = name_parts[1] if len(name_parts) > 1 else ""
         result = await hunter_io.find_email(domain, first_name, last_name, settings.hunter_api_key)
-        if result and result.get("score", 0) >= 70:
+        if result and result.get("score", 0) >= 70 and _is_plausible_email(result.get("email", "")):
             discovered_email = result["email"]
             email_confidence = result["score"]
             email_source     = "finder"
@@ -333,11 +351,11 @@ async def discover_email_node(state: OutreachMailerState, config) -> OutreachMai
             best       = results[0]
             confidence = best.get("confidence", 0)
             email_val  = best.get("value") or best.get("email")
-            if confidence >= 70 and email_val:
+            if confidence >= 70 and email_val and _is_plausible_email(email_val):
                 discovered_email = email_val
                 email_confidence = confidence
                 email_source     = "domain_search"
-            elif email_val:
+            elif email_val and _is_plausible_email(email_val):
                 await update_email_cadence(
                     pool, cadence_id,
                     status="low_confidence",
