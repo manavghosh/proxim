@@ -84,8 +84,12 @@ async def verify_email(email: str, api_key: str) -> str:
         if resp.status_code != 200:
             logger.warning("hunter_io.verify_failed", email=email, status=resp.status_code)
             return "unknown"
-        status = resp.json().get("data", {}).get("status", "unknown")
-        logger.info("hunter_io.verify_email", email=email, status=status)
+        data   = resp.json().get("data", {})
+        # Hunter.io v2 returns status as "deliverable"/"risky"/"undeliverable"/"unknown"
+        # but older endpoint variants return "valid"/"invalid" — normalise both.
+        raw    = data.get("status", "unknown")
+        status = {"valid": "deliverable", "invalid": "undeliverable"}.get(raw, raw)
+        logger.info("hunter_io.verify_email", email=email, status=status, raw=raw)
         return status
     except HunterRateLimitError:
         raise

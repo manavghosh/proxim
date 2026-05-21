@@ -446,7 +446,7 @@ async def search_person_email(name: str, company: str, api_key: str) -> str | No
     query = f'"{name}" {company} email'
     try:
         exa     = _exa_client(api_key)
-        results = exa.search(query, num_results=5, use_autoprompt=False)
+        results = exa.search(query, num_results=5)
         for result in (results.results or []):
             text = " ".join(filter(None, [
                 result.title or "",

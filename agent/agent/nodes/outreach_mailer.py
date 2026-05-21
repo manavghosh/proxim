@@ -315,9 +315,14 @@ async def discover_email_node(state: OutreachMailerState, config) -> OutreachMai
     logger.info("outreach_mailer.discovery_start", cadence_id=cadence_id,
                 domain=domain, has_manager_name=bool(hiring_manager_name))
 
-    name_parts = hiring_manager_name.split(" ", 1) if hiring_manager_name else []
-    first_name = name_parts[0] if name_parts else ""
-    last_name  = name_parts[1] if len(name_parts) > 1 else ""
+    # Strip LinkedIn headline suffixes before splitting into first/last name.
+    # Stored names often look like "Lee Edwards - Recruitment Manager at Capgemini - LinkedIn".
+    # We only want "Lee Edwards" for email pattern generation and web searches.
+    import re as _re
+    clean_name  = _re.split(r'\s*[-|,/]\s*', hiring_manager_name.strip())[0].strip() if hiring_manager_name else ""
+    name_parts  = clean_name.split(" ", 1) if clean_name else []
+    first_name  = name_parts[0] if name_parts else ""
+    last_name   = name_parts[1] if len(name_parts) > 1 else ""
 
     # ── Shared verification helper ────────────────────────────────────────────
 
@@ -360,8 +365,8 @@ async def discover_email_node(state: OutreachMailerState, config) -> OutreachMai
                 return _success_state(state, e, c, s, hiring_manager_name)
 
     # ── Pass 2: Exa web search ────────────────────────────────────────────────
-    if hiring_manager_name:
-        web_email = await search_person_email(hiring_manager_name, company, exa_api_key)
+    if clean_name:
+        web_email = await search_person_email(clean_name, company, exa_api_key)
         if web_email:
             e, c, s = await _try(web_email, "web_search", 80)
             if e:
