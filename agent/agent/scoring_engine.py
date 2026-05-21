@@ -63,6 +63,38 @@ def _friendly_score_error(exc: Exception, job: dict) -> str:
     return "Scoring failed unexpectedly — click Retry to try again"
 
 
+def _sanitize_json_strings(raw: str) -> str:
+    """Escape literal control characters inside JSON string values.
+
+    LLMs frequently embed real newlines/tabs in reasoning strings.
+    json.JSONDecoder rejects these; this pass converts them to their
+    escape sequences before parsing.
+    """
+    result: list[str] = []
+    in_string = False
+    i = 0
+    while i < len(raw):
+        c = raw[i]
+        if c == '\\' and in_string:
+            result.append(c)
+            i += 1
+            if i < len(raw):
+                result.append(raw[i])
+        elif c == '"':
+            in_string = not in_string
+            result.append(c)
+        elif in_string and c == '\n':
+            result.append('\\n')
+        elif in_string and c == '\r':
+            result.append('\\r')
+        elif in_string and c == '\t':
+            result.append('\\t')
+        else:
+            result.append(c)
+        i += 1
+    return ''.join(result)
+
+
 def truncate_jd(jd_text: str, max_words: int = 4000) -> str:
     """Truncate JD to max_words for prompt construction."""
     words = jd_text.split()
@@ -242,9 +274,10 @@ async def score_job(
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"},
                 temperature=0.1,
-                max_tokens=4096,
+                max_tokens=8192,
             )
             raw = response.choices[0].message.content
+            finish_reason = response.choices[0].finish_reason
 
             # Strip markdown code fencing that some models add despite response_format
             if raw:
@@ -253,13 +286,27 @@ async def score_job(
 
             # Guard: empty/None content means the model didn't return JSON
             if not raw or not raw.strip():
-                finish_reason = response.choices[0].finish_reason
                 raise ValueError(
                     f"Empty response from LLM (finish_reason={finish_reason}). "
                     "JD may be too long — will retry with truncated prompt."
                 )
 
-            parsed, _ = json.JSONDecoder().raw_decode(raw.strip())
+            # Guard: truncated at token limit — repaired JSON would be missing keys
+            if finish_reason == "length":
+                raise ValueError(
+                    f"LLM response truncated at token limit (finish_reason=length, "
+                    f"raw_len={len(raw)}). Retrying."
+                )
+
+            # 1. Sanitize: escape literal newlines/tabs inside strings (most common cause
+            #    of "Unterminated string" from LLMs)
+            # 2. Try strict parse; fall back to json_repair for other structural issues
+            sanitized = _sanitize_json_strings(raw.strip())
+            try:
+                parsed, _ = json.JSONDecoder().raw_decode(sanitized)
+            except json.JSONDecodeError:
+                from json_repair import repair_json
+                parsed = json.loads(repair_json(sanitized))
 
 
             # Recompute grade + score deterministically — do not trust the LLM's values
