@@ -1,11 +1,9 @@
-import { and, eq, gt, ne, notInArray, sql } from 'drizzle-orm'
+import { and, eq, gt } from 'drizzle-orm'
 import { db } from '@/db'
-import { jobs } from '@/db/schema'
-
-type JobStatus = 'awaiting' | 'approved' | 'rejected' | 'snoozed' | 'discovered' | 'scored' | 'score_failed' | 'resume_failed' | 'resume_ready' | 'submitted'
+import { jobs, emailCadences, outreachTargets } from '@/db/schema'
 
 const POLL_INTERVAL_MS = 5000
-const IDLE_TIMEOUT_MS = 60000
+const IDLE_TIMEOUT_MS  = 300000   // 5 minutes — was 60s
 
 export async function GET(
   _request: Request,
@@ -25,25 +23,32 @@ export async function GET(
 
       const poll = async () => {
         try {
-          const newJobs = await db
-            .select({ id: jobs.id })
-            .from(jobs)
-            .where(
-              and(
-                eq(jobs.candidateId, candidateId),
-                ne(jobs.grade, 'F'),
-                notInArray(jobs.status, ['discovered', 'score_failed', 'rejected'] as JobStatus[]),
-                gt(jobs.createdAt, sql`${lastSeenAt}::timestamptz`)
-              )
-            )
+          const since = new Date(lastSeenAt)
 
-          if (newJobs.length > 0) {
+          const [changedJobs, changedCadences, changedOutreach] = await Promise.all([
+            db.select({ id: jobs.id })
+              .from(jobs)
+              .where(and(eq(jobs.candidateId, candidateId), gt(jobs.updatedAt, since))),
+            db.select({ id: emailCadences.id })
+              .from(emailCadences)
+              .where(and(eq(emailCadences.candidateId, candidateId), gt(emailCadences.updatedAt, since))),
+            db.select({ id: outreachTargets.id })
+              .from(outreachTargets)
+              .where(and(eq(outreachTargets.candidateId, candidateId), gt(outreachTargets.updatedAt, since))),
+          ])
+
+          const hasChanges =
+            changedJobs.length > 0 ||
+            changedCadences.length > 0 ||
+            changedOutreach.length > 0
+
+          if (hasChanges) {
             lastSeenAt = new Date().toISOString()
             idleMs = 0
             controller.enqueue(
               encode('jobs_arrived', {
-                count: newJobs.length,
-                jobIds: newJobs.map(j => j.id),
+                count:  changedJobs.length,
+                jobIds: changedJobs.map(j => j.id),
               })
             )
           } else {
@@ -68,9 +73,9 @@ export async function GET(
 
   return new Response(stream, {
     headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
+      'Content-Type':    'text/event-stream',
+      'Cache-Control':   'no-cache',
+      Connection:        'keep-alive',
       'X-Accel-Buffering': 'no',
     },
   })
