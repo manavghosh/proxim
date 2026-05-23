@@ -1,0 +1,1 @@
+ALTER TABLE `candidates` ADD `avatar_data` text;

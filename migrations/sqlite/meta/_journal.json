@@ -57,6 +57,13 @@
       "when": 1779499738693,
       "tag": "0007_glamorous_kat_farrell",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1779547714405,
+      "tag": "0008_glossy_bastion",
+      "breakpoints": true
     }
   ]
 }

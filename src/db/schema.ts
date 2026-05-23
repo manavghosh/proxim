@@ -83,6 +83,7 @@ export const candidates = pgTable('candidates', {
   parsedProfile: jsonb().$type<ParsedProfile>(),
   parseStatus: parseStatusEnum().default('pending').notNull(),
   preferences: jsonb().$type<Preferences>().default({}).notNull(),
+  avatarData: text('avatar_data'),              // base64 data URL for uploaded avatar
   createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp({ withTimezone: true })
     .defaultNow()

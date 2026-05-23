@@ -76,6 +76,7 @@ export const candidates = sqliteTable('candidates', {
   parseStatus:    text().default('pending').notNull(),
   preferences:    text({ mode: 'json' }).$type<Preferences>().default({} as Preferences).notNull(),
   baseResumePdfPath: text(),
+  avatarData:     text('avatar_data'),          // base64 data URL for uploaded avatar
   createdAt:      text().$defaultFn(now).notNull(),
   updatedAt:      text().$defaultFn(now).$onUpdateFn(now).notNull(),
 })
