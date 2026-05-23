@@ -153,7 +153,8 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, jobId
 
       {/* Editable recipient email — shown whenever an email address is known */}
       {cadence.hiringManagerEmail && (
-        <div className="flex items-center gap-2">
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2">
           {!editingEmail ? (
             <>
               <span className="text-[10px] text-[#475569] shrink-0">To:</span>
@@ -203,6 +204,14 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, jobId
                 <X className="w-3 h-3" />
               </Button>
             </>
+          )}
+          </div>
+          {/* Confidence warning — shown when AI Agent found email but couldn't verify it individually */}
+          {!editingEmail && cadence.emailConfidence !== null && cadence.emailConfidence < 80 && (
+            <p className="text-[10px] text-amber-400/80 flex items-center gap-1">
+              <span>△</span>
+              Found by AI Agent · {cadence.emailConfidence}% confidence · catch-all domain — verify before sending
+            </p>
           )}
         </div>
       )}
