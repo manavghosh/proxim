@@ -91,6 +91,45 @@ async def update_pipeline_run(pool: asyncpg.Pool, run_id: str, **kwargs) -> None
         await conn.execute(query, *values)
 
 
+async def update_run_aggregates(pool: asyncpg.Pool, run_id: str) -> None:
+    """Populate F7 aggregate columns on pipeline_runs at run completion.
+
+    Called once when a pipeline run transitions to 'completed'. Fire-and-forget
+    — errors are logged but never re-raised so the pipeline completion is not
+    blocked by an aggregation failure.
+    """
+    import structlog
+    _log = structlog.get_logger()
+    try:
+        async with pool.acquire() as conn:
+            await conn.execute("""
+                UPDATE pipeline_runs SET
+                  ab_grade_count = (
+                    SELECT COUNT(*) FROM jobs
+                    WHERE pipeline_run_id = $1 AND grade IN ('A','B')
+                  ),
+                  resumes_generated = (
+                    SELECT COUNT(*) FROM resume_versions rv
+                    JOIN jobs j ON j.id = rv.job_id
+                    WHERE j.pipeline_run_id = $1
+                  ),
+                  emails_sent = (
+                    SELECT COUNT(*) FROM email_drafts ed
+                    JOIN email_cadences ec ON ec.id = ed.cadence_id
+                    JOIN jobs j ON j.id = ec.job_id
+                    WHERE j.pipeline_run_id = $1 AND ed.status = 'sent'
+                  ),
+                  replies_received = (
+                    SELECT COUNT(*) FROM email_cadences ec
+                    JOIN jobs j ON j.id = ec.job_id
+                    WHERE j.pipeline_run_id = $1 AND ec.reply_detected_at IS NOT NULL
+                  )
+                WHERE id = $1
+            """, run_id)
+    except Exception as exc:
+        _log.warning("update_run_aggregates_failed", run_id=run_id, error=str(exc))
+
+
 async def get_scan_history_urls(pool: asyncpg.Pool, candidate_id: str) -> set[str]:
     async with pool.acquire() as conn:
         rows = await conn.fetch("""

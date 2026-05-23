@@ -128,7 +128,14 @@ export const pipelineRuns = pgTable('pipeline_runs', {
   completedAt: timestamp({ withTimezone: true }),
   summary: jsonb().$type<Record<string, unknown>>(),
   error: text(),
-})
+  // F7 aggregate fields (populated by Python agent at run completion)
+  abGradeCount:     integer().default(0).notNull(),
+  resumesGenerated: integer().default(0).notNull(),
+  emailsSent:       integer().default(0).notNull(),
+  repliesReceived:  integer().default(0).notNull(),
+}, (table) => [
+  index('pipeline_runs_candidate_started_idx').on(table.candidateId, table.startedAt),
+])
 
 export const jobs = pgTable('jobs', {
   id: uuid().defaultRandom().primaryKey(),
@@ -152,6 +159,8 @@ export const jobs = pgTable('jobs', {
   archetypeConfidence: numeric({ precision: 3, scale: 2 }),
   createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp({ withTimezone: true }).defaultNow().notNull().$onUpdateFn(() => new Date()),
+  // F7 interview callback tracking (self-reported)
+  interviewCallbackAt: timestamp({ withTimezone: true }),
 }, (table) => [
   index('jobs_candidate_status_idx').on(table.candidateId, table.status),
   index('jobs_candidate_source_url_idx').on(table.candidateId, table.sourceUrl),

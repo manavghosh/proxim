@@ -1,9 +1,9 @@
 import { and, eq, gt } from 'drizzle-orm'
 import { db } from '@/db'
-import { jobs, emailCadences, outreachTargets } from '@/db/schema'
+import { jobs, emailCadences, outreachTargets, pipelineRuns } from '@/db/schema'
 
 const POLL_INTERVAL_MS = 5000
-const IDLE_TIMEOUT_MS  = 300000   // 5 minutes — was 60s
+const IDLE_TIMEOUT_MS  = 300000   // 5 minutes
 
 export async function GET(
   _request: Request,
@@ -20,12 +20,14 @@ export async function GET(
 
       let lastSeenAt = new Date().toISOString()
       let idleMs = 0
+      // De-duplication map: runId → last emitted terminal status
+      const runStatusSeen = new Map<string, string>()
 
       const poll = async () => {
         try {
           const since = new Date(lastSeenAt)
 
-          const [changedJobs, changedCadences, changedOutreach] = await Promise.all([
+          const [changedJobs, changedCadences, changedOutreach, allRuns] = await Promise.all([
             db.select({ id: jobs.id })
               .from(jobs)
               .where(and(eq(jobs.candidateId, candidateId), gt(jobs.updatedAt, since))),
@@ -35,7 +37,33 @@ export async function GET(
             db.select({ id: outreachTargets.id })
               .from(outreachTargets)
               .where(and(eq(outreachTargets.candidateId, candidateId), gt(outreachTargets.updatedAt, since))),
+            // F7: check for run status transitions
+            db.select({ id: pipelineRuns.id, status: pipelineRuns.status })
+              .from(pipelineRuns)
+              .where(eq(pipelineRuns.candidateId, candidateId)),
           ])
+
+          // Emit run_status_changed for newly terminal runs (de-duplicated)
+          for (const run of allRuns) {
+            if (run.status === 'completed' || run.status === 'failed') {
+              const prev = runStatusSeen.get(run.id)
+              if (prev !== run.status) {
+                runStatusSeen.set(run.id, run.status)
+                // Only emit when transitioning TO terminal (not on every poll after)
+                if (prev !== undefined && prev !== 'completed' && prev !== 'failed') {
+                  controller.enqueue(
+                    encode('run_status_changed', { runId: run.id, status: run.status, candidateId })
+                  )
+                } else if (prev === undefined) {
+                  // First time seeing this run — record it but don't emit
+                  // (avoids flooding on page load with already-completed runs)
+                }
+              }
+            } else {
+              // Track running/queued runs so we detect their transition to terminal
+              runStatusSeen.set(run.id, run.status)
+            }
+          }
 
           const hasChanges =
             changedJobs.length > 0 ||

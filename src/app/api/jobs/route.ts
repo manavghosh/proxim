@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
-import { eq, and, inArray } from 'drizzle-orm'
+import { eq, and, inArray, sql } from 'drizzle-orm'
 import { db } from '@/db'
-import { jobs, emailCadences, emailDrafts, outreachTargets } from '@/db/schema'
+import { jobs, emailCadences, emailDrafts, outreachTargets, pipelineJobs } from '@/db/schema'
 import { getOrCreateCandidate, getCandidateById } from '@/lib/cv-service'
 import type { EmailCadenceSummary, EmailCadenceStatus, EmailDraftStatus, EmailDraftSummary, OutreachTargetSummary, OutreachStatus } from '@/types/candidate'
 
@@ -38,6 +38,17 @@ export async function GET(request: Request) {
         archetype:           jobs.archetype,
         archetypeConfidence: jobs.archetypeConfidence,
         createdAt:           jobs.createdAt,
+        updatedAt:           jobs.updatedAt,
+        interviewCallbackAt: jobs.interviewCallbackAt,
+        errorMessage:        jobs.errorMessage,
+        // Latest pipeline_jobs status for this job (sub-query).
+        // CAST(id AS TEXT) works in both PostgreSQL and SQLite.
+        pipelineJobStatus: sql<string | null>`(
+          SELECT status FROM pipeline_jobs
+          WHERE payload->>'job_id' = CAST(${jobs.id} AS TEXT)
+          ORDER BY created_at DESC
+          LIMIT 1
+        )`,
         cadenceId:              emailCadences.id,
         cadenceStatus:          emailCadences.status,
         cadenceHiringEmail:     emailCadences.hiringManagerEmail,
@@ -116,6 +127,10 @@ export async function GET(request: Request) {
       archetype:           j.archetype,
       archetypeConfidence: j.archetypeConfidence,
       createdAt:           j.createdAt,
+      updatedAt:           j.updatedAt ? String(j.updatedAt) : new Date().toISOString(),
+      interviewCallbackAt: j.interviewCallbackAt ? String(j.interviewCallbackAt) : null,
+      errorMessage:        j.errorMessage ?? null,
+      pipelineJobStatus:   j.pipelineJobStatus ?? null,
       outreachTarget: j.outreachId ? ({
         id:           j.outreachId,
         status:       j.outreachStatus as OutreachStatus,

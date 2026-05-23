@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
-import { getJobs, markSubmitted, rejectJob, getResumeVersions, triggerResumeGeneration, getPreferences, startJobStream } from '@/lib/api'
+import { getJobs, markSubmitted, rejectJob, getResumeVersions, triggerResumeGeneration, getPreferences, startJobStream, markInterview, retryPipelineStage } from '@/lib/api'
 import type { ScoredJob, ResumeVersion } from '@/lib/api'
 import type { EmailOutreachMode, OutreachStatus, EmailCadenceStatus } from '@/types/candidate'
 import { Topbar } from '@/components/layout/Topbar'
@@ -13,6 +13,11 @@ import type { Grade } from '@/components/applications/GradeFilterDropdown'
 import { ExportResumePanel } from '@/components/applications/ExportResumePanel'
 import { PdfPreviewSheet } from '@/components/applications/PdfPreviewSheet'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { AnalyticsPanel } from '@/components/applications/AnalyticsPanel'
+import { RunHistoryTable } from '@/components/applications/RunHistoryTable'
+import { getRunHistory, exportRunHistory } from '@/lib/api'
+import type { PipelineRunSummary, TimeRange } from '@/types/candidate'
 
 export default function ApplicationsPage() {
   const { id: candidateId } = useParams<{ id: string }>()
@@ -31,6 +36,28 @@ export default function ApplicationsPage() {
   const [emailOutreachMode, setEmailOutreachMode] = useState<EmailOutreachMode>('manual')
   const [emailResumeAttachment, setEmailResumeAttachment] = useState<'tailored' | 'original'>('tailored')
   const [livePolling, setLivePolling]       = useState(false)
+  const [analyticsRange, setAnalyticsRange] = useState<TimeRange>('30d')
+  const [analyticsRefresh, setAnalyticsRefresh] = useState(0)
+
+  // History tab state
+  const [historyPage, setHistoryPage] = useState(1)
+  const [historyRuns, setHistoryRuns] = useState<PipelineRunSummary[]>([])
+  const [historyInProgress, setHistoryInProgress] = useState<PipelineRunSummary[]>([])
+  const [historyTotal, setHistoryTotal] = useState(0)
+  const [historyTotalPages, setHistoryTotalPages] = useState(1)
+  const [historyLoading, setHistoryLoading] = useState(false)
+
+  const loadHistory = useCallback(async (page: number, range: TimeRange) => {
+    setHistoryLoading(true)
+    try {
+      const result = await getRunHistory(candidateId, page, range)
+      setHistoryRuns(result.runs)
+      setHistoryInProgress(result.inProgress)
+      setHistoryTotal(result.total)
+      setHistoryTotalPages(result.totalPages)
+    } catch { /* ignore */ }
+    finally { setHistoryLoading(false) }
+  }, [candidateId])
 
   const loadJobs = useCallback(async (grades: Grade[]) => {
     setLoading(true)
@@ -79,13 +106,17 @@ export default function ApplicationsPage() {
     return () => clearInterval(interval)
   }, [jobs, loading, selectedGrades, silentRefresh])
 
-  // SSE stream subscription — fires immediately when daemon writes any change,
-  // covers the case where user arrives after transients have already cleared.
+  // SSE stream subscription — fires immediately when daemon writes any change.
+  // F7: also handles run_status_changed to trigger silent refresh.
   useEffect(() => {
     const cleanup = startJobStream(
       candidateId,
       () => { void silentRefresh(selectedGrades) },
-      () => { /* idle/disconnect — transient polling covers reconnect lag */ }
+      () => { /* idle/disconnect — transient polling covers reconnect lag */ },
+      () => {                                         // run_status_changed → refresh jobs + analytics
+        void silentRefresh(selectedGrades)
+        setAnalyticsRefresh(n => n + 1)
+      }
     )
     return cleanup
   }, [candidateId, selectedGrades, silentRefresh])
@@ -175,6 +206,32 @@ export default function ApplicationsPage() {
     }
   }
 
+  // F7: retry failed pipeline stage
+  const handleRetry = async (jobId: string) => {
+    setPendingId(jobId)
+    setError(null)
+    try {
+      await retryPipelineStage(jobId, candidateId)
+    } catch {
+      setError('Failed to retry pipeline stage. Please try again.')
+    } finally {
+      setPendingId(null)
+    }
+  }
+
+  // F7: mark / unmark interview callback
+  const handleMarkInterview = async (jobId: string, mark: boolean) => {
+    setError(null)
+    try {
+      const result = await markInterview(jobId, candidateId, mark)
+      setJobs(prev => prev.map(j =>
+        j.id === jobId ? { ...j, interviewCallbackAt: result.interviewCallbackAt } : j
+      ))
+    } catch {
+      setError('Failed to update interview callback. Please try again.')
+    }
+  }
+
   const counts = ALL_GRADES.reduce((acc, g) => {
     acc[g] = jobs.filter((j) => j.grade === g).length
     return acc
@@ -200,52 +257,110 @@ export default function ApplicationsPage() {
           </div>
         }
       />
-      <main className="flex-1 overflow-y-auto p-6 bg-[#0d1829]">
-        {error && (
-          <div className="mb-4 px-4 py-3 bg-[#450a0a] border border-[#7f1d1d] rounded-lg text-[12px] text-[#fca5a5] flex items-center justify-between gap-3">
-            <span>{error}</span>
-            <button
-              onClick={() => setError(null)}
-              aria-label="Dismiss"
-              className="shrink-0 text-[#fca5a5] hover:text-white transition-colors"
-            >
-              ✕
-            </button>
+      <main className="flex-1 overflow-y-auto bg-[#0d1829]">
+        <Tabs
+          defaultValue="jobs"
+          className="flex flex-col h-full"
+          onValueChange={(v) => {
+            if (v === 'history') void loadHistory(historyPage, analyticsRange)
+          }}
+        >
+          <div className="px-6 pt-4 border-b border-[#1e3a5f]">
+            <TabsList className="bg-[#0d1f3c] border border-[#1e3a5f]">
+              <TabsTrigger value="jobs" className="data-[state=active]:bg-[#1e3a5f] data-[state=active]:text-white text-[#64748b]">
+                Jobs
+              </TabsTrigger>
+              <TabsTrigger value="analytics" className="data-[state=active]:bg-[#1e3a5f] data-[state=active]:text-white text-[#64748b]">
+                Analytics
+              </TabsTrigger>
+              <TabsTrigger value="history" className="data-[state=active]:bg-[#1e3a5f] data-[state=active]:text-white text-[#64748b]">
+                History
+              </TabsTrigger>
+            </TabsList>
           </div>
-        )}
-        <div className="mb-5">
-          <GradeFilterDropdown selected={selectedGrades} onChange={setSelectedGrades} counts={counts} />
-        </div>
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-[140px] rounded-xl bg-[#0d1f3c]" />)}
-          </div>
-        ) : jobs.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="text-[#475569] text-sm">{emptyMessage}</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {jobs.map((job) => (
-              <JobCard
-                key={job.id}
-                job={job}
-                candidateId={candidateId}
-                emailOutreachMode={emailOutreachMode}
-                emailResumeAttachment={emailResumeAttachment}
-                onMarkSubmitted={handleMarkSubmitted}
-                onMoveToRejected={handleMoveToRejected}
-                onGenerateResume={handleGenerateResume}
-                onRetryResume={handleRetryResume}
-                onBuildComplete={handleBuildComplete}
-                onViewResume={handleViewResume}
-                onViewCoverLetter={handleViewCoverLetter}
-                isPending={pendingId === job.id}
-              />
-            ))}
-          </div>
-        )}
+
+          {/* ── Jobs Tab ─────────────────────────────────────────────────────── */}
+          <TabsContent value="jobs" className="flex-1 overflow-y-auto p-6 mt-0">
+            {error && (
+              <div className="mb-4 px-4 py-3 bg-[#450a0a] border border-[#7f1d1d] rounded-lg text-[12px] text-[#fca5a5] flex items-center justify-between gap-3">
+                <span>{error}</span>
+                <button
+                  onClick={() => setError(null)}
+                  aria-label="Dismiss"
+                  className="shrink-0 text-[#fca5a5] hover:text-white transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+            <div className="mb-5">
+              <GradeFilterDropdown selected={selectedGrades} onChange={setSelectedGrades} counts={counts} />
+            </div>
+            {loading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-[140px] rounded-xl bg-[#0d1f3c]" />)}
+              </div>
+            ) : jobs.length === 0 ? (
+              <div className="text-center py-20">
+                <p className="text-[#475569] text-sm">{emptyMessage}</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {jobs.map((job) => (
+                  <JobCard
+                    key={job.id}
+                    job={job}
+                    candidateId={candidateId}
+                    emailOutreachMode={emailOutreachMode}
+                    emailResumeAttachment={emailResumeAttachment}
+                    onMarkSubmitted={handleMarkSubmitted}
+                    onMoveToRejected={handleMoveToRejected}
+                    onGenerateResume={handleGenerateResume}
+                    onRetryResume={handleRetryResume}
+                    onBuildComplete={handleBuildComplete}
+                    onViewResume={handleViewResume}
+                    onViewCoverLetter={handleViewCoverLetter}
+                    onRetry={handleRetry}
+                    onMarkInterview={handleMarkInterview}
+                    isPending={pendingId === job.id}
+                  />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* ── Analytics Tab ────────────────────────────────────────────────── */}
+          <TabsContent value="analytics" className="flex-1 overflow-y-auto p-6 mt-0">
+            <AnalyticsPanel
+              candidateId={candidateId}
+              range={analyticsRange}
+              onRangeChange={setAnalyticsRange}
+              refreshTrigger={analyticsRefresh}
+            />
+          </TabsContent>
+
+          {/* ── History Tab ──────────────────────────────────────────────────── */}
+          <TabsContent
+            value="history"
+            className="flex-1 overflow-y-auto p-6 mt-0"
+          >
+            <RunHistoryTable
+              runs={historyRuns}
+              inProgress={historyInProgress}
+              total={historyTotal}
+              page={historyPage}
+              totalPages={historyTotalPages}
+              loading={historyLoading}
+              onPageChange={(p) => {
+                setHistoryPage(p)
+                void loadHistory(p, analyticsRange)
+              }}
+              onExport={() => void exportRunHistory(candidateId, analyticsRange)}
+            />
+          </TabsContent>
+        </Tabs>
       </main>
+
       {/* Inline PDF preview — one sheet per type, swapped on each open */}
       <PdfPreviewSheet
         open={!!pdfPreview}

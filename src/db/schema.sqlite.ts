@@ -108,6 +108,10 @@ export const pipelineRuns = sqliteTable('pipeline_runs', {
   completedAt:         text(),
   summary:             text({ mode: 'json' }).$type<Record<string, unknown>>(),
   error:               text(),
+  abGradeCount:        integer().default(0).notNull(),
+  resumesGenerated:    integer().default(0).notNull(),
+  emailsSent:          integer().default(0).notNull(),
+  repliesReceived:     integer().default(0).notNull(),
 })
 
 export const jobs = sqliteTable('jobs', {
@@ -132,6 +136,7 @@ export const jobs = sqliteTable('jobs', {
   archetypeConfidence: real(),
   createdAt:      text().$defaultFn(now).notNull(),
   updatedAt:      text().$defaultFn(now).$onUpdateFn(now).notNull(),
+  interviewCallbackAt: text(),
 }, (table) => [
   index('jobs_candidate_status_idx').on(table.candidateId, table.status),
   index('jobs_candidate_source_url_idx').on(table.candidateId, table.sourceUrl),

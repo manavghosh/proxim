@@ -70,7 +70,7 @@ The candidate reviews historical pipeline runs and can export their full pipelin
 - **FR-005**: Pipeline stage updates MUST be pushed to the open dashboard within 5 seconds via server-sent events.
 - **FR-006**: The dashboard MUST display these aggregate metrics: jobs discovered per run, A/B grade rate (%), email open rate (%), email reply rate (%), LinkedIn acceptance rate (%), interview callback rate (%).
 - **FR-007**: A time range filter (last 7 days / 30 days / 90 days / all time) MUST be available and all metrics MUST update when the filter changes.
-- **FR-008**: A grade distribution chart (A/B/C/D/F counts) MUST be shown for all scored jobs in the selected period.
+- **FR-008**: A grade distribution chart (A/B/C/D/E/F counts) MUST be shown for all scored jobs in the selected period.
 - **FR-009**: Run history MUST list each completed run with: start time, duration, jobs discovered, A/B graded, resumes generated, emails sent, replies.
 - **FR-010**: Run history MUST be paginated at 50 rows per page.
 - **FR-011**: A CSV export MUST be available for the full run history or a filtered time range.

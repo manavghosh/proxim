@@ -38,4 +38,11 @@ function CardTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElem
   )
 }
 
-export { Card, CardHeader, CardContent, CardFooter, CardTitle }
+// Added for analytics components (F7)
+function CardDescription({ className, ...props }: React.HTMLAttributes<HTMLParagraphElement>) {
+  return (
+    <p data-slot="card-description" className={cn('text-sm text-[#64748b]', className)} {...props} />
+  )
+}
+
+export { Card, CardHeader, CardContent, CardFooter, CardTitle, CardDescription }

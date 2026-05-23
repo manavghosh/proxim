@@ -346,6 +346,10 @@ async def write_run_summary(state: DiscoveryState) -> dict:
 
         await update_pipeline_job_status(pool, state.pipeline_job_id, "completed")
 
+        # Populate F7 aggregate metrics on the run now that it's complete
+        from agent.db import update_run_aggregates
+        await update_run_aggregates(pool, state.pipeline_run_id)
+
         # Auto-queue a fetch_jds job if any discovered jobs still have empty jd_raw
         from agent.db import count_jobs_with_empty_jd, queue_pipeline_job
         unfetched = await count_jobs_with_empty_jd(pool, state.candidate_id)

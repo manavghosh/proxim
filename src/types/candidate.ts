@@ -130,3 +130,41 @@ export interface PipelineReadiness {
 }
 
 export type EmailOutreachMode = 'agentic' | 'manual'
+
+// ── Pipeline Analytics Dashboard (F7) ────────────────────────────────────────
+
+export type TimeRange = '7d' | '30d' | '90d' | 'all'
+
+export interface GradeDistribution {
+  A: number
+  B: number
+  C: number
+  D: number
+  E: number
+  F: number
+}
+
+export interface AnalyticsMetrics {
+  totalJobsDiscovered:   number
+  abGradeRate:           number | null
+  emailOpenRate:         number | null
+  emailReplyRate:        number | null
+  linkedInAcceptRate:    number | null
+  interviewCallbackRate: number | null
+  gradeDistribution:     GradeDistribution
+  totalRuns:             number
+  inProgressRuns:        number
+}
+
+export interface PipelineRunSummary {
+  id:               string
+  status:           string
+  startedAt:        string
+  completedAt:      string | null
+  durationSeconds:  number | null
+  jobsDiscovered:   number
+  abGradeCount:     number
+  resumesGenerated: number
+  emailsSent:       number
+  repliesReceived:  number
+}

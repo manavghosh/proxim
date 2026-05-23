@@ -17,6 +17,10 @@ const baseJob: ScoredJob = {
   archetype: 'GCC AI Practice Head',
   archetypeConfidence: '0.82',
   createdAt: '2026-05-02T00:00:00Z',
+  updatedAt: '2026-05-02T00:00:00Z',
+  interviewCallbackAt: null,
+  errorMessage: null,
+  pipelineJobStatus: null,
   outreachTarget: null,
   emailCadence: null,
 }

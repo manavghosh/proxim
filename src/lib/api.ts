@@ -141,6 +141,10 @@ export interface ScoredJob {
   archetype: string | null
   archetypeConfidence: string | null
   createdAt: string
+  updatedAt: string
+  interviewCallbackAt: string | null
+  errorMessage: string | null
+  pipelineJobStatus: string | null
   outreachTarget: OutreachTargetSummary | null
   emailCadence: EmailCadenceSummary | null
 }
@@ -350,7 +354,8 @@ export async function unsnoozeJob(
 export function startJobStream(
   candidateId: string,
   onJobsArrived: (jobIds: string[]) => void,
-  onIdle: () => void
+  onIdle: () => void,
+  onRunStatusChanged?: (runId: string, status: string) => void
 ): () => void {
   const eventSource = new EventSource(`/api/candidates/${candidateId}/jobs/stream`)
 
@@ -358,6 +363,16 @@ export function startJobStream(
     try {
       const data = JSON.parse(e.data) as { count: number; jobIds: string[] }
       onJobsArrived(data.jobIds)
+    } catch {
+      // ignore parse errors
+    }
+  })
+
+  eventSource.addEventListener('run_status_changed', (e: MessageEvent) => {
+    if (!onRunStatusChanged) return
+    try {
+      const data = JSON.parse(e.data) as { runId: string; status: string }
+      onRunStatusChanged(data.runId, data.status)
     } catch {
       // ignore parse errors
     }
@@ -374,6 +389,55 @@ export function startJobStream(
   }
 
   return () => eventSource.close()
+}
+
+// ── F7 — Pipeline Analytics Dashboard ────────────────────────────────────────
+
+import type { AnalyticsMetrics, PipelineRunSummary, TimeRange } from '@/types/candidate'
+export type { AnalyticsMetrics, PipelineRunSummary, TimeRange }
+
+export async function getAnalytics(
+  candidateId: string,
+  range: TimeRange = '30d'
+): Promise<{ metrics: AnalyticsMetrics; range: TimeRange }> {
+  return request(`/api/candidates/${encodeURIComponent(candidateId)}/analytics?range=${range}`)
+}
+
+export async function getRunHistory(
+  candidateId: string,
+  page: number = 1,
+  range: TimeRange = 'all'
+): Promise<{ runs: PipelineRunSummary[]; total: number; page: number; totalPages: number; inProgress: PipelineRunSummary[] }> {
+  return request(`/api/candidates/${encodeURIComponent(candidateId)}/analytics/runs?page=${page}&range=${range}`)
+}
+
+export async function exportRunHistory(candidateId: string, range: TimeRange = 'all'): Promise<void> {
+  const url = `/api/candidates/${encodeURIComponent(candidateId)}/analytics/export?range=${range}`
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'pipeline-history.csv'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+}
+
+export async function markInterview(
+  jobId: string,
+  candidateId: string,
+  mark: boolean
+): Promise<{ jobId: string; interviewCallbackAt: string | null }> {
+  return request(`/api/jobs/${jobId}/interview${qs(candidateId)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mark }),
+  })
+}
+
+export async function retryPipelineStage(
+  jobId: string,
+  candidateId: string
+): Promise<{ jobId: string; newPipelineJobId: string; jobType: string; resetJobStatus: string }> {
+  return request(`/api/jobs/${jobId}/retry-stage${qs(candidateId)}`, { method: 'POST' })
 }
 
 // ── LinkedIn Connector (F5) ───────────────────────────────────────────────────

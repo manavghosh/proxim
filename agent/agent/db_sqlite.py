@@ -135,6 +135,40 @@ async def update_pipeline_run(
     await pool.commit()
 
 
+async def update_run_aggregates(pool: aiosqlite.Connection, run_id: str) -> None:
+    """Populate F7 aggregate columns on pipeline_runs at run completion."""
+    import structlog
+    _log = structlog.get_logger()
+    try:
+        await pool.execute("""
+            UPDATE pipeline_runs SET
+              ab_grade_count = (
+                SELECT COUNT(*) FROM jobs
+                WHERE pipeline_run_id = ? AND grade IN ('A','B')
+              ),
+              resumes_generated = (
+                SELECT COUNT(*) FROM resume_versions rv
+                JOIN jobs j ON j.id = rv.job_id
+                WHERE j.pipeline_run_id = ?
+              ),
+              emails_sent = (
+                SELECT COUNT(*) FROM email_drafts ed
+                JOIN email_cadences ec ON ec.id = ed.cadence_id
+                JOIN jobs j ON j.id = ec.job_id
+                WHERE j.pipeline_run_id = ? AND ed.status = 'sent'
+              ),
+              replies_received = (
+                SELECT COUNT(*) FROM email_cadences ec
+                JOIN jobs j ON j.id = ec.job_id
+                WHERE j.pipeline_run_id = ? AND ec.reply_detected_at IS NOT NULL
+              )
+            WHERE id = ?
+        """, (run_id, run_id, run_id, run_id, run_id))
+        await pool.commit()
+    except Exception as exc:
+        _log.warning("update_run_aggregates_failed", run_id=run_id, error=str(exc))
+
+
 async def get_scan_history_urls(
     pool: aiosqlite.Connection,
     candidate_id: str,

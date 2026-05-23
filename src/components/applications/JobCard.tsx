@@ -42,10 +42,42 @@ interface Props {
   onBuildComplete?: (jobId: string) => void
   onViewResume?: (jobId: string) => void
   onViewCoverLetter?: (jobId: string) => void
+  onRetry?: (jobId: string) => void
+  onMarkInterview?: (jobId: string, mark: boolean) => void
   isPending: boolean
   candidateId: string
   emailOutreachMode?: EmailOutreachMode
   emailResumeAttachment?: 'tailored' | 'original'
+}
+
+function formatElapsed(updatedAt: string): string {
+  const diffMs = Date.now() - new Date(updatedAt).getTime()
+  const hours = Math.floor(diffMs / 3_600_000)
+  const mins = Math.floor((diffMs % 3_600_000) / 60_000)
+  if (hours > 0) return `${hours}h ${mins}m`
+  if (mins > 0) return `${mins}m`
+  return 'just now'
+}
+
+function getAgentBadge(pipelineJobStatus: string | null, status: string, errorMessage: string | null): {
+  label: string
+  agentName: string
+  variant: 'running' | 'queued' | 'error' | 'done' | null
+} | null {
+  if (errorMessage || status === 'resume_failed') {
+    const agentName = status === 'resume_failed' ? 'Resume Builder' : 'Pipeline'
+    return { label: 'Error', agentName, variant: 'error' }
+  }
+  if (status === 'resume_ready' || status === 'submitted') {
+    return { label: 'Done', agentName: 'Resume Builder', variant: 'done' }
+  }
+  if (pipelineJobStatus === 'running') {
+    return { label: 'Running', agentName: 'Pipeline', variant: 'running' }
+  }
+  if (pipelineJobStatus === 'queued' && status === 'approved') {
+    return { label: 'Queued', agentName: 'Pipeline', variant: 'queued' }
+  }
+  return null
 }
 
 export function JobCard({
@@ -57,6 +89,8 @@ export function JobCard({
   onBuildComplete,
   onViewResume,
   onViewCoverLetter,
+  onRetry,
+  onMarkInterview,
   isPending,
   candidateId,
   emailOutreachMode = 'manual',
@@ -78,6 +112,12 @@ export function JobCard({
   const score = (job.score10d as Record<string, unknown> | null)?.numeric_score as number | undefined
   const isSnoozed   = job.status === 'snoozed'
   const isApproved  = job.status === 'approved'
+
+  // F7: agent badge + error card
+  const agentBadge = getAgentBadge(job.pipelineJobStatus ?? null, job.status, job.errorMessage ?? null)
+  const elapsedTime = job.updatedAt ? formatElapsed(job.updatedAt) : null
+  const canMarkInterview = ['approved', 'resume_ready', 'submitted'].includes(job.status)
+  const isInterviewMarked = !!job.interviewCallbackAt
   const isRejected  = job.status === 'rejected'
   const isSubmitted = job.status === 'submitted'
   const isResumeReady   = job.status === 'resume_ready'
@@ -126,6 +166,56 @@ export function JobCard({
           )}
         </div>
       </div>
+
+      {/* F7: elapsed time + agent status chips */}
+      {(elapsedTime || agentBadge) && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {elapsedTime && (
+            <span className="text-[10px] text-[#475569]">{elapsedTime} in {job.status.replaceAll('_', ' ')}</span>
+          )}
+          {agentBadge && agentBadge.variant === 'running' && (
+            <Badge className="text-[10px] bg-blue-500/20 text-blue-300 border-blue-500/30 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+              {agentBadge.label}
+            </Badge>
+          )}
+          {agentBadge && agentBadge.variant === 'queued' && (
+            <Badge className="text-[10px] bg-amber-500/20 text-amber-300 border-amber-500/30">{agentBadge.label}</Badge>
+          )}
+          {agentBadge && agentBadge.variant === 'done' && (
+            <Badge className="text-[10px] bg-emerald-500/20 text-emerald-300 border-emerald-500/30">{agentBadge.label}</Badge>
+          )}
+        </div>
+      )}
+
+      {/* F7: error card */}
+      {agentBadge?.variant === 'error' && (
+        <div className="rounded-lg bg-[#450a0a] border border-[#7f1d1d] p-3 flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <p className="text-[11px] font-semibold text-[#fca5a5]">{agentBadge.agentName} failed</p>
+              {job.errorMessage && (
+                <p className="text-[10px] text-[#f87171] mt-0.5 line-clamp-2">{job.errorMessage}</p>
+              )}
+              {elapsedTime && (
+                <p className="text-[10px] text-[#ef4444] mt-0.5">Failed {elapsedTime} ago</p>
+              )}
+            </div>
+            {onRetry && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-[10px] h-7 border-[#7f1d1d] text-[#fca5a5] hover:bg-[#7f1d1d] shrink-0"
+                onClick={() => onRetry(job.id)}
+                disabled={isPending}
+              >
+                <RotateCcw className="w-3 h-3 mr-1" />
+                Retry
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Pills */}
       {(job.location || job.archetype) && (
@@ -208,6 +298,24 @@ export function JobCard({
             disabled={isPending}
             isLoading={isPending}>
             <CheckCheck className="w-3 h-3" /> Mark Submitted
+          </Button>
+        )}
+
+        {/* F7: Interview callback marker */}
+        {canMarkInterview && onMarkInterview && (
+          <Button
+            size="sm"
+            variant="outline"
+            className={`h-7 text-[11px] gap-1 ${
+              isInterviewMarked
+                ? 'border-purple-500/50 text-purple-300 bg-purple-900/20'
+                : 'border-[#1e2d4a] text-[#64748b] hover:text-[#94a3b8]'
+            }`}
+            onClick={() => onMarkInterview(job.id, !isInterviewMarked)}
+            disabled={isPending}
+            title={isInterviewMarked ? 'Unmark interview callback' : 'Mark as interview callback'}
+          >
+            {isInterviewMarked ? '★ Interview' : '☆ Interview'}
           </Button>
         )}
 
