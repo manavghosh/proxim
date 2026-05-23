@@ -245,10 +245,9 @@ export function JobCard({
         </button>
       </CollapsibleTrigger>
 
-      {/* ── Expanded content — smooth grid-row animation ─────────────────── */}
-      <CollapsibleContent className="grid transition-[grid-template-rows] duration-200 ease-out data-[state=closed]:grid-rows-[0fr] data-[state=open]:grid-rows-[1fr]">
-        <div className="min-h-0 overflow-hidden">
-          <div className="border-t border-[#1e2d4a] px-4 pb-4 pt-3 flex flex-col gap-3">
+      {/* ── Expanded content ─────────────────────────────────────────────── */}
+      <CollapsibleContent className="overflow-hidden">
+        <div className="border-t border-[#1e2d4a] px-4 pb-4 pt-3 flex flex-col gap-3">
 
             {/* Error card */}
             {agentBadge?.variant === 'error' && (
@@ -637,7 +636,6 @@ export function JobCard({
             )}
 
           </div>
-        </div>
       </CollapsibleContent>
     </Collapsible>
   )

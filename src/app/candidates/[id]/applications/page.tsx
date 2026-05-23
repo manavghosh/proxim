@@ -305,7 +305,7 @@ export default function ApplicationsPage() {
                 <p className="text-[#475569] text-sm">{emptyMessage}</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                 {jobs.map((job) => (
                   <JobCard
                     key={job.id}
