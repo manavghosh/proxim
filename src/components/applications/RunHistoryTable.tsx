@@ -90,7 +90,7 @@ export function RunHistoryTable({
         </div>
       ) : runs.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-[#475569] text-sm">No completed runs yet.</p>
+          <p className="text-[#475569] text-sm">No AI Agent runs yet — start the pipeline from the Dashboard.</p>
         </div>
       ) : (
         <>

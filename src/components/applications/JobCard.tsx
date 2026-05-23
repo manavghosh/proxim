@@ -92,13 +92,13 @@ function getAgentBadge(pipelineJobStatus: string | null, status: string, errorMe
     return { label: 'Error', agentName, variant: 'error' }
   }
   if (status === 'resume_ready' || status === 'submitted') {
-    return { label: 'Done', agentName: 'Resume Builder', variant: 'done' }
+    return { label: 'Complete', agentName: 'Resume Builder', variant: 'done' }
   }
   if (pipelineJobStatus === 'running') {
-    return { label: 'Running', agentName: 'Pipeline', variant: 'running' }
+    return { label: 'Agent working', agentName: 'AI Agent', variant: 'running' }
   }
   if (pipelineJobStatus === 'queued' && status === 'approved') {
-    return { label: 'Queued', agentName: 'Pipeline', variant: 'queued' }
+    return { label: 'In queue', agentName: 'AI Agent', variant: 'queued' }
   }
   return null
 }
@@ -214,20 +214,20 @@ export function JobCard({
             {agentBadge?.variant === 'running' && (
               <Badge className="text-[10px] h-5 px-1.5 bg-blue-500/20 text-blue-300 border-blue-500/30 flex items-center gap-1">
                 <span className="w-1 h-1 rounded-full bg-blue-400 animate-pulse" />
-                Running
+                Agent working
               </Badge>
             )}
             {agentBadge?.variant === 'queued' && (
-              <Badge className="text-[10px] h-5 px-1.5 bg-amber-500/20 text-amber-300 border-amber-500/30">Queued</Badge>
+              <Badge className="text-[10px] h-5 px-1.5 bg-amber-500/20 text-amber-300 border-amber-500/30">In queue</Badge>
             )}
             {agentBadge?.variant === 'error' && (
               <Badge className="text-[10px] h-5 px-1.5 bg-red-500/20 text-red-300 border-red-500/30 flex items-center gap-1">
                 <span className="w-1 h-1 rounded-full bg-red-400" />
-                Error
+                Action needed
               </Badge>
             )}
             {agentBadge?.variant === 'done' && (
-              <Badge className="text-[10px] h-5 px-1.5 bg-emerald-500/20 text-emerald-300 border-emerald-500/30">Done</Badge>
+              <Badge className="text-[10px] h-5 px-1.5 bg-emerald-500/20 text-emerald-300 border-emerald-500/30">Complete</Badge>
             )}
 
             {/* Interview marker */}
@@ -323,7 +323,7 @@ export function JobCard({
                   disabled={isPending || buildRunning}
                   isLoading={buildRunning}>
                   <FileTextIcon className="w-3 h-3" />
-                  {buildRunning ? 'Building…' : 'Generate Resume'}
+                  {buildRunning ? 'AI Agent writing…' : 'Generate Resume'}
                 </Button>
               )}
 
@@ -436,7 +436,7 @@ export function JobCard({
                   {!job.outreachTarget && (
                     <span className="flex items-center gap-1.5 text-[10px] text-[#475569] animate-pulse">
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                      Searching for contact…
+                      AI Agent identifying hiring contact…
                     </span>
                   )}
 
@@ -446,10 +446,10 @@ export function JobCard({
                     <>
                       <span className="flex items-center gap-1.5 text-[10px] text-[#475569] animate-pulse">
                         <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                        {(outreachStatus ?? job.outreachTarget.status) === 'discovering'  && 'Discovering contact…'}
-                        {(outreachStatus ?? job.outreachTarget.status) === 'enriching'    && 'Enriching profile…'}
-                        {(outreachStatus ?? job.outreachTarget.status) === 'generating'   && 'Generating notes…'}
-                        {(outreachStatus ?? job.outreachTarget.status) === 'pending'      && 'Starting…'}
+                        {(outreachStatus ?? job.outreachTarget.status) === 'discovering'  && 'Identifying decision-maker…'}
+                        {(outreachStatus ?? job.outreachTarget.status) === 'enriching'    && 'Researching their background…'}
+                        {(outreachStatus ?? job.outreachTarget.status) === 'generating'   && 'Crafting personalised message…'}
+                        {(outreachStatus ?? job.outreachTarget.status) === 'pending'      && 'AI Agent starting…'}
                       </span>
                       <Button size="sm" variant="outline"
                         className="h-6 text-[10px] border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c] gap-1"
@@ -527,16 +527,16 @@ export function JobCard({
                   {!emailCadence && (
                     <span className="flex items-center gap-1.5 text-[10px] text-[#475569] animate-pulse">
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                      Finding email…
+                      AI Agent locating email address…
                     </span>
                   )}
 
                   {emailCadence && EMAIL_TRANSIENT.includes(emailCadence.status) && (
                     <span className="flex items-center gap-1.5 text-[10px] text-[#475569] animate-pulse">
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                      {emailCadence.status === 'pending_discovery' && 'Starting…'}
-                      {emailCadence.status === 'discovering'       && 'Discovering email…'}
-                      {emailCadence.status === 'generating'        && 'Drafting emails…'}
+                      {emailCadence.status === 'pending_discovery' && 'AI Agent starting…'}
+                      {emailCadence.status === 'discovering'       && 'Running email discovery…'}
+                      {emailCadence.status === 'generating'        && 'Writing 3-touch email sequence…'}
                     </span>
                   )}
 

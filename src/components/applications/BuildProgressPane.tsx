@@ -30,15 +30,38 @@ const POLL_INTERVAL_MS = 2000
 const TERMINAL_STATUSES = new Set(['completed', 'failed'])
 
 function stepIcon(level: string, step: string): string {
-  if (level === 'error') return '❌'
-  if (level === 'warning') return '⚠️'
-  if (step.includes('keyword')) return '🔑'
-  if (step.includes('personalise') || step.includes('personalised')) return '✍️'
-  if (step.includes('review')) return '🔍'
-  if (step.includes('cover_letter')) return '✉️'
-  if (step.includes('render')) return '📄'
-  if (step.includes('store') || step.includes('complete')) return '🏁'
-  return '⚡'
+  if (level === 'error') return '✗'
+  if (level === 'warning') return '△'
+  if (step.includes('keyword')) return '◈'
+  if (step.includes('personalise') || step.includes('personalised')) return '◎'
+  if (step.includes('review')) return '◇'
+  if (step.includes('cover_letter')) return '◉'
+  if (step.includes('render') || step.includes('pdf')) return '▣'
+  if (step.includes('store') || step.includes('complete')) return '✓'
+  if (step.includes('archetype')) return '◆'
+  if (step.includes('scrape') || step.includes('fetch') || step.includes('jd')) return '◐'
+  return '▸'
+}
+
+function humanizeMessage(step: string, message: string, level: string): string {
+  if (level === 'error') {
+    return message
+      .replace(/^Build failed:\s*/i, '')
+      .replace(/^Error:\s*/i, '')
+  }
+  const s = step.toLowerCase()
+  if (s.includes('keyword')) return 'Extracting key requirements from job description'
+  if (s.includes('archetype')) return 'Identifying optimal resume strategy'
+  if (s.includes('personalise') || s.includes('personali')) return 'Tailoring your experience to match this role'
+  if (s.includes('self_review') || (s.includes('review') && !s.includes('cover'))) return 'Verifying factual accuracy and coherence'
+  if (s.includes('cover_letter')) return 'Writing personalised cover letter'
+  if (s.includes('render') || s.includes('pdf')) return 'Generating PDF documents'
+  if (s.includes('store') || s.includes('complete') || s.includes('finish')) return 'Saved to your profile'
+  if (s.includes('scrape') || s.includes('fetch') || s.includes('jd')) return 'Analysing job description'
+  if (s.includes('score')) return 'Computing fit score'
+  if (s.includes('start') || s.includes('begin') || s.includes('init')) return 'AI Agent initialising…'
+  // Fall back to the original message but strip technical prefixes
+  return message.replace(/^resume_builder\.\w+\s*/i, '').replace(/^[a-z_]+\.[a-z_]+\s*/i, '')
 }
 
 function formatTime(iso: string): string {
@@ -144,7 +167,7 @@ export function BuildProgressPane({ jobId, autoOpen = false, onBuildFailed, onBu
                   id: `err-${Date.now()}`,
                   level: 'error',
                   step: 'failed',
-                  message: `Build failed: ${data.jobError}`,
+                  message: data.jobError ?? 'Agent encountered an unexpected error',
                   createdAt: new Date().toISOString(),
                 },
               ])
@@ -176,9 +199,9 @@ export function BuildProgressPane({ jobId, autoOpen = false, onBuildFailed, onBu
         className="text-[11px] text-[#64748b] hover:text-[#94a3b8] px-0 h-auto gap-1"
       >
         {open ? (
-          <>Hide build progress <ChevronUp className="w-3 h-3" /></>
+          <>Hide agent log <ChevronUp className="w-3 h-3" /></>
         ) : (
-          <>Build progress <ChevronDown className="w-3 h-3" /></>
+          <>Agent log <ChevronDown className="w-3 h-3" /></>
         )}
         {pipelineStatus && !TERMINAL_STATUSES.has(pipelineStatus) && (
           <Loader2 className="w-3 h-3 animate-spin text-[#93c5fd]" />
@@ -187,15 +210,21 @@ export function BuildProgressPane({ jobId, autoOpen = false, onBuildFailed, onBu
 
       {open && (
         <div className="mt-2 p-3 rounded-md bg-[#080f1e] border border-[#1e2d4a] max-h-72 overflow-y-auto font-mono text-[10px]">
-          {loadingLookup && <p className="text-[#64748b]">Looking up build job…</p>}
-          {error && !loadingLookup && <p className="text-[#475569]">{error}</p>}
+          {loadingLookup && <p className="text-[#475569]">Connecting to AI Agent…</p>}
+          {error && !loadingLookup && (
+            <p className="text-[#475569]">
+              {error === 'No build has run for this job yet.'
+                ? 'No activity yet — the AI Agent hasn\'t started on this role.'
+                : 'Unable to reach AI Agent.'}
+            </p>
+          )}
           {!error && !loadingLookup && logs.length === 0 && (
-            <p className="text-[#475569]">Waiting for build to start…</p>
+            <p className="text-[#475569]">AI Agent queued — starting shortly…</p>
           )}
           {logs.map((l) => (
             <div
               key={l.id}
-              className={`flex gap-2 ${
+              className={`flex gap-2 items-baseline ${
                 l.level === 'warning'
                   ? 'text-amber-400'
                   : l.level === 'error'
@@ -203,9 +232,9 @@ export function BuildProgressPane({ jobId, autoOpen = false, onBuildFailed, onBu
                     : 'text-[#94a3b8]'
               }`}
             >
-              <span className="text-[#475569] shrink-0 tabular-nums">[{formatTime(l.createdAt)}]</span>
-              <span className="shrink-0">{stepIcon(l.level, l.step)}</span>
-              <span className="break-all">{l.message}</span>
+              <span className="text-[#334155] shrink-0 tabular-nums text-[9px]">{formatTime(l.createdAt)}</span>
+              <span className="shrink-0 text-[#475569]">{stepIcon(l.level, l.step)}</span>
+              <span className="break-all">{humanizeMessage(l.step, l.message, l.level)}</span>
             </div>
           ))}
         </div>

@@ -263,7 +263,7 @@ export default function DashboardPage() {
               <StatCard
                 label="Jobs Matched"
                 value={jobsMatched === null ? '—' : String(jobsMatched)}
-                sub={jobsMatched === null ? 'Loading…' : jobsMatched === 0 ? 'Run pipeline to discover jobs' : `${jobsMatched} scored job${jobsMatched !== 1 ? 's' : ''}`}
+                sub={jobsMatched === null ? 'Loading…' : jobsMatched === 0 ? 'Start AI Agent to discover roles' : `${jobsMatched} evaluated role${jobsMatched !== 1 ? 's' : ''}`}
                 dotColor={jobsMatched !== null && jobsMatched > 0 ? '#10b981' : undefined}
               />
               <StatCard

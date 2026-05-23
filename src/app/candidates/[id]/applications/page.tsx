@@ -238,8 +238,8 @@ export default function ApplicationsPage() {
   }, {} as Partial<Record<Grade, number>>)
 
   const emptyMessage = selectedGrades.length === 0
-    ? 'Select at least one grade to see jobs.'
-    : `No ${selectedGrades.join(', ')} grade jobs found — run the pipeline to discover and score matches.`
+    ? 'Select at least one grade to see evaluated roles.'
+    : `No ${selectedGrades.join(', ')}-grade roles found yet — start the AI Agent to discover and evaluate opportunities.`
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
