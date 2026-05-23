@@ -97,12 +97,12 @@ export function EmailNotFoundPanel({ jobId, candidateId, cadence, company, outre
         <div className="rounded-md bg-amber-950/30 border border-amber-800/40 px-3 py-2 space-y-1">
           <div className="flex items-center gap-1.5">
             <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
-            <span className="text-[10px] text-amber-300 font-medium">Found via Hunter.io — catch-all domain</span>
+            <span className="text-[10px] text-amber-300 font-medium">Found by AI Agent — catch-all domain</span>
           </div>
           <p className="text-[11px] font-mono text-[#f1f5f9]">{suggestedEmail}</p>
           {confidence > 0 && (
             <p className="text-[10px] text-amber-400/70">
-              {confidence}% confidence · Domain accepts all mail — address can&apos;t be individually verified
+              {confidence}% confidence · Catch-all domain — address can&apos;t be individually verified
             </p>
           )}
           <Button

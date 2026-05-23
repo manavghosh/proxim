@@ -137,7 +137,7 @@ export function ImportJobsSheet({ candidateId, onImported, label = '+ Add Jobs' 
                   {(result?.imported ?? 0) > 0 && (
                     <>
                       <p className="text-xs text-[#64748b] mt-2">
-                        The daemon is scraping each URL, extracting the job description, and scoring it against your CV.
+                        The AI Agent is processing each URL, extracting the job description, and scoring it against your CV.
                         This usually takes 1–2 minutes per job.
                       </p>
                       <div className="mt-3 flex flex-col gap-2 text-[11px] text-[#475569]">

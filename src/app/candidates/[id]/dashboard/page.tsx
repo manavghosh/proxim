@@ -133,7 +133,7 @@ export default function DashboardPage() {
       void poll(jobId)
     } catch (e) {
       setPipelineLoading(false)
-      setError(e instanceof Error ? e.message : 'Failed to start pipeline. Check the daemon is running.')
+      setError(e instanceof Error ? e.message : 'Failed to start pipeline. Check the AI Agent is running.')
     }
   }
 

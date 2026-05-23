@@ -353,7 +353,7 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, jobId
         <div className="space-y-2">
           <p className="text-xs text-[#475569]">
             {cadence.status === 'failed'
-              ? 'Email draft generation failed — the daemon will retry, or you can trigger it now.'
+              ? 'Email draft generation failed — the AI Agent will retry, or you can trigger it now.'
               : 'No email address found for this company domain.'}
           </p>
           <Button
