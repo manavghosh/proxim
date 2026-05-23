@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ExternalLink, FileTextIcon, MoreHorizontal, XCircle, CheckCheck, RotateCcw, Link2, MailIcon, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -130,6 +130,23 @@ export function JobCard({
   const [retryCount, setRetryCount] = useState(0)
 
   const [isOpen, setIsOpen] = useState(false)
+
+  // Sync emailCadence local state when the parent's silentRefresh delivers new
+  // data from the backend. Only sync when prop carries a real (non-optimistic)
+  // cadence row — optimistic inserts use id='' as a sentinel.
+  useEffect(() => {
+    if (job.emailCadence?.id && job.emailCadence.id !== '') {
+      setEmailCadence(job.emailCadence)
+    }
+  }, [job.emailCadence?.id, job.emailCadence?.status])
+
+  // Sync outreach status when the parent's silentRefresh delivers an update
+  // (e.g. generating → notes_ready after the LinkedIn agent finishes).
+  useEffect(() => {
+    if (job.outreachTarget?.status) {
+      setOutreachStatus(job.outreachTarget.status as OutreachStatus)
+    }
+  }, [job.outreachTarget?.status])
 
   const score = (job.score10d as Record<string, unknown> | null)?.numeric_score as number | undefined
   const isSnoozed   = job.status === 'snoozed'
