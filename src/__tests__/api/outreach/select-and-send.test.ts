@@ -43,7 +43,7 @@ describe('POST /api/outreach/[targetId]/select-and-send', () => {
     // 1. candidate prefs (not paused, has access token)
     mockSelectOnce(vi.mocked(db.select), [{ preferences: { linkedin_access_token: 'tok', linkedin_paused: false } }])
     // 2. outreach target (notes_ready, has noteA/noteB)
-    mockSelectOnce(vi.mocked(db.select), [{ id: TARGET, candidateId: CAND, status: 'notes_ready', noteA: 'Note A', noteB: 'Note B', sentAt: null }])
+    mockSelectOnce(vi.mocked(db.select), [{ id: TARGET, candidateId: CAND, status: 'notes_ready', noteA: 'Note A', noteB: 'Note B', sentAt: null, linkedinUrl: 'https://linkedin.com/in/test-person' }])
     // 3. daily send count
     mockSelectOnce(vi.mocked(db.select), [{ count: 0 }])
 
@@ -145,7 +145,7 @@ describe('POST /api/outreach/[targetId]/select-and-send', () => {
     const { db } = await import('@/db')
 
     mockSelectOnce(vi.mocked(db.select), [{ preferences: { linkedin_access_token: 'tok', linkedin_paused: false } }])
-    mockSelectOnce(vi.mocked(db.select), [{ id: TARGET, candidateId: CAND, status: 'notes_ready', noteA: 'Original A', noteB: 'Original B', sentAt: null }])
+    mockSelectOnce(vi.mocked(db.select), [{ id: TARGET, candidateId: CAND, status: 'notes_ready', noteA: 'Original A', noteB: 'Original B', sentAt: null, linkedinUrl: 'https://linkedin.com/in/test-person' }])
     mockSelectOnce(vi.mocked(db.select), [{ count: 0 }])
 
     const updateChain = { set: vi.fn().mockReturnThis(), where: vi.fn().mockResolvedValue([]) }
@@ -170,11 +170,44 @@ describe('POST /api/outreach/[targetId]/select-and-send', () => {
     expect(fetchBody.message).toBe('My custom note')
   })
 
+  it('includes LinkedIn-Version header in invitation API call', async () => {
+    const { db } = await import('@/db')
+
+    mockSelectOnce(vi.mocked(db.select), [{ preferences: { linkedin_access_token: 'tok', linkedin_paused: false } }])
+    mockSelectOnce(vi.mocked(db.select), [{
+      id: TARGET, candidateId: CAND, status: 'notes_ready',
+      noteA: 'Note A', noteB: 'Note B', sentAt: null,
+      linkedinUrl: 'https://linkedin.com/in/test-person',
+    }])
+    mockSelectOnce(vi.mocked(db.select), [{ count: 0 }])
+
+    const updateChain = { set: vi.fn().mockReturnThis(), where: vi.fn().mockResolvedValue([]) }
+    vi.mocked(db.update).mockReturnValue(updateChain as never)
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 'inv-123' }),
+    } as Response)
+
+    const { POST } = await import('@/app/api/outreach/[targetId]/select-and-send/route')
+    const req = new Request(
+      `http://localhost/api/outreach/${TARGET}/select-and-send?candidateId=${CAND}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ selectedNote: 'A' }) }
+    )
+    await POST(req, { params: Promise.resolve({ targetId: TARGET }) })
+
+    const fetchCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+    expect(fetchCall).toBeTruthy()
+    const headers = fetchCall[1].headers as Record<string, string>
+    expect(headers['LinkedIn-Version']).toMatch(/^\d{6}$/)
+  })
+
   it('records selected note variant in DB', async () => {
     const { db } = await import('@/db')
 
     mockSelectOnce(vi.mocked(db.select), [{ preferences: { linkedin_access_token: 'tok', linkedin_paused: false } }])
-    mockSelectOnce(vi.mocked(db.select), [{ id: TARGET, candidateId: CAND, status: 'notes_ready', noteA: 'Note A text', noteB: 'Note B text', sentAt: null }])
+    mockSelectOnce(vi.mocked(db.select), [{ id: TARGET, candidateId: CAND, status: 'notes_ready', noteA: 'Note A text', noteB: 'Note B text', sentAt: null, linkedinUrl: 'https://linkedin.com/in/test-person' }])
     mockSelectOnce(vi.mocked(db.select), [{ count: 0 }])
 
     const setMock = vi.fn().mockReturnThis()

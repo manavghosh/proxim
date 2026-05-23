@@ -6,7 +6,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Paperclip, FileText, Pencil, Check, X } from 'lucide-react'
+import { Paperclip, FileText, Pencil, Check, X, Lightbulb } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { approveCadence, overrideEmail, startCountdown, cancelCadence, retryCadenceGeneration } from '@/lib/api'
 import { PdfPreviewSheet } from '@/components/applications/PdfPreviewSheet'
@@ -20,13 +20,15 @@ interface Props {
   jobId?: string
   mode?: EmailOutreachMode
   attachmentMode?: 'tailored' | 'original'
+  suggestedEmail?: string | null
+  suggestedEmailConfidence?: number | null
   onCadenceUpdated: (c: EmailCadenceSummary) => void
 }
 
 const DAY_LABELS: Record<number, string> = { 1: 'Day 1', 3: 'Day 3', 7: 'Day 7' }
 const DAY_SUBLABELS: Record<number, string> = { 1: 'Intro', 3: 'Value add', 7: 'Gentle close' }
 
-export function EmailOutreachPanel({ cadence: initialCadence, candidateId, jobId, mode = 'manual', attachmentMode = 'tailored', onCadenceUpdated }: Props) {
+export function EmailOutreachPanel({ cadence: initialCadence, candidateId, jobId, mode = 'manual', attachmentMode = 'tailored', suggestedEmail, suggestedEmailConfidence, onCadenceUpdated }: Props) {
   const [cadence, setCadence]               = useState(initialCadence)
   // Deduplicate by dayNumber — keep the last entry per day in case the daemon
   // re-ran and inserted duplicate rows before the DB-level fix was applied.
@@ -47,6 +49,7 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, jobId
   const [isStarting, setIsStarting]         = useState(false)
   const [isRetrying, setIsRetrying]         = useState(false)
   const [day1GmailOpened, setDay1GmailOpened] = useState(false)
+  const [usingSuggestion, setUsingSuggestion] = useState(false)
 
   function handleDraftUpdated(updated: EmailDraftSummary) {
     setDrafts(prev => prev.map(d => d.id === updated.id ? updated : d))
@@ -213,6 +216,40 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, jobId
               Found by AI Agent · {cadence.emailConfidence}% confidence · catch-all domain — verify before sending
             </p>
           )}
+        </div>
+      )}
+
+      {/* LinkedIn contact email suggestion — shown when F5 found an email but F6 hasn't yet */}
+      {needsEmail && suggestedEmail && (
+        <div
+          data-testid="linkedin-email-suggestion"
+          className="rounded-lg border border-blue-800/40 bg-blue-950/20 px-3 py-2 space-y-1.5"
+        >
+          <div className="flex items-center gap-1.5">
+            <Lightbulb className="w-3 h-3 text-blue-400 shrink-0" />
+            <span className="text-[10px] text-blue-300 font-medium">From LinkedIn contact</span>
+            {suggestedEmailConfidence != null && (
+              <span className="text-[10px] text-blue-400/70">· {suggestedEmailConfidence}% confidence</span>
+            )}
+          </div>
+          <p className="text-[11px] font-mono text-[#f1f5f9]">{suggestedEmail}</p>
+          <Button
+            data-testid="use-linkedin-email-btn"
+            size="sm"
+            className="h-6 text-[10px] bg-blue-600 hover:bg-blue-700 text-white gap-1"
+            isLoading={usingSuggestion}
+            onClick={async () => {
+              setUsingSuggestion(true)
+              try {
+                const result = await overrideEmail(cadence.id, candidateId, suggestedEmail)
+                const updated: EmailCadenceSummary = { ...cadence, status: result.status, hiringManagerEmail: suggestedEmail }
+                setCadence(updated)
+                onCadenceUpdated(updated)
+              } finally { setUsingSuggestion(false) }
+            }}
+          >
+            Use this
+          </Button>
         </div>
       )}
 

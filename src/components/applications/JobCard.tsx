@@ -648,6 +648,8 @@ export function JobCard({
                     jobId={job.id}
                     mode={emailOutreachMode}
                     attachmentMode={emailResumeAttachment}
+                    suggestedEmail={job.outreachTarget?.email ?? null}
+                    suggestedEmailConfidence={job.outreachTarget?.emailConfidence ?? null}
                     onCadenceUpdated={setEmailCadence}
                   />
                 )}

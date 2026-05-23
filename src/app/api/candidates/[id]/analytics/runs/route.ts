@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { and, eq, inArray, gte, desc } from 'drizzle-orm'
+import { and, eq, inArray, desc, sql } from 'drizzle-orm'
 import { db } from '@/db'
 import { pipelineRuns } from '@/db/schema'
 import type { TimeRange } from '@/types/candidate'
@@ -20,7 +20,7 @@ export async function GET(
     const rangeStart = getRangeStart(range)
     const conditions = [eq(pipelineRuns.candidateId, candidateId)]
     if (rangeStart) {
-      conditions.push(gte(pipelineRuns.startedAt, rangeStart))
+      conditions.push(sql`${pipelineRuns.startedAt} >= ${rangeStart}`)
     }
 
     const allRuns = await db

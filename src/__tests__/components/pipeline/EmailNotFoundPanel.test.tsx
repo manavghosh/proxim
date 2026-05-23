@@ -63,6 +63,7 @@ describe('EmailNotFoundPanel', () => {
       title: 'HR Director', seniority: null,
       noteA: null, noteB: null, selectedNote: null,
       editedNote: null, sentAt: null, acceptedAt: null, errorMessage: null,
+      email: null, emailConfidence: null,
     }
     render(<EmailNotFoundPanel {...baseProps} outreachTarget={target} />)
     expect(screen.getByText(/Use LinkedIn/)).toBeInTheDocument()

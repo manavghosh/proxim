@@ -1,4 +1,4 @@
-import { and, count, eq, gte, inArray, isNotNull } from 'drizzle-orm'
+import { and, count, eq, inArray, isNotNull, sql } from 'drizzle-orm'
 import type { AnalyticsMetrics, GradeDistribution, PipelineRunSummary, TimeRange } from '@/types/candidate'
 import { jobs, emailDrafts, emailCadences, outreachTargets, pipelineRuns } from '@/db/schema'
 
@@ -48,12 +48,12 @@ export function buildZeroMetrics(): AnalyticsMetrics {
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
-export function getRangeStart(range: TimeRange): Date | null {
+export function getRangeStart(range: TimeRange): string | null {
   if (range === 'all') return null
   const days = range === '7d' ? 7 : range === '30d' ? 30 : 90
   const d = new Date()
   d.setDate(d.getDate() - days)
-  return d
+  return d.toISOString()
 }
 
 // ── DB-dependent computations ─────────────────────────────────────────────────
@@ -218,7 +218,9 @@ export async function fetchRunsForRange(
   const rangeStart = getRangeStart(range)
   const conditions = [eq(pipelineRuns.candidateId, candidateId)]
   if (rangeStart) {
-    conditions.push(gte(pipelineRuns.startedAt, rangeStart))
+    // Use raw sql comparison: ISO strings sort correctly in SQLite (TEXT),
+    // and PostgreSQL implicitly casts the string to timestamptz.
+    conditions.push(sql`${pipelineRuns.startedAt} >= ${rangeStart}`)
   }
   return db.select().from(pipelineRuns).where(and(...conditions))
 }

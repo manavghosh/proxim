@@ -59,19 +59,21 @@ export type OutreachStatus =
   | 'paused' | 'no_contact_found' | 'skipped_dnc' | 'failed'
 
 export interface OutreachTargetSummary {
-  id:           string
-  status:       OutreachStatus
-  name:         string | null
-  linkedinUrl:  string | null
-  title:        string | null
-  seniority:    string | null
-  noteA:        string | null
-  noteB:        string | null
-  selectedNote: 'A' | 'B' | null
-  editedNote:   string | null
-  sentAt:       string | null
-  acceptedAt:   string | null
-  errorMessage: string | null
+  id:              string
+  status:          OutreachStatus
+  name:            string | null
+  linkedinUrl:     string | null
+  title:           string | null
+  seniority:       string | null
+  noteA:           string | null
+  noteB:           string | null
+  selectedNote:    'A' | 'B' | null
+  editedNote:      string | null
+  sentAt:          string | null
+  acceptedAt:      string | null
+  errorMessage:    string | null
+  email:           string | null
+  emailConfidence: number | null
 }
 
 // ── Outreach Mailer Agent (F6) ────────────────────────────────────────────────

@@ -68,9 +68,11 @@ export async function GET(request: Request) {
         outreachNoteB:        outreachTargets.noteB,
         outreachSelectedNote: outreachTargets.selectedNote,
         outreachEditedNote:   outreachTargets.editedNote,
-        outreachSentAt:       outreachTargets.sentAt,
-        outreachAcceptedAt:   outreachTargets.acceptedAt,
-        outreachErrorMessage: outreachTargets.errorMessage,
+        outreachSentAt:          outreachTargets.sentAt,
+        outreachAcceptedAt:      outreachTargets.acceptedAt,
+        outreachErrorMessage:    outreachTargets.errorMessage,
+        outreachEmail:           outreachTargets.email,
+        outreachEmailConfidence: outreachTargets.emailConfidence,
       })
       .from(jobs)
       .leftJoin(emailCadences, eq(emailCadences.jobId, jobs.id))
@@ -142,9 +144,11 @@ export async function GET(request: Request) {
         noteB:        j.outreachNoteB,
         selectedNote: j.outreachSelectedNote as 'A' | 'B' | null,
         editedNote:   j.outreachEditedNote,
-        sentAt:       j.outreachSentAt ? String(j.outreachSentAt) : null,
-        acceptedAt:   j.outreachAcceptedAt ? String(j.outreachAcceptedAt) : null,
-        errorMessage: j.outreachErrorMessage,
+        sentAt:          j.outreachSentAt ? String(j.outreachSentAt) : null,
+        acceptedAt:      j.outreachAcceptedAt ? String(j.outreachAcceptedAt) : null,
+        errorMessage:    j.outreachErrorMessage,
+        email:           j.outreachEmail ?? null,
+        emailConfidence: j.outreachEmailConfidence ?? null,
       } satisfies OutreachTargetSummary) : null,
       emailCadence: j.cadenceId ? ({
         id:                 j.cadenceId,

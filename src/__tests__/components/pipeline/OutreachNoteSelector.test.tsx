@@ -25,6 +25,8 @@ const BASE_TARGET: OutreachTargetSummary = {
   sentAt:       null,
   acceptedAt:   null,
   errorMessage: null,
+  email: null,
+  emailConfidence: null,
 }
 
 const makeProps = (overrides: Partial<OutreachTargetSummary> = {}) => ({

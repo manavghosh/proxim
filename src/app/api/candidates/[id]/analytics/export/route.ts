@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, desc } from 'drizzle-orm'
+import { and, eq, inArray, desc, sql } from 'drizzle-orm'
 import { db } from '@/db'
 import { pipelineRuns } from '@/db/schema'
 import type { TimeRange } from '@/types/candidate'
@@ -27,7 +27,7 @@ export async function GET(
     inArray(pipelineRuns.status, ['completed', 'failed']),
   ]
   if (rangeStart) {
-    conditions.push(gte(pipelineRuns.startedAt, rangeStart))
+    conditions.push(sql`${pipelineRuns.startedAt} >= ${rangeStart}`)
   }
 
   const runs = await db

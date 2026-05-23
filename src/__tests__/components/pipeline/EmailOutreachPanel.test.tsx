@@ -189,4 +189,55 @@ describe('EmailOutreachPanel', () => {
     )
     expect(screen.getByTestId('attachment-missing-notice')).toBeDefined()
   })
+
+  it('shows LinkedIn email suggestion chip when cadence needs email and suggestedEmail is provided', () => {
+    render(
+      <EmailOutreachPanel
+        cadence={makeCadence({ status: 'email_not_found', hiringManagerEmail: null, emailConfidence: null, drafts: [makeDraft(1), makeDraft(3), makeDraft(7)] })}
+        candidateId="cand-001"
+        suggestedEmail="jeff@suffolkglobal.com"
+        suggestedEmailConfidence={87}
+        onCadenceUpdated={vi.fn()}
+      />
+    )
+    expect(screen.getByTestId('linkedin-email-suggestion')).toBeDefined()
+    expect(screen.getByText('jeff@suffolkglobal.com')).toBeDefined()
+    expect(screen.getByText(/87%/)).toBeDefined()
+  })
+
+  it('clicking Use this on suggestion chip calls overrideEmail with the suggested email', async () => {
+    const { overrideEmail } = await import('@/lib/api')
+    vi.mocked(overrideEmail).mockResolvedValue({
+      cadenceId: 'cad-001',
+      status: 'generating',
+      hiringManagerEmail: 'jeff@suffolkglobal.com',
+      emailSource: 'outreach_target',
+    })
+
+    render(
+      <EmailOutreachPanel
+        cadence={makeCadence({ status: 'email_not_found', hiringManagerEmail: null, emailConfidence: null, drafts: [makeDraft(1), makeDraft(3), makeDraft(7)] })}
+        candidateId="cand-001"
+        suggestedEmail="jeff@suffolkglobal.com"
+        suggestedEmailConfidence={87}
+        onCadenceUpdated={vi.fn()}
+      />
+    )
+
+    fireEvent.click(screen.getByTestId('use-linkedin-email-btn'))
+    await waitFor(() => {
+      expect(overrideEmail).toHaveBeenCalledWith('cad-001', 'cand-001', 'jeff@suffolkglobal.com')
+    })
+  })
+
+  it('does not show suggestion chip when suggestedEmail is not provided', () => {
+    render(
+      <EmailOutreachPanel
+        cadence={makeCadence({ status: 'email_not_found', hiringManagerEmail: null, emailConfidence: null, drafts: [] })}
+        candidateId="cand-001"
+        onCadenceUpdated={vi.fn()}
+      />
+    )
+    expect(screen.queryByTestId('linkedin-email-suggestion')).toBeNull()
+  })
 })
