@@ -129,9 +129,7 @@ export function JobCard({
   const [buildRunning, setBuildRunning] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
 
-  // Auto-expand error states so failures are immediately visible
-  const hasError = !!(job.errorMessage || job.status === 'resume_failed')
-  const [isOpen, setIsOpen] = useState(hasError)
+  const [isOpen, setIsOpen] = useState(false)
 
   const score = (job.score10d as Record<string, unknown> | null)?.numeric_score as number | undefined
   const isSnoozed   = job.status === 'snoozed'
