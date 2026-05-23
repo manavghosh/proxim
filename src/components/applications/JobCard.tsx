@@ -246,7 +246,7 @@ export function JobCard({
       </CollapsibleTrigger>
 
       {/* ── Expanded content ─────────────────────────────────────────────── */}
-      <CollapsibleContent className="overflow-hidden">
+      <CollapsibleContent className="overflow-hidden data-[state=closed]:hidden">
         <div className="border-t border-[#1e2d4a] px-4 pb-4 pt-3 flex flex-col gap-3">
 
             {/* Error card */}
