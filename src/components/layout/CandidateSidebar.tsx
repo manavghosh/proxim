@@ -4,6 +4,7 @@ import type { LucideIcon } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { LayoutDashboard, Workflow, Send, Settings, ChevronLeft } from 'lucide-react'
+import { CandidateAvatar } from '@/components/shared/CandidateAvatar'
 
 function NavItem({
   href,
@@ -34,16 +35,14 @@ function NavItem({
   )
 }
 
-function initials(name: string) {
-  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
-}
-
 export function CandidateSidebar({
   candidateId,
   candidateName,
+  avatarData,
 }: {
   candidateId: string
   candidateName: string
+  avatarData?: string | null
 }) {
   const pathname = usePathname()
   const base = `/candidates/${candidateId}`
@@ -101,9 +100,7 @@ export function CandidateSidebar({
       {/* Candidate footer */}
       <div className="px-2.5 py-3 border-t border-[#0d1829]">
         <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-md hover:bg-[#0d1829] cursor-pointer transition-colors">
-          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-700 to-indigo-700 flex items-center justify-center flex-shrink-0">
-            <span className="text-white text-xs font-bold">{initials(candidateName)}</span>
-          </div>
+          <CandidateAvatar name={candidateName} avatarData={avatarData} size="md" className="flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-[11px] font-semibold text-[#cbd5e1] truncate">{candidateName}</p>
             <p className="text-[9px] text-[#475569]">Candidate</p>

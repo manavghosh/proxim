@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { ChevronDownIcon, UsersIcon } from 'lucide-react'
+import { ChevronDownIcon } from 'lucide-react'
+import { CandidateAvatar } from '@/components/shared/CandidateAvatar'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -50,7 +51,7 @@ export function CandidateSwitcher({ candidateId }: Props) {
       }`}
       aria-label={`Current candidate: ${currentName}`}
     >
-      <UsersIcon className="size-3.5 text-[#475569]" />
+      <CandidateAvatar name={currentName} avatarData={current?.avatarData} size="sm" />
       <span className="text-[#e2e8f0] max-w-[160px] truncate">{currentName}</span>
       {hasMultiple && <ChevronDownIcon className="size-3 text-[#475569]" />}
     </button>
@@ -70,6 +71,7 @@ export function CandidateSwitcher({ candidateId }: Props) {
             onClick={() => router.push(`/candidates/${c.id}/${section}`)}
             className={c.id === candidateId ? 'text-[#93c5fd]' : ''}
           >
+            <CandidateAvatar name={c.name} avatarData={c.avatarData} size="sm" className="mr-1.5" />
             <span className="flex-1 truncate">{c.name}</span>
             {c.id === candidateId && (
               <span className="text-[10px] text-[#475569] ml-2">current</span>

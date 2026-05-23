@@ -1,18 +1,10 @@
 import Link from 'next/link'
 import type { CandidateState } from '@/types/candidate'
+import { CandidateAvatar } from '@/components/shared/CandidateAvatar'
 
 interface ProfileCardProps {
   candidate: CandidateState | null
   candidateId: string
-}
-
-function initials(name: string): string {
-  return name
-    .split(' ')
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
 }
 
 const STATUS_STYLE: Record<string, string> = {
@@ -73,9 +65,7 @@ export function ProfileCard({ candidate, candidateId }: ProfileCardProps) {
       </div>
 
       {/* Avatar + name */}
-      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-700 to-indigo-700 flex items-center justify-center text-white font-bold text-lg mb-3">
-        {initials(name)}
-      </div>
+      <CandidateAvatar name={name} avatarData={candidate?.avatarData} size="lg" className="rounded-xl mb-3" />
       <p className="text-[15px] font-bold text-[#f1f5f9] mb-0.5">{name}</p>
       {topRole && (
         <p className="text-[11px] text-[#60a5fa] mb-4">
