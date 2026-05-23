@@ -14,6 +14,7 @@ import type { CandidateState, Preferences, PipelineReadiness } from '@/types/can
 import { LinkedInConnectCard } from '@/components/settings/LinkedInConnectCard'
 import { EmailOutreachModeCard } from '@/components/settings/EmailOutreachModeCard'
 import { ResumeAttachmentCard } from '@/components/settings/ResumeAttachmentCard'
+import { AvatarUploadSection } from '@/components/settings/AvatarUploadSection'
 
 export default function SettingsPage() {
   const { id: candidateId } = useParams<{ id: string }>()
@@ -155,6 +156,16 @@ export default function SettingsPage() {
           </section>
 
           <div className="flex flex-col gap-6">
+            <section className="bg-[#0d1f3c] border border-[#1e3a5f] rounded-xl p-5 space-y-4">
+              <p className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase">Profile Photo</p>
+              <AvatarUploadSection
+                candidateId={candidateId}
+                candidateName={candidate?.parsedProfile?.name ?? 'Candidate'}
+                avatarData={candidate?.avatarData ?? null}
+                onAvatarChange={(data) => setCandidate(prev => prev ? { ...prev, avatarData: data } : prev)}
+              />
+            </section>
+
             <section className="bg-[#0d1f3c] border border-[#1e3a5f] rounded-xl p-5 space-y-4">
               <p className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase">Preferences</p>
               <PreferencesForm
