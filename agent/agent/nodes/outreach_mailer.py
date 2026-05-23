@@ -354,6 +354,11 @@ async def discover_email_node(state: OutreachMailerState, config) -> OutreachMai
             return email, max(base_confidence, 90), source
         if status == "risky":
             return email, min(base_confidence, 65), source   # cap risky at 65
+        if status == "accept_all":
+            # Catch-all domain: server accepts all mail; can't verify individual
+            # address exists. Treat as a low-confidence suggestion (cap at 55)
+            # so the user is shown the best candidate rather than a blank input.
+            return email, min(base_confidence, 55), source
         return None, 0, ""   # undeliverable / unknown
 
     # Track a risky result in case nothing deliverable is found

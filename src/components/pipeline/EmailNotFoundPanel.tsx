@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Mail, ExternalLink, X, RotateCcw } from 'lucide-react'
+import { Mail, ExternalLink, X, RotateCcw, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { overrideEmail, cancelCadence, startEmailOutreach } from '@/lib/api'
@@ -17,11 +17,9 @@ interface Props {
 }
 
 export function EmailNotFoundPanel({ jobId, candidateId, cadence, company, outreachTarget, onUpdate }: Props) {
-  // Bug 4: pre-fill with the low-confidence email so the user can confirm or replace it
+  const suggestedEmail = cadence.hiringManagerEmail ?? ''
   const [showInput, setShowInput]   = useState(false)
-  const [emailValue, setEmailValue] = useState(
-    cadence.status === 'low_confidence' ? (cadence.hiringManagerEmail ?? '') : ''
-  )
+  const [emailValue, setEmailValue] = useState(suggestedEmail)
   const [saving, setSaving]         = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [retrying, setRetrying]     = useState(false)
@@ -29,11 +27,13 @@ export function EmailNotFoundPanel({ jobId, candidateId, cadence, company, outre
   const retryCount                  = cadence.retryCount ?? 0
   const [error, setError]           = useState<string | null>(null)
 
-  // Bug 2: message variant for each triggering status
+  const isLowConfidence = cadence.status === 'low_confidence'
+  const confidence      = cadence.emailConfidence ?? 0
+
   const message =
-    cadence.status === 'low_confidence' ? `Email found but could not be verified for ${company}` :
-    cadence.status === 'failed'         ? `Email outreach could not be completed for ${company}` :
-                                          `No email found for ${company}`
+    isLowConfidence         ? `Email found but unverified for ${company}` :
+    cadence.status === 'failed' ? `Email outreach could not be completed for ${company}` :
+                                  `No verified email found for ${company}`
 
   const emailValid = emailValue.includes('@') && emailValue.includes('.')
 
@@ -92,6 +92,30 @@ export function EmailNotFoundPanel({ jobId, candidateId, cadence, company, outre
     <div className="mt-1 space-y-2">
       <p className="text-[11px] text-[#64748b]">{message}</p>
 
+      {/* Show discovered email when low_confidence (catch-all domain) */}
+      {isLowConfidence && suggestedEmail && (
+        <div className="rounded-md bg-amber-950/30 border border-amber-800/40 px-3 py-2 space-y-1">
+          <div className="flex items-center gap-1.5">
+            <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
+            <span className="text-[10px] text-amber-300 font-medium">Found via Hunter.io — catch-all domain</span>
+          </div>
+          <p className="text-[11px] font-mono text-[#f1f5f9]">{suggestedEmail}</p>
+          {confidence > 0 && (
+            <p className="text-[10px] text-amber-400/70">
+              {confidence}% confidence · Domain accepts all mail — address can&apos;t be individually verified
+            </p>
+          )}
+          <Button
+            size="sm"
+            className="h-6 text-[10px] bg-amber-600 hover:bg-amber-700 text-white mt-1 gap-1"
+            onClick={() => { setShowInput(true); setEmailValue(suggestedEmail) }}
+          >
+            <Mail className="w-3 h-3" />
+            Use this email
+          </Button>
+        </div>
+      )}
+
       {!showInput ? (
         <div className="flex items-center gap-2 flex-wrap">
           <Button
@@ -101,7 +125,7 @@ export function EmailNotFoundPanel({ jobId, candidateId, cadence, company, outre
             onClick={() => setShowInput(true)}
           >
             <Mail className="w-3 h-3" />
-            Enter email
+            {isLowConfidence ? 'Edit email' : 'Enter email'}
           </Button>
 
           {outreachTarget?.linkedinUrl && (
