@@ -305,7 +305,37 @@ export default function ApplicationsPage() {
                 <p className="text-[#475569] text-sm">{emptyMessage}</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+              // Two independent flex columns so collapsed cards don't inherit
+              // the row-height of an expanded neighbour (CSS grid limitation).
+              <div className="hidden md:flex gap-4">
+                {[0, 1].map((col) => (
+                  <div key={col} className="flex-1 flex flex-col gap-4">
+                    {jobs.filter((_, i) => i % 2 === col).map((job) => (
+                      <JobCard
+                        key={job.id}
+                        job={job}
+                        candidateId={candidateId}
+                        emailOutreachMode={emailOutreachMode}
+                        emailResumeAttachment={emailResumeAttachment}
+                        onMarkSubmitted={handleMarkSubmitted}
+                        onMoveToRejected={handleMoveToRejected}
+                        onGenerateResume={handleGenerateResume}
+                        onRetryResume={handleRetryResume}
+                        onBuildComplete={handleBuildComplete}
+                        onViewResume={handleViewResume}
+                        onViewCoverLetter={handleViewCoverLetter}
+                        onRetry={handleRetry}
+                        onMarkInterview={handleMarkInterview}
+                        isPending={pendingId === job.id}
+                      />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* Single column on mobile */}
+            {!loading && jobs.length > 0 && (
+              <div className="flex md:hidden flex-col gap-4">
                 {jobs.map((job) => (
                   <JobCard
                     key={job.id}
