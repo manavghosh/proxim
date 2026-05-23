@@ -24,9 +24,9 @@ export async function POST(
     if (ALREADY_SENT.includes(draft.status))
       return NextResponse.json({ error: 'Draft already sent', currentStatus: draft.status }, { status: 409 })
 
-    const now = new Date()
+    const sentAt = new Date()
     const [updated] = await db.update(emailDrafts)
-      .set({ status: 'manually_sent', sentAt: now, updatedAt: now })
+      .set({ status: 'manually_sent', sentAt })
       .where(eq(emailDrafts.id, draftId))
       .returning()
 
@@ -34,7 +34,7 @@ export async function POST(
       draftId: updated.id,
       dayNumber: updated.dayNumber,
       status: 'manually_sent',
-      sentAt: now.toISOString(),
+      sentAt: sentAt.toISOString(),
     })
   } catch (e) {
     console.error('[mark-sent] error:', e)

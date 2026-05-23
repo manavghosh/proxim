@@ -36,7 +36,7 @@ export async function POST(
     if (ACTIVE_STATUSES.includes(cadence.status)) {
       await db
         .update(emailCadences)
-        .set({ hiringManagerEmail: confirmedEmail, emailSource: 'manual', updatedAt: new Date() })
+        .set({ hiringManagerEmail: confirmedEmail, emailSource: 'manual' })
         .where(eq(emailCadences.id, cadenceId))
       return NextResponse.json({
         cadenceId,

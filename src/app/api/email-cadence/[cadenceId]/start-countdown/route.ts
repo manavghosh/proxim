@@ -32,7 +32,7 @@ export async function POST(
       .where(and(eq(emailDrafts.cadenceId, cadenceId), eq(emailDrafts.dayNumber, 7)))
 
     await db.update(emailCadences)
-      .set({ status: 'active', updatedAt: now })
+      .set({ status: 'active' })
       .where(eq(emailCadences.id, cadenceId))
 
     return NextResponse.json({

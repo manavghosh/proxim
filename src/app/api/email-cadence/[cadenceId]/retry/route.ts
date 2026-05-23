@@ -41,7 +41,7 @@ export async function POST(
     // Reset cadence to generating (email address already known — skip discovery)
     await db
       .update(emailCadences)
-      .set({ status: 'generating', errorMessage: null, updatedAt: new Date() })
+      .set({ status: 'generating', errorMessage: null })
       .where(eq(emailCadences.id, cadenceId))
 
     // Queue outreach_mailer_generate — skips Hunter.io, goes straight to LLM

@@ -33,7 +33,7 @@ export async function PATCH(
 
     const [updated] = await db
       .update(emailDrafts)
-      .set({ bodyHtml, updatedAt: new Date() })
+      .set({ bodyHtml })
       .where(and(eq(emailDrafts.id, draftId), eq(emailDrafts.cadenceId, cadenceId)))
       .returning()
 

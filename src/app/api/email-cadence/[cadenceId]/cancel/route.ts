@@ -21,16 +21,15 @@ export async function POST(
     if (TERMINAL.includes(cadence.status))
       return NextResponse.json({ error: 'Cadence already in terminal state', currentStatus: cadence.status }, { status: 409 })
 
-    const now = new Date()
     await db.update(emailDrafts)
-      .set({ status: 'cancelled', updatedAt: now })
+      .set({ status: 'cancelled' })
       .where(and(
         eq(emailDrafts.cadenceId, cadenceId),
         or(eq(emailDrafts.status, 'draft'), eq(emailDrafts.status, 'approved'), eq(emailDrafts.status, 'scheduled'))
       ))
 
     await db.update(emailCadences)
-      .set({ status: 'cancelled', updatedAt: now })
+      .set({ status: 'cancelled' })
       .where(eq(emailCadences.id, cadenceId))
 
     return NextResponse.json({ cadenceId, status: 'cancelled' })
