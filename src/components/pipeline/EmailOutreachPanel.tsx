@@ -123,8 +123,17 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, jobId
   const showDraftTabs = (
     cadence.status === 'pending_approval' ||
     cadence.status === 'approved' ||
-    cadence.status === 'active'
+    cadence.status === 'active' ||
+    // Show drafts even when email is unverified — drafts are generated regardless
+    cadence.status === 'email_not_found' ||
+    cadence.status === 'low_confidence'
   ) && drafts.length > 0
+
+  const needsEmail = !cadence.hiringManagerEmail && (
+    cadence.status === 'pending_approval' ||
+    cadence.status === 'email_not_found' ||
+    cadence.status === 'low_confidence'
+  )
 
   const isManual = mode === 'manual'
 
@@ -195,6 +204,32 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, jobId
               </Button>
             </>
           )}
+        </div>
+      )}
+
+      {/* Email entry required — shown when drafts exist but no email address is set */}
+      {needsEmail && (
+        <div className="rounded-lg bg-amber-950/30 border border-amber-800/40 px-3 py-2.5 space-y-2">
+          <p className="text-[10px] text-amber-300 font-medium">Enter recipient email to schedule sending</p>
+          <div className="flex gap-2">
+            <input
+              autoFocus
+              value={emailDraft}
+              onChange={e => setEmailDraft(e.target.value)}
+              placeholder="hiring@company.com"
+              className="h-7 flex-1 rounded-md border border-[#2d4a6e] bg-[#060d1f] px-2 text-[11px] text-[#f1f5f9] outline-none focus:border-blue-500"
+              onKeyDown={e => { if (e.key === 'Enter') void handleSaveEmail() }}
+            />
+            <Button
+              size="sm"
+              className="h-7 text-[10px] bg-amber-600 hover:bg-amber-700 text-white shrink-0 px-3"
+              onClick={handleSaveEmail}
+              disabled={!emailDraft.includes('@') || savingEmail}
+              isLoading={savingEmail}
+            >
+              Save
+            </Button>
+          </div>
         </div>
       )}
 
@@ -284,16 +319,18 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, jobId
           {/* Agentic: pending_approval → Approve & Send */}
           {cadence.status === 'pending_approval' && !isManual && (
             <Button onClick={handleApprove} isLoading={isApproving}
-              data-testid="approve-cadence-btn" className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-              Approve & Send Day 1 Now
+              disabled={needsEmail || isApproving}
+              data-testid="approve-cadence-btn" className="w-full bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50">
+              {needsEmail ? 'Enter email above to send' : 'Approve & Send Day 1 Now'}
             </Button>
           )}
 
           {/* Manual: pending_approval → Approve Drafts */}
           {cadence.status === 'pending_approval' && isManual && (
             <Button onClick={handleApprove} isLoading={isApproving}
-              data-testid="approve-cadence-btn" className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-              Approve Drafts
+              disabled={needsEmail || isApproving}
+              data-testid="approve-cadence-btn" className="w-full bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50">
+              {needsEmail ? 'Enter email above to schedule' : 'Approve Drafts'}
             </Button>
           )}
 

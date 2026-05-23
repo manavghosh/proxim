@@ -638,7 +638,9 @@ export function JobCard({
                   emailCadence.status === 'replied' ||
                   emailCadence.status === 'bounced' ||
                   emailCadence.status === 'auth_expired' ||
-                  emailCadence.status === 'attachment_missing'
+                  emailCadence.status === 'attachment_missing' ||
+                  // Always surface drafts when they exist, even if email not yet confirmed
+                  ((emailCadence.status === 'email_not_found' || emailCadence.status === 'low_confidence') && emailCadence.drafts.length > 0)
                 ) && (
                   <EmailOutreachPanel
                     cadence={emailCadence}
