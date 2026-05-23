@@ -123,6 +123,7 @@ export interface CandidateState {
   parseStatus: ParseStatus
   parsedProfile: ParsedProfile | null
   preferences: Preferences
+  avatarData: string | null
 }
 
 export interface PipelineReadiness {

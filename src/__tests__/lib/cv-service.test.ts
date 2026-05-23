@@ -23,6 +23,7 @@ const base: Candidate = {
   parsedProfile: null,
   parseStatus: 'pending',
   preferences: {},
+  avatarData: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 }

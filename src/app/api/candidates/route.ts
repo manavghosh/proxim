@@ -11,6 +11,7 @@ export async function GET() {
         name:        candidates.name,
         parseStatus: candidates.parseStatus,
         createdAt:   candidates.createdAt,
+        avatarData:  candidates.avatarData,
       })
       .from(candidates)
       .orderBy(desc(candidates.createdAt))

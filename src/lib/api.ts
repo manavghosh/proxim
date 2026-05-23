@@ -31,6 +31,7 @@ export interface CandidateSummary {
   jobsMatched: number
   applications: number
   createdAt: string
+  avatarData: string | null
 }
 
 export async function getCandidates(): Promise<{ candidates: CandidateSummary[] }> {
@@ -50,6 +51,17 @@ export async function updateCandidateName(id: string, name: string): Promise<voi
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),
+  })
+}
+
+export async function updateCandidateAvatar(
+  id: string,
+  avatarData: string | null
+): Promise<void> {
+  return request(`/api/candidates/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ avatarData }),
   })
 }
 

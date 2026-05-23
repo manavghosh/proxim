@@ -55,6 +55,7 @@ const baseCandidate: CandidateState = {
   parseStatus: 'failed' satisfies ParseStatus,
   parsedProfile: null,
   preferences: {},
+  avatarData: null,
 }
 
 describe('SettingsPage — Re-parse', () => {
