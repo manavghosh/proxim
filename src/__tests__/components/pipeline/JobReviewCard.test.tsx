@@ -108,3 +108,23 @@ describe('JobReviewCard', () => {
     expect(badge.className).toMatch(/blue/)
   })
 })
+
+describe('JobReviewCard — New badge', () => {
+  it('shows "New" badge for jobs created within 24 hours', () => {
+    const recentJob = {
+      ...baseJob,
+      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2h ago
+    }
+    render(<JobReviewCard {...makeProps(recentJob)} />)
+    expect(screen.getByText('New')).toBeInTheDocument()
+  })
+
+  it('does not show "New" badge for jobs older than 24 hours', () => {
+    const oldJob = {
+      ...baseJob,
+      createdAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(), // 25h ago
+    }
+    render(<JobReviewCard {...makeProps(oldJob)} />)
+    expect(screen.queryByText('New')).not.toBeInTheDocument()
+  })
+})

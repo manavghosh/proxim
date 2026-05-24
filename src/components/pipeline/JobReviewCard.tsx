@@ -84,6 +84,14 @@ export function JobReviewCard({
   const [reportOpen, setReportOpen] = useState(false)
 
   const gradeStyle = job.grade ? GRADE_STYLES[job.grade] ?? GRADE_STYLES.D : ''
+  const isNew = (() => {
+    try {
+      const ms = Date.now() - new Date(job.createdAt).getTime()
+      return ms < 24 * 60 * 60 * 1000
+    } catch {
+      return false
+    }
+  })()
   const isSnoozed   = job.status === 'snoozed'
   const isApproved  = job.status === 'approved' || job.status === 'resume_ready' || job.status === 'submitted'
   const snoozedUntil = job.hitlCheckpoint?.snoozedUntil
@@ -131,9 +139,16 @@ export function JobReviewCard({
             </div>
 
             {/* Title + Company */}
-            <h3 className="text-[13px] font-semibold text-[#f1f5f9] leading-snug truncate">
-              {job.title}
-            </h3>
+            <div className="flex items-center gap-1">
+              <h3 className="text-[13px] font-semibold text-[#f1f5f9] leading-snug truncate">
+                {job.title}
+              </h3>
+              {isNew && (
+                <Badge className="bg-blue-950/60 text-blue-300 border-blue-700 text-[9px] ml-1 shrink-0">
+                  New
+                </Badge>
+              )}
+            </div>
             <div className="flex items-center gap-3 mt-1">
               <span className="flex items-center gap-1 text-[11px] text-[#64748b]">
                 <Building2 className="w-3 h-3" />
