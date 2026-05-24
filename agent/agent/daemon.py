@@ -927,8 +927,9 @@ async def main() -> None:
     _check_langsmith_guard(settings)
     _configure_langsmith(settings)
 
-    from agent.llm_tracker import configure_langfuse
+    from agent.llm_tracker import configure_langfuse, configure_langsmith_litellm
     configure_langfuse(settings)
+    configure_langsmith_litellm(settings)
 
     from agent.telemetry import init_telemetry
     init_telemetry(settings)
