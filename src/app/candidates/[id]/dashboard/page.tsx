@@ -1,9 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
-import { getCV, getReadiness, triggerPipeline, getPipelineStatus, getJobStats, resetFailedJobs, getReadyToScoreGroups } from '@/lib/api'
-import type { PipelineJobType } from '@/lib/api'
+import { getCV, getReadiness, getJobStats, resetFailedJobs, getReadyToScoreGroups, getLastSearch } from '@/lib/api'
 import { Topbar } from '@/components/layout/Topbar'
 import { CandidateSwitcher } from '@/components/layout/CandidateSwitcher'
 import { StatCard } from '@/components/dashboard/StatCard'
@@ -15,13 +14,8 @@ import { Button } from '@/components/ui/button'
 import { PipelineLogPane } from '@/components/dashboard/PipelineLogPane'
 import { ScoringBatchSheet } from '@/components/dashboard/ScoringBatchSheet'
 import { ImportJobsSheet } from '@/components/pipeline/ImportJobsSheet'
+import { JobSearchCard } from '@/components/dashboard/JobSearchCard'
 import type { CandidateState, PipelineReadiness } from '@/types/candidate'
-
-const PHASE_OPTIONS: Array<{ value: PipelineJobType; label: string; description: string }> = [
-  { value: 'discovery_only', label: '▶ Full Pipeline',   description: 'Discover → Fetch JDs → Score' },
-  { value: 'fetch_jds',      label: '📄 Fetch JDs',      description: 'Fetch JD text for discovered jobs' },
-  { value: 'score_jobs',     label: '🏅 Score Jobs',     description: 'Score & grade all fetched JDs' },
-]
 
 function parseStatusMeta(candidate: CandidateState | null) {
   if (!candidate) return { value: '—', sub: 'Loading…' }
@@ -46,12 +40,6 @@ export default function DashboardPage() {
   const [readiness, setReadiness]         = useState<PipelineReadiness | null>(null)
   const [loading, setLoading]             = useState(true)
   const [error, setError]                 = useState<string | null>(null)
-  const [chainJobIds, setChainJobIds]     = useState<string[]>([])
-  const [pipelineStatus, setPipelineStatus] = useState<string | null>(null)
-  const [pipelineLoading, setPipelineLoading] = useState(false)
-  const [selectedPhase, setSelectedPhase] = useState<PipelineJobType>('discovery_only')
-  const [showPhaseMenu, setShowPhaseMenu] = useState(false)
-  const phaseMenuRef = useRef<HTMLDivElement>(null)
   const [scoreFailed, setScoreFailed]     = useState(0)
   const [jobsMatched, setJobsMatched]     = useState<number | null>(null)
   const [applications, setApplications]   = useState<number | null>(null)
@@ -59,6 +47,8 @@ export default function DashboardPage() {
   const [readyToScore, setReadyToScore]   = useState(0)
   const [batchSheetOpen, setBatchSheetOpen] = useState(false)
   const [importJobId, setImportJobId]       = useState<string | null>(null)
+  const [lastSearch, setLastSearch]       = useState<import('@/lib/api').LastSearch | null>(null)
+  const [awaitingReview, setAwaitingReview] = useState(0)
 
   const refreshReadyToScore = useCallback(async () => {
     try {
@@ -73,18 +63,21 @@ export default function DashboardPage() {
     async function load() {
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
-          const [cv, r, stats, ready] = await Promise.all([
+          const [cv, r, stats, ready, lastSearchData] = await Promise.all([
             getCV(candidateId),
             getReadiness(candidateId),
             getJobStats(candidateId),
             getReadyToScoreGroups(candidateId).catch(() => ({ totalJobs: 0, groups: [] })),
+            getLastSearch(candidateId),
           ])
           setCandidate(cv)
           setReadiness(r)
           setScoreFailed(stats.scoreFailed)
           setJobsMatched(stats.jobsMatched)
           setApplications(stats.applications)
+          setAwaitingReview(stats.awaitingReview)
           setReadyToScore(ready.totalJobs)
+          setLastSearch(lastSearchData)
           setLoading(false)
           return
         } catch {
@@ -96,54 +89,28 @@ export default function DashboardPage() {
     load()
   }, [candidateId])
 
-  async function startPipeline(phase: PipelineJobType) {
-    setPipelineLoading(true)
-    setPipelineStatus(null)
-    setError(null)
+  const refreshStats = useCallback(async () => {
     try {
-      const { jobId } = await triggerPipeline(phase, candidateId)
-      setChainJobIds([jobId])
-      setPipelineStatus('queued')
-
-      const poll = async (currentJobId: string) => {
-        try {
-          const status = await getPipelineStatus(currentJobId)
-          setPipelineStatus(status.status)
-          if (status.followUpJobId) {
-            setChainJobIds((prev) => [...prev, status.followUpJobId!])
-            setPipelineStatus('running')
-            setTimeout(() => { void poll(status.followUpJobId!) }, 3000)
-          } else if (status.status !== 'completed' && status.status !== 'failed') {
-            setTimeout(() => { void poll(currentJobId) }, 5000)
-          } else {
-            setPipelineLoading(false)
-            // After any phase finishes, refresh ready-to-score count and job stats so
-            // the user sees the new "ready to score" chip without a manual reload.
-            void refreshReadyToScore()
-            void getJobStats(candidateId).then((s) => {
-              setScoreFailed(s.scoreFailed)
-              setJobsMatched(s.jobsMatched)
-              setApplications(s.applications)
-            }).catch(() => {})
-          }
-        } catch {
-          setTimeout(() => { void poll(currentJobId) }, 5000)
-        }
-      }
-      void poll(jobId)
-    } catch (e) {
-      setPipelineLoading(false)
-      setError(e instanceof Error ? e.message : 'Failed to start pipeline. Check the AI Agent is running.')
+      const [stats, lastSearchData] = await Promise.all([
+        getJobStats(candidateId),
+        getLastSearch(candidateId),
+      ])
+      setScoreFailed(stats.scoreFailed)
+      setJobsMatched(stats.jobsMatched)
+      setApplications(stats.applications)
+      setAwaitingReview(stats.awaitingReview)
+      setLastSearch(lastSearchData)
+    } catch {
+      // silently ignore refresh errors
     }
-  }
+  }, [candidateId])
 
   async function handleRescore() {
     setRescoreLoading(true)
     try {
-      const { reset } = await resetFailedJobs(candidateId)
+      await resetFailedJobs(candidateId)
       setScoreFailed(0)
       setError(null)
-      if (reset > 0) await startPipeline('score_jobs')
     } catch {
       setError('Failed to reset failed jobs. Please try again.')
     } finally {
@@ -152,30 +119,9 @@ export default function DashboardPage() {
   }
 
   function handleBatchScored(pipelineJobId: string) {
-    setChainJobIds([pipelineJobId])
-    setPipelineStatus('queued')
-    setPipelineLoading(true)
+    setImportJobId(pipelineJobId)
     void refreshReadyToScore()
-    const poll = async () => {
-      try {
-        const status = await getPipelineStatus(pipelineJobId)
-        setPipelineStatus(status.status)
-        if (status.status === 'completed' || status.status === 'failed') {
-          setPipelineLoading(false)
-          void refreshReadyToScore()
-          void getJobStats(candidateId).then((s) => {
-            setScoreFailed(s.scoreFailed)
-            setJobsMatched(s.jobsMatched)
-            setApplications(s.applications)
-          }).catch(() => {})
-        } else {
-          setTimeout(() => { void poll() }, 5000)
-        }
-      } catch {
-        setTimeout(() => { void poll() }, 5000)
-      }
-    }
-    void poll()
+    void refreshStats()
   }
 
   const cvMeta = parseStatusMeta(candidate)
@@ -210,37 +156,6 @@ export default function DashboardPage() {
               label="+ Add Jobs"
               onImported={(pjId) => { if (pjId) setImportJobId(pjId) }}
             />
-            <div className="relative flex items-center gap-0" ref={phaseMenuRef}>
-              <Button size="sm" className="text-xs rounded-r-none border-r border-r-white/20"
-                onClick={() => startPipeline(selectedPhase)} isLoading={pipelineLoading}>
-                {pipelineStatus ? `Pipeline: ${pipelineStatus}` : PHASE_OPTIONS.find(p => p.value === selectedPhase)?.label ?? '▶ Run Pipeline'}
-              </Button>
-              {!pipelineLoading && (
-                <Button
-                  size="sm"
-                  onClick={() => setShowPhaseMenu(v => !v)}
-                  className="h-8 px-2 rounded-l-none rounded-r-sm border-l border-l-white/20 text-xs"
-                  title="Select pipeline phase"
-                >▾</Button>
-              )}
-              {showPhaseMenu && (
-                <div className="absolute top-full right-0 mt-1 w-64 bg-[#0d1f3c] border border-[#1e2d4a] rounded-lg shadow-xl z-50 overflow-hidden">
-                  {PHASE_OPTIONS.map((opt) => (
-                    <Button
-                      key={opt.value}
-                      variant="ghost"
-                      className={`w-full justify-start px-4 py-3 h-auto text-xs rounded-none ${selectedPhase === opt.value ? 'bg-[#1e3a5f] text-[#e2e8f0]' : 'text-[#94a3b8]'}`}
-                      onClick={() => { setSelectedPhase(opt.value); setShowPhaseMenu(false) }}
-                    >
-                      <div className="text-left">
-                        <div className="font-medium">{opt.label}</div>
-                        <div className="text-[#475569] text-[10px] mt-0.5">{opt.description}</div>
-                      </div>
-                    </Button>
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
         }
       />
@@ -273,6 +188,13 @@ export default function DashboardPage() {
                 dotColor={applications !== null && applications > 0 ? '#06b6d4' : undefined}
               />
             </div>
+            <JobSearchCard
+              candidateId={candidateId}
+              lastSearch={lastSearch}
+              awaitingReview={awaitingReview}
+              scoreFailed={scoreFailed}
+              onSearchComplete={refreshStats}
+            />
             <div className="grid grid-cols-[1fr_320px] gap-4">
               <div className="flex flex-col gap-4">
                 {readiness && <ReadinessRing readiness={readiness} candidateId={candidateId} />}
@@ -281,7 +203,7 @@ export default function DashboardPage() {
               <ProfileCard candidate={candidate} candidateId={candidateId} />
             </div>
             <PipelineLogPane
-              chainJobIds={[...chainJobIds, ...(importJobId ? [importJobId] : [])]}
+              chainJobIds={importJobId ? [importJobId] : []}
               onReviewRequired={() => setBatchSheetOpen(true)}
             />
           </>
