@@ -171,6 +171,31 @@ C1 summary card:
 
 ---
 
+## Pipeline Page Changes
+
+Two targeted changes to make the pipeline page consistent with the new dashboard card.
+
+### 1. "New" badge on recently discovered jobs
+
+`jobs.createdAt` is already present in the `HitlJob` API response. In `JobReviewCard`, badge any job where `createdAt` is within 24 hours with a **"New"** pill. This completes the loop opened by the dashboard card's "Review X New Jobs in Pipeline →" CTA — candidates can immediately identify which jobs came from their latest search.
+
+No API changes needed — data is already returned.
+
+### 2. Vocabulary consistency
+
+Two strings reference the retired "Run Pipeline" concept:
+
+| File | Line | Current | New |
+|---|---|---|---|
+| `src/app/candidates/[id]/pipeline/page.tsx` | empty state button | `"Run Pipeline →"` | `"Search for New Jobs →"` |
+| `src/components/dashboard/PipelineLogPane.tsx` | placeholder text | `"Click ▶ Run Pipeline to begin job discovery"` | `"Search for new jobs from the Dashboard to begin"` |
+
+### Applications Page
+
+No changes needed. Approved/submitted jobs are unaffected by search refresh. The existing History tab (`RunHistoryTable`) will naturally surface each new search run.
+
+---
+
 ## Files Touched
 
 | File | Change |
@@ -179,6 +204,9 @@ C1 summary card:
 | `src/components/dashboard/JobSearchCard.tsx` | New component |
 | `src/app/candidates/[id]/dashboard/page.tsx` | Remove split button; add JobSearchCard; fetch last-search data |
 | `src/lib/api.ts` | Add `getLastSearch(candidateId)` client function |
+| `src/components/pipeline/JobReviewCard.tsx` | Add "New" badge for jobs created within 24h |
+| `src/app/candidates/[id]/pipeline/page.tsx` | Update empty state button text |
+| `src/components/dashboard/PipelineLogPane.tsx` | Update placeholder text |
 
 ---
 
