@@ -7,7 +7,7 @@ export function getModel(): LanguageModel {
   const model = process.env.LLM_MODEL
 
   if (provider === 'anthropic') {
-    return anthropic(model ?? 'claude-sonnet-4-6')
+    return anthropic(model ?? 'claude-sonnet-4-6')   // legacy — prefer gemini provider
   }
 
   if (provider === 'gemini' || provider === 'google') {
