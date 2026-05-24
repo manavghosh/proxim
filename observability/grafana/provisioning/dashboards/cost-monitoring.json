@@ -1,0 +1,114 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "Prometheus",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
+  "uid": "proxim-cost-monitoring",
+  "title": "Proxim — LLM Cost Monitoring",
+  "tags": ["proxim", "cost", "llm"],
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5m",
+  "time": { "from": "now-7d", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "token_cost_per_k",
+        "label": "Cost per 1K tokens ($)",
+        "type": "custom",
+        "current": { "value": "0.003", "text": "0.003" },
+        "options": [
+          { "value": "0.001", "text": "0.001" },
+          { "value": "0.003", "text": "0.003" },
+          { "value": "0.006", "text": "0.006" },
+          { "value": "0.015", "text": "0.015" }
+        ],
+        "query": "0.001,0.003,0.006,0.015",
+        "hide": 0,
+        "includeAll": false,
+        "multi": false
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Total Tokens per Agent (daily)",
+      "type": "barchart",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "expr": "sum by (agent_name) (increase(llm_token_count_prompt_total[1d]) + increase(llm_token_count_completion_total[1d]))",
+          "legendFormat": "{{agent_name}}"
+        }
+      ],
+      "options": {
+        "xField": "Time",
+        "groupWidth": 0.7,
+        "barWidth": 0.97
+      }
+    },
+    {
+      "id": 2,
+      "title": "Estimated Cost per Agent (daily, $)",
+      "type": "barchart",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "expr": "sum by (agent_name) ((increase(llm_token_count_prompt_total[1d]) + increase(llm_token_count_completion_total[1d])) / 1000) * ${token_cost_per_k}",
+          "legendFormat": "{{agent_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 4
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Token Usage Over Time (prompt vs completion)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 8, "w": 24, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "expr": "sum(rate(llm_token_count_prompt_total[1h])) * 3600",
+          "legendFormat": "Prompt tokens/hr"
+        },
+        {
+          "expr": "sum(rate(llm_token_count_completion_total[1h])) * 3600",
+          "legendFormat": "Completion tokens/hr"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Cumulative Estimated Cost (7d, $)",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 16, "w": 8, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "expr": "sum((increase(llm_token_count_prompt_total[7d]) + increase(llm_token_count_completion_total[7d])) / 1000) * ${token_cost_per_k}",
+          "legendFormat": "7d cost"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 4
+        }
+      }
+    }
+  ]
+}

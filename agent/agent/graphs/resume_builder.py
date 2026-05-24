@@ -185,6 +185,7 @@ async def personalise_resume(state: ResumeBuilderState) -> dict:
         from agent.config import settings
         from agent.archetype_registry import ArchetypeRegistry
         from agent.resume_engine import personalise_resume as _personalise
+        from agent.telemetry import get_tracer
 
         registry = ArchetypeRegistry()
         arch_config = registry.get_archetype(state.archetype, state.archetype_confidence)
@@ -194,11 +195,16 @@ async def personalise_resume(state: ResumeBuilderState) -> dict:
             prompt_kwargs["review_feedback"] = state.review_feedback
 
         try:
-            result = _personalise(
-                {"id": state.job_id, "title": state.job_title,
-                 "company": state.job_company, "jd_raw": state.jd_raw},
-                state.parsed_profile, arch_config, state.keywords, settings,
-            )
+            with get_tracer().start_as_current_span("personalise_resume") as span:
+                span.set_attribute("agent_name", "resume_builder")
+                span.set_attribute("job_id", state.job_id or "")
+                span.set_attribute("pipeline_run_id", state.pipeline_run_id or "")
+                result = _personalise(
+                    {"id": state.job_id, "title": state.job_title,
+                     "company": state.job_company, "jd_raw": state.jd_raw},
+                    state.parsed_profile, arch_config, state.keywords, settings,
+                    job_id=state.job_id, run_id=state.pipeline_run_id,
+                )
             await _log(pool, state.pipeline_job_id, "personalise_resume",
                        f"Resume personalised (attempt {state.self_review_attempt + 1})")
             return {
@@ -223,15 +229,21 @@ async def self_review(state: ResumeBuilderState) -> dict:
         from agent.config import settings
         from agent.models import PersonalisedResume
         from agent.resume_engine import self_review as _review
+        from agent.telemetry import get_tracer
 
         if not state.personalised_resume:
             return {"review_passed": False, "review_feedback": "No resume content generated"}
 
         pr = PersonalisedResume.model_validate_json(state.personalised_resume)
-        ok, feedback = _review(
-            {"id": state.job_id, "title": state.job_title, "company": state.job_company},
-            pr, state.parsed_profile, settings,
-        )
+        with get_tracer().start_as_current_span("self_review") as span:
+            span.set_attribute("agent_name", "resume_builder")
+            span.set_attribute("job_id", state.job_id or "")
+            span.set_attribute("pipeline_run_id", state.pipeline_run_id or "")
+            ok, feedback = _review(
+                {"id": state.job_id, "title": state.job_title, "company": state.job_company},
+                pr, state.parsed_profile, settings,
+                job_id=state.job_id, run_id=state.pipeline_run_id,
+            )
         await _log(pool, state.pipeline_job_id, "self_review",
                    f"Coherence check: {'passed' if ok else 'failed'} — {feedback}")
         return {"review_passed": ok, "review_feedback": feedback}

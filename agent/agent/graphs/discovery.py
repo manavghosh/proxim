@@ -116,6 +116,7 @@ def fan_out(state: DiscoveryState) -> list[Send]:
 
 async def scrape_naukri(state: DiscoveryState) -> dict:
     from agent.scrapers.naukri import NaukriScraper
+    from agent.telemetry import get_tracer
     pool = await _make_pool()
     try:
         scraper = NaukriScraper()
@@ -123,7 +124,11 @@ async def scrape_naukri(state: DiscoveryState) -> dict:
         logger.info("pipeline_step", step="scrape_naukri", status="started", query_count=len(queries))
         await _log(pool, state.pipeline_job_id, "info", "scrape_naukri",
                    f"Scraping Naukri ({len(queries)} queries)…", {"query_count": len(queries)})
-        jobs = await scraper.safe_scrape(queries, state.preferences)
+        with get_tracer().start_as_current_span("scrape_naukri") as span:
+            span.set_attribute("agent_name", "discovery")
+            span.set_attribute("source", "naukri")
+            span.set_attribute("pipeline_run_id", state.pipeline_run_id or "")
+            jobs = await scraper.safe_scrape(queries, state.preferences)
         logger.info("pipeline_step", step="scrape_naukri", status="complete", jobs_found=len(jobs))
         await _log(pool, state.pipeline_job_id, "info", "scrape_naukri",
                    f"Naukri complete — {len(jobs)} jobs found", {"jobs_found": len(jobs)})
@@ -134,6 +139,7 @@ async def scrape_naukri(state: DiscoveryState) -> dict:
 
 async def scrape_iimjobs(state: DiscoveryState) -> dict:
     from agent.scrapers.iimjobs import IimjobsScraper
+    from agent.telemetry import get_tracer
     pool = await _make_pool()
     try:
         scraper = IimjobsScraper()
@@ -141,7 +147,11 @@ async def scrape_iimjobs(state: DiscoveryState) -> dict:
         logger.info("pipeline_step", step="scrape_iimjobs", status="started", query_count=len(queries))
         await _log(pool, state.pipeline_job_id, "info", "scrape_iimjobs",
                    f"Scraping IIMJobs ({len(queries)} queries)…", {"query_count": len(queries)})
-        jobs = await scraper.safe_scrape(queries, state.preferences)
+        with get_tracer().start_as_current_span("scrape_iimjobs") as span:
+            span.set_attribute("agent_name", "discovery")
+            span.set_attribute("source", "iimjobs")
+            span.set_attribute("pipeline_run_id", state.pipeline_run_id or "")
+            jobs = await scraper.safe_scrape(queries, state.preferences)
         logger.info("pipeline_step", step="scrape_iimjobs", status="complete", jobs_found=len(jobs))
         await _log(pool, state.pipeline_job_id, "info", "scrape_iimjobs",
                    f"IIMJobs complete — {len(jobs)} jobs found", {"jobs_found": len(jobs)})
@@ -152,6 +162,7 @@ async def scrape_iimjobs(state: DiscoveryState) -> dict:
 
 async def scrape_linkedin(state: DiscoveryState) -> dict:
     from agent.scrapers.linkedin import LinkedInScraper
+    from agent.telemetry import get_tracer
     pool = await _make_pool()
     try:
         scraper = LinkedInScraper()
@@ -159,7 +170,11 @@ async def scrape_linkedin(state: DiscoveryState) -> dict:
         logger.info("pipeline_step", step="scrape_linkedin", status="started", query_count=len(queries))
         await _log(pool, state.pipeline_job_id, "info", "scrape_linkedin",
                    f"Scraping LinkedIn ({len(queries)} queries)…", {"query_count": len(queries)})
-        jobs = await scraper.safe_scrape(queries, state.preferences)
+        with get_tracer().start_as_current_span("scrape_linkedin") as span:
+            span.set_attribute("agent_name", "discovery")
+            span.set_attribute("source", "linkedin")
+            span.set_attribute("pipeline_run_id", state.pipeline_run_id or "")
+            jobs = await scraper.safe_scrape(queries, state.preferences)
         logger.info("pipeline_step", step="scrape_linkedin", status="complete", jobs_found=len(jobs))
         await _log(pool, state.pipeline_job_id, "info", "scrape_linkedin",
                    f"LinkedIn complete — {len(jobs)} jobs found", {"jobs_found": len(jobs)})

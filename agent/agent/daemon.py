@@ -778,6 +778,44 @@ async def _reply_bounce_detection_loop(pool) -> None:
         await asyncio.sleep(3600)
 
 
+def _check_langsmith_guard(settings) -> None:
+    """Warn loudly if LangSmith tracing is accidentally enabled in production.
+    This guard is warning-only: daemon startup is never blocked.
+    """
+    if settings.environment == "production" and settings.langsmith_tracing:
+        logger.critical(
+            "langsmith_active_in_production",
+            message="LANGSMITH_TRACING=true in production — set to false immediately",
+        )
+
+
+def _configure_langsmith(settings) -> None:
+    """Push LangSmith settings into os.environ so LangGraph picks them up.
+
+    pydantic-settings reads .env into the Settings object but does NOT write
+    back to os.environ. LangGraph reads LANGSMITH_* directly from os.environ,
+    so we must bridge the gap here before any LangGraph graphs are imported.
+    """
+    import os as _os
+    if not settings.langsmith_tracing or not settings.langsmith_api_key:
+        return
+    # New-style vars (langsmith SDK 0.5+)
+    _os.environ["LANGSMITH_TRACING"] = "true"
+    _os.environ["LANGSMITH_API_KEY"] = settings.langsmith_api_key
+    _os.environ["LANGSMITH_PROJECT"] = settings.langsmith_project
+    if settings.langsmith_endpoint:
+        _os.environ["LANGSMITH_ENDPOINT"] = settings.langsmith_endpoint
+    # Legacy vars — langchain-core (used by LangGraph 1.x internally) still
+    # checks LANGCHAIN_TRACING_V2 / LANGCHAIN_API_KEY, not LANGSMITH_*.
+    _os.environ["LANGCHAIN_TRACING_V2"] = "true"
+    _os.environ["LANGCHAIN_API_KEY"] = settings.langsmith_api_key
+    _os.environ["LANGCHAIN_PROJECT"] = settings.langsmith_project
+    if settings.langsmith_endpoint:
+        _os.environ["LANGCHAIN_ENDPOINT"] = settings.langsmith_endpoint
+    logger.info("langsmith_configured", project=settings.langsmith_project,
+                endpoint=settings.langsmith_endpoint)
+
+
 async def main() -> None:
     from agent.config import settings
     from agent.db import (
@@ -799,6 +837,16 @@ async def main() -> None:
     signal.signal(signal.SIGINT, _handle_shutdown)
 
     logger.info("daemon_starting", polling_interval_seconds=settings.polling_interval_seconds)
+
+    _check_langsmith_guard(settings)
+    _configure_langsmith(settings)
+
+    from agent.llm_tracker import configure_langfuse
+    configure_langfuse(settings)
+
+    from agent.telemetry import init_telemetry
+    init_telemetry(settings)
+
     pool = await create_pool(settings.database_url)
 
     # On startup, re-queue any pipeline_jobs that were 'running' when the

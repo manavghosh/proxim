@@ -11,6 +11,7 @@ from typing import TypedDict, Optional
 
 import litellm
 from langchain_core.runnables import RunnableConfig
+from agent.llm_tracker import langfuse_metadata
 from pydantic import BaseModel, field_validator
 
 from agent import proxycurl
@@ -181,6 +182,7 @@ async def determine_target_roles(job_title: str, company: str) -> list[str]:
             response_format={"type": "json_object"},
             temperature=0.2,
             max_tokens=200,
+            metadata=langfuse_metadata("linkedin_connector", "linkedin"),
         )
         raw   = (resp.choices[0].message.content or "").strip() or "{}"
         data  = json.loads(raw)
@@ -509,6 +511,7 @@ async def generate_notes_node(state: LinkedInConnectorState, config: RunnableCon
 
     await update_outreach_target(pool, state["outreach_target_id"], status="generating")
 
+    from agent.telemetry import get_tracer as _get_tracer
     last_error: str = ""
     for attempt in range(1, MAX_NOTE_RETRIES + 1):
         logger.info(
@@ -525,6 +528,7 @@ async def generate_notes_node(state: LinkedInConnectorState, config: RunnableCon
                 {"role": "user",   "content": prompt},
             ],
             response_format={"type": "json_object"},
+            metadata=langfuse_metadata("linkedin_connector", "linkedin", job_id=state.get("job_id")),
         )
         raw = response.choices[0].message.content or "{}"
         try:

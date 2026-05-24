@@ -7,6 +7,7 @@ import structlog
 from pydantic import ValidationError
 
 from agent.models import JobScoreOutput, ScoreReport
+from agent.llm_tracker import langfuse_metadata
 
 logger = structlog.get_logger()
 
@@ -258,6 +259,7 @@ async def score_job(
     job: dict,
     parsed_profile: dict,
     preferences: dict,
+    run_id: str | None = None,
 ) -> JobScoreOutput:
     """Score a single job using LiteLLM. Self-repair retry on Pydantic validation failure."""
     import litellm
@@ -275,6 +277,7 @@ async def score_job(
                 response_format={"type": "json_object"},
                 temperature=0.1,
                 max_tokens=8192,
+                metadata=langfuse_metadata("scoring_engine", "scoring", job_id=str(job.get("id") or ""), run_id=run_id),
             )
             raw = response.choices[0].message.content
             finish_reason = response.choices[0].finish_reason
@@ -350,6 +353,7 @@ async def generate_report(
     job: dict,
     parsed_profile: dict,
     score_output: JobScoreOutput,
+    run_id: str | None = None,
 ) -> ScoreReport:
     """Generate the 6-block report. Block A only for F-grade jobs."""
     import litellm
@@ -369,6 +373,8 @@ async def generate_report(
             messages=[{"role": "user", "content": summary_prompt}],
             response_format={"type": "json_object"},
             temperature=0.1,
+            metadata={"agent_name": "scoring_engine", "feature": "scoring",
+                      "job_id": job.get("id"), "run_id": run_id},
         )
         raw_f = response.choices[0].message.content or ""
         raw_f = re.sub(r'^```(?:json)?\s*\n?', '', raw_f.strip())
@@ -386,6 +392,8 @@ async def generate_report(
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
         temperature=0.2,
+        metadata={"agent_name": "scoring_engine", "feature": "scoring",
+                  "job_id": job.get("id"), "run_id": run_id},
     )
     raw_r = response.choices[0].message.content or ""
     raw_r = re.sub(r'^```(?:json)?\s*\n?', '', raw_r.strip())

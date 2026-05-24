@@ -83,6 +83,8 @@ async def score_and_report_batch(state: ScoringState) -> dict:
     """Score each job with LiteLLM and save to DB immediately after each job."""
     from agent.scoring_engine import score_job, generate_report
     from agent.db import update_job_score, mark_job_score_failed
+    from agent.telemetry import get_tracer
+    from agent.config import settings as _settings
 
     if not state.jobs_to_score:
         logger.info("score_batch_skip", reason="no jobs to score")
@@ -94,6 +96,16 @@ async def score_and_report_batch(state: ScoringState) -> dict:
     skipped = 0
     total = len(state.jobs_to_score)
 
+    from opentelemetry import context as _otel_ctx, trace as _otel_trace
+    tracer = get_tracer()
+    model_id = f"{_settings.llm_provider}/{_settings.llm_model}"
+
+    root_span = tracer.start_span("scoring")
+    root_span.set_attribute("agent_name", "scoring")
+    root_span.set_attribute("pipeline_run_id", state.pipeline_run_id or "")
+    root_span.set_attribute("candidate_id", state.candidate_id or "")
+    _ctx_token = _otel_ctx.attach(_otel_trace.set_span_in_context(root_span))
+
     try:
         parsed_profile, preferences = await _load_candidate_context(pool, state.candidate_id)
 
@@ -102,8 +114,20 @@ async def score_and_report_batch(state: ScoringState) -> dict:
 
         for job in state.jobs_to_score:
             try:
-                score_output = await score_job(job, parsed_profile, preferences)
-                report = await generate_report(job, parsed_profile, score_output)
+                with tracer.start_as_current_span("score_job") as span:
+                    span.set_attribute("job_id", str(job.get("id", "")))
+                    span.set_attribute("pipeline_run_id", state.pipeline_run_id or "")
+                    span.set_attribute("agent_name", "scoring")
+                    span.set_attribute("model", model_id)
+                    try:
+                        score_output = await score_job(job, parsed_profile, preferences,
+                                                       run_id=state.pipeline_run_id)
+                        report = await generate_report(job, parsed_profile, score_output,
+                                                       run_id=state.pipeline_run_id)
+                    except Exception as span_exc:
+                        span.set_attribute("error", True)
+                        span.set_attribute("error.message", str(span_exc))
+                        raise
 
                 score_json = {
                     "gate": {
@@ -182,6 +206,8 @@ async def score_and_report_batch(state: ScoringState) -> dict:
         logger.info("score_batch_done", scored=scored, skipped=skipped, failed=failed)
 
     finally:
+        _otel_ctx.detach(_ctx_token)
+        root_span.end()
         await _close_pool(pool)
 
     return {"scored_count": scored, "failed_count": failed, "skipped_count": skipped}

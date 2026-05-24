@@ -11,6 +11,7 @@ from typing import TypedDict, Optional
 
 import litellm
 from pydantic import BaseModel, field_validator, model_validator
+from agent.llm_tracker import langfuse_metadata
 
 from agent import hunter_io
 from agent.proxycurl import find_company_domain as _find_company_domain
@@ -191,6 +192,7 @@ async def litellm_generate(state: OutreachMailerState, settings,
         api_key=_api_key(settings),
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
+        metadata=langfuse_metadata("outreach_mailer", "email", job_id=state.get("job_id")),
     )
     raw = _strip_markdown(resp.choices[0].message.content or "")
     data = json.loads(raw)
@@ -233,6 +235,7 @@ async def litellm_self_review(draft: EmailDraftOutput, settings) -> SelfReviewRe
         api_key=_api_key(settings),
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
+        metadata=langfuse_metadata("outreach_mailer", "email"),
     )
     raw = _strip_markdown(resp.choices[0].message.content or "")
     data = json.loads(raw)

@@ -6,6 +6,7 @@ import re
 import structlog
 
 from agent.models import PersonalisedResume, CoverLetterContent, KeywordSet
+from agent.llm_tracker import langfuse_metadata
 from agent.archetype_registry import ArchetypeConfig
 
 logger = structlog.get_logger()
@@ -48,7 +49,12 @@ def _fix_json_newlines(s: str) -> str:
     return ''.join(result)
 
 
-def _call_llm(prompt: str, settings) -> str:
+def _call_llm(
+    prompt: str,
+    settings,
+    job_id: str | None = None,
+    run_id: str | None = None,
+) -> str:
     import litellm
     response = litellm.completion(
         model=f"{settings.llm_provider}/{settings.llm_model}",
@@ -57,6 +63,7 @@ def _call_llm(prompt: str, settings) -> str:
         response_format={"type": "json_object"},
         temperature=0.2,
         max_tokens=8192,
+        metadata=langfuse_metadata("resume_engine", "resume", job_id=job_id, run_id=run_id),
     )
     choice = response.choices[0]
     finish_reason = getattr(choice, 'finish_reason', 'unknown')
@@ -75,6 +82,8 @@ def personalise_resume(
     archetype_config: ArchetypeConfig,
     keywords: list[str],
     settings,
+    job_id: str | None = None,
+    run_id: str | None = None,
 ) -> PersonalisedResume:
     """Call LLM to personalise the resume for the detected archetype."""
     prompt = f"""You are a senior career writer personalising a resume for a specific job.
@@ -118,7 +127,7 @@ JD: {str(job.get('jd_raw', ''))[:2000]}
     for attempt in range(3):
         raw = ""
         try:
-            raw = _call_llm(prompt, settings)
+            raw = _call_llm(prompt, settings, job_id=job_id or job.get("id"), run_id=run_id)
             parsed = json.loads(raw)
             return PersonalisedResume.model_validate(parsed)
         except (json.JSONDecodeError, ValueError) as exc:
@@ -137,6 +146,8 @@ def self_review(
     personalised: PersonalisedResume,
     parsed_profile: dict,
     settings,
+    job_id: str | None = None,
+    run_id: str | None = None,
 ) -> tuple[bool, str]:
     """Ask the LLM to check factual integrity of the personalised resume."""
     prompt = f"""You are a factual integrity auditor reviewing a personalised resume.
@@ -156,7 +167,7 @@ Respond with JSON:
   "feedback": "<brief explanation of any issues found, or 'All factual claims verified' if clean>"
 }}"""
 
-    raw = _call_llm(prompt, settings)
+    raw = _call_llm(prompt, settings, job_id=job_id or job.get("id"), run_id=run_id)
     parsed = json.loads(raw)
     return bool(parsed.get("coherence_ok", False)), str(parsed.get("feedback", ""))
 

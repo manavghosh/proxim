@@ -39,12 +39,17 @@ async def load_jobs(state: FetchJdsState) -> dict:
     fetch_jds currently only fetches LinkedIn JDs — Naukri/IIMJobs populate
     jd_raw inline during discovery — so the log message reflects that.
     """
+    from agent.telemetry import get_tracer
     pool = await _make_pool()
     try:
         from agent.db import get_jobs_with_empty_jd
-        jobs = await get_jobs_with_empty_jd(
-            pool, state.candidate_id, limit=JD_FETCH_LIMIT
-        )
+        with get_tracer().start_as_current_span("fetch_jds") as span:
+            span.set_attribute("agent_name", "fetch_jds")
+            span.set_attribute("pipeline_run_id", state.pipeline_run_id or "")
+            span.set_attribute("candidate_id", state.candidate_id or "")
+            jobs = await get_jobs_with_empty_jd(
+                pool, state.candidate_id, limit=JD_FETCH_LIMIT
+            )
         await _log(pool, state.pipeline_job_id, "info", "load_jobs",
                    f"Found {len(jobs)} LinkedIn jobs needing JD fetch",
                    {"count": len(jobs), "source": "linkedin"})
