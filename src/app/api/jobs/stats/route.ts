@@ -23,15 +23,16 @@ export async function GET(request: Request) {
       counts[row.status] = Number(row.count)
     }
 
-    const scoreFailed  = counts['score_failed'] ?? 0
-    const jobsMatched  = Object.entries(counts)
+    const scoreFailed    = counts['score_failed'] ?? 0
+    const jobsMatched    = Object.entries(counts)
       .filter(([s]) => !['discovered', 'score_failed'].includes(s))
       .reduce((sum, [, n]) => sum + n, 0)
-    const applications = (counts['approved'] ?? 0) + (counts['submitted'] ?? 0)
+    const applications   = (counts['approved'] ?? 0) + (counts['submitted'] ?? 0)
+    const awaitingReview = (counts['scored'] ?? 0) + (counts['awaiting'] ?? 0)
 
-    return NextResponse.json({ scoreFailed, jobsMatched, applications })
+    return NextResponse.json({ scoreFailed, jobsMatched, applications, awaitingReview })
   } catch (e) {
     console.error('[jobs/stats] error:', e)
-    return NextResponse.json({ scoreFailed: 0, jobsMatched: 0, applications: 0 })
+    return NextResponse.json({ scoreFailed: 0, jobsMatched: 0, applications: 0, awaitingReview: 0 })
   }
 }

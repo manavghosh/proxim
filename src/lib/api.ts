@@ -180,11 +180,16 @@ export async function getJobReport(
   return request(`/api/jobs/${jobId}/report`)
 }
 
-export async function getJobStats(candidateId: string): Promise<{ scoreFailed: number; jobsMatched: number; applications: number }> {
+export async function getJobStats(candidateId: string): Promise<{
+  scoreFailed: number
+  jobsMatched: number
+  applications: number
+  awaitingReview: number
+}> {
   try {
     return await request(`/api/jobs/stats${qs(candidateId)}`)
   } catch {
-    return { scoreFailed: 0, jobsMatched: 0, applications: 0 }
+    return { scoreFailed: 0, jobsMatched: 0, applications: 0, awaitingReview: 0 }
   }
 }
 
