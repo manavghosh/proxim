@@ -9,3 +9,4 @@ __pycache__/
 .ruff_cache/
 .agents/
 output/resumes/
+skills-lock.json

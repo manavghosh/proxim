@@ -23,3 +23,20 @@ build/
 
 # local SQLite dev database
 proxim-dev.db
+proxim-dev.db-shm
+proxim-dev.db-wal
+
+# TypeScript incremental build cache
+tsconfig.tsbuildinfo
+
+# Screenshots / local debug images
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# Generated output
+resumes/
+
+# Playwright MCP cache
+.playwright-mcp/
