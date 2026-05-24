@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import { JobCard } from '@/components/applications/JobCard'
 import type { ScoredJob } from '@/lib/api'
 
@@ -59,6 +59,7 @@ describe('JobCard', () => {
 
   it('shows Mark Submitted button only when status is resume_ready', () => {
     render(<JobCard {...defaultProps()} />)
+    act(() => { fireEvent.click(screen.getByRole('button', { name: /Expand job card/i })) })
     expect(screen.getByRole('button', { name: /Mark Submitted/i })).toBeInTheDocument()
   })
 
@@ -66,12 +67,14 @@ describe('JobCard', () => {
     const props = defaultProps()
     props.job = { ...baseJob, status: 'approved' }
     render(<JobCard {...props} />)
+    act(() => { fireEvent.click(screen.getByRole('button', { name: /Expand job card/i })) })
     expect(screen.queryByRole('button', { name: /Mark Submitted/i })).not.toBeInTheDocument()
   })
 
   it('calls onMarkSubmitted when Mark Submitted is clicked', () => {
     const props = defaultProps()
     render(<JobCard {...props} />)
+    act(() => { fireEvent.click(screen.getByRole('button', { name: /Expand job card/i })) })
     fireEvent.click(screen.getByRole('button', { name: /Mark Submitted/i }))
     expect(props.onMarkSubmitted).toHaveBeenCalledWith('job-1')
   })
@@ -83,6 +86,7 @@ describe('JobCard', () => {
     // actual onMoveToRejected wiring is also covered by the page-level handler.
     const props = defaultProps()
     render(<JobCard {...props} />)
+    act(() => { fireEvent.click(screen.getByRole('button', { name: /Expand job card/i })) })
     expect(screen.getByRole('button', { name: /more actions/i })).toBeInTheDocument()
   })
 
@@ -90,11 +94,13 @@ describe('JobCard', () => {
     const props = defaultProps()
     props.job = { ...baseJob, status: 'rejected' }
     render(<JobCard {...props} />)
+    act(() => { fireEvent.click(screen.getByRole('button', { name: /Expand job card/i })) })
     expect(screen.queryByRole('button', { name: /more actions/i })).not.toBeInTheDocument()
   })
 
   it('disables Mark Submitted when isPending is true', () => {
     render(<JobCard {...defaultProps()} isPending={true} />)
+    act(() => { fireEvent.click(screen.getByRole('button', { name: /Expand job card/i })) })
     expect(screen.getByRole('button', { name: /Mark Submitted/i })).toBeDisabled()
   })
 })

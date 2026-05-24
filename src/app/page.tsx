@@ -9,16 +9,13 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { CandidateAvatar } from '@/components/shared/CandidateAvatar'
 
 const PARSE_BADGE: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   ready:   { label: 'Ready',   variant: 'default'     },
   parsing: { label: 'Parsing', variant: 'outline'     },
   failed:  { label: 'Failed',  variant: 'destructive' },
   pending: { label: 'Pending', variant: 'secondary'   },
-}
-
-function initials(name: string) {
-  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
 }
 
 export default function RosterPage() {
@@ -101,9 +98,12 @@ export default function RosterPage() {
                 <Card key={c.id} className="p-5 gap-4">
                   {/* Top row */}
                   <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-700 to-indigo-700 flex items-center justify-center flex-shrink-0">
-                      <span className="text-white text-sm font-bold">{initials(c.name)}</span>
-                    </div>
+                    <CandidateAvatar
+                      name={c.name}
+                      avatarData={c.avatarData}
+                      size="md"
+                      className="h-10 w-10 text-sm flex-shrink-0"
+                    />
                     <div className="flex-1 min-w-0">
                       {editingId === c.id ? (
                         <div className="flex gap-1.5">

@@ -12,6 +12,10 @@ vi.mock('@/db/schema', () => ({
   emailCadences: {
     id: 'id', jobId: 'jobId', candidateId: 'candidateId', status: 'status',
     hiringManagerEmail: 'hiringManagerEmail', emailSource: 'emailSource',
+    updatedAt: 'updatedAt',
+  },
+  emailDrafts: {
+    id: 'id', cadenceId: 'cadenceId', dayNumber: 'dayNumber',
   },
   pipelineJobs: {
     id: 'id', jobType: 'jobType', candidateId: 'candidateId', payload: 'payload',
@@ -32,10 +36,9 @@ describe('POST /api/email-cadence/[cadenceId]/override-email', () => {
 
   it('returns 200 and sets status to generating', async () => {
     const { db } = await import('@/db')
-    vi.mocked(db.select).mockReturnValue({
-      from: vi.fn().mockReturnThis(),
-      where: vi.fn().mockResolvedValue([makeCadence()]),
-    } as never)
+    vi.mocked(db.select)
+      .mockReturnValueOnce({ from: vi.fn().mockReturnThis(), where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([makeCadence()]) } as never)
+      .mockReturnValue({ from: vi.fn().mockReturnThis(), where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([]) } as never)
     vi.mocked(db.update).mockReturnValue({
       set: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
@@ -61,10 +64,9 @@ describe('POST /api/email-cadence/[cadenceId]/override-email', () => {
 
   it('sets email_source to manual_override', async () => {
     const { db } = await import('@/db')
-    vi.mocked(db.select).mockReturnValue({
-      from: vi.fn().mockReturnThis(),
-      where: vi.fn().mockResolvedValue([makeCadence()]),
-    } as never)
+    vi.mocked(db.select)
+      .mockReturnValueOnce({ from: vi.fn().mockReturnThis(), where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([makeCadence()]) } as never)
+      .mockReturnValue({ from: vi.fn().mockReturnThis(), where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([]) } as never)
     vi.mocked(db.update).mockReturnValue({
       set: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
@@ -84,15 +86,14 @@ describe('POST /api/email-cadence/[cadenceId]/override-email', () => {
     const res = await POST(req, { params: Promise.resolve({ cadenceId: 'cad-001' }) })
 
     const body = await res.json()
-    expect(body).toHaveProperty('emailSource', 'manual_override')
+    expect(body).toHaveProperty('emailSource', 'manual')
   })
 
   it('inserts outreach_mailer_generate pipeline job', async () => {
     const { db } = await import('@/db')
-    vi.mocked(db.select).mockReturnValue({
-      from: vi.fn().mockReturnThis(),
-      where: vi.fn().mockResolvedValue([makeCadence()]),
-    } as never)
+    vi.mocked(db.select)
+      .mockReturnValueOnce({ from: vi.fn().mockReturnThis(), where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([makeCadence()]) } as never)
+      .mockReturnValue({ from: vi.fn().mockReturnThis(), where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([]) } as never)
     vi.mocked(db.update).mockReturnValue({
       set: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
@@ -117,10 +118,9 @@ describe('POST /api/email-cadence/[cadenceId]/override-email', () => {
 
   it('returns 422 when cadence not in low_confidence status', async () => {
     const { db } = await import('@/db')
-    vi.mocked(db.select).mockReturnValue({
-      from: vi.fn().mockReturnThis(),
-      where: vi.fn().mockResolvedValue([makeCadence({ status: 'generating' })]),
-    } as never)
+    vi.mocked(db.select).mockReturnValue(
+      { from: vi.fn().mockReturnThis(), where: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([makeCadence({ status: 'generating' })]) } as never
+    )
 
     const { POST } = await import('@/app/api/email-cadence/[cadenceId]/override-email/route')
     const req = new Request('http://localhost/api/email-cadence/cad-001/override-email?candidateId=cand-001', {

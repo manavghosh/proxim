@@ -27,12 +27,12 @@ describe('EmailNotFoundPanel', () => {
 
   it('shows "No email found" message for email_not_found status', () => {
     render(<EmailNotFoundPanel {...baseProps} />)
-    expect(screen.getByText('No email found for Acme Corp')).toBeInTheDocument()
+    expect(screen.getByText('No verified email found for Acme Corp')).toBeInTheDocument()
   })
 
   it('shows "could not be verified" message for low_confidence status', () => {
     render(<EmailNotFoundPanel {...baseProps} cadence={{ ...baseCadence, status: 'low_confidence' }} />)
-    expect(screen.getByText(/could not be verified for Acme Corp/)).toBeInTheDocument()
+    expect(screen.getByText(/Email found but unverified for Acme Corp/)).toBeInTheDocument()
   })
 
   it('shows Retry (0/2) when retryCount is 0', () => {
