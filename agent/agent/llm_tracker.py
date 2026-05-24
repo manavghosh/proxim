@@ -44,7 +44,7 @@ class _LangfuseLogger:
         cost: float = kwargs.get("response_cost") or 0.0
         trace_id: str = meta.get("langfuse_trace_id") or meta.get("trace_id") or str(uuid.uuid4())
         agent_name: str = meta.get("agent_name", "proxim")
-        job_id: str | None = meta.get("session_id")  # set by langfuse_metadata when job_id provided
+        job_id: str | None = meta.get("langfuse_session_id") or meta.get("session_id")
 
         # Extract input/output so Langfuse shows the actual prompts and completions.
         input_messages = kwargs.get("messages") or []
@@ -96,7 +96,7 @@ class _LangfuseLogger:
                 },
                 "metadata": {
                     k: meta[k]
-                    for k in ("agent_name", "feature", "session_id")
+                    for k in ("agent_name", "feature", "langfuse_session_id")
                     if k in meta
                 },
             },
@@ -209,5 +209,5 @@ def langfuse_metadata(
     if run_id:
         meta["langfuse_trace_id"] = run_id
     if job_id:
-        meta["session_id"] = str(job_id)
+        meta["langfuse_session_id"] = str(job_id)
     return meta
