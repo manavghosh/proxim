@@ -329,7 +329,10 @@ export function JobSearchCard({
             </div>
             <Button
               className="w-full text-[12px] h-8 mt-1"
-              onClick={() => router.push(`/candidates/${candidateId}/pipeline`)}
+              onClick={() => {
+                onSearchComplete()
+                router.push(`/candidates/${candidateId}/pipeline`)
+              }}
             >
               Review {completeResult.newJobs} New Jobs in Pipeline →
             </Button>
