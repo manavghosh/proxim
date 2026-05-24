@@ -162,8 +162,13 @@ async def extract_keywords(state: ResumeBuilderState) -> dict:
     try:
         from agent.config import settings
         from agent.resume_engine import extract_keywords as _extract
+        from agent.telemetry import get_tracer
         try:
-            keyword_set = _extract(state.jd_raw, settings, job_id=state.job_id, run_id=state.pipeline_run_id)
+            with get_tracer().start_as_current_span("extract_keywords") as span:
+                span.set_attribute("agent_name", "resume_builder")
+                span.set_attribute("job_id", state.job_id or "")
+                span.set_attribute("pipeline_run_id", state.pipeline_run_id or "")
+                keyword_set = _extract(state.jd_raw, settings, job_id=state.job_id, run_id=state.pipeline_run_id)
             await _log(pool, state.pipeline_job_id, "extract_keywords",
                        f"Extracted {len(keyword_set.keywords)} keywords")
             return {"keywords": keyword_set.keywords}
@@ -301,16 +306,21 @@ async def generate_cover_letter(state: ResumeBuilderState) -> dict:
         from agent.config import settings
         from agent.archetype_registry import ArchetypeRegistry
         from agent.resume_engine import generate_cover_letter as _gen_cl
+        from agent.telemetry import get_tracer
 
         registry = ArchetypeRegistry()
         arch_config = registry.get_archetype(state.archetype, state.archetype_confidence)
 
-        cl = _gen_cl(
-            {"id": state.job_id, "title": state.job_title,
-             "company": state.job_company, "jd_raw": state.jd_raw},
-            state.parsed_profile, arch_config, settings,
-            job_id=state.job_id, run_id=state.pipeline_run_id,
-        )
+        with get_tracer().start_as_current_span("generate_cover_letter") as span:
+            span.set_attribute("agent_name", "resume_builder")
+            span.set_attribute("job_id", state.job_id or "")
+            span.set_attribute("pipeline_run_id", state.pipeline_run_id or "")
+            cl = _gen_cl(
+                {"id": state.job_id, "title": state.job_title,
+                 "company": state.job_company, "jd_raw": state.jd_raw},
+                state.parsed_profile, arch_config, settings,
+                job_id=state.job_id, run_id=state.pipeline_run_id,
+            )
         if not cl.company_research_used:
             await _log(pool, state.pipeline_job_id, "cover_letter_fallback",
                        "Company research not available — using JD-derived content")

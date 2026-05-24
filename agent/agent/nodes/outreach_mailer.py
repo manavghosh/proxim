@@ -12,6 +12,7 @@ from typing import TypedDict, Optional
 import litellm
 from pydantic import BaseModel, field_validator, model_validator
 from agent.llm_tracker import langfuse_metadata
+from agent.telemetry import get_tracer as _get_tracer
 
 from agent import hunter_io
 from agent.proxycurl import find_company_domain as _find_company_domain
@@ -46,6 +47,7 @@ class OutreachMailerState(TypedDict):
     generation_attempts: int
     status: str
     error: Optional[str]
+    run_id: Optional[str]   # pipeline_run_id — used to group Langfuse traces
 
 
 # ── Pydantic validators ────────────────────────────────────────────────────────
@@ -192,7 +194,9 @@ async def litellm_generate(state: OutreachMailerState, settings,
         api_key=_api_key(settings),
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
-        metadata=langfuse_metadata("outreach_mailer", "email", job_id=state.get("job_id")),
+        metadata=langfuse_metadata("outreach_mailer", "email",
+                                   job_id=state.get("job_id"),
+                                   run_id=state.get("run_id")),
     )
     raw = _strip_markdown(resp.choices[0].message.content or "")
     data = json.loads(raw)
@@ -216,7 +220,8 @@ async def litellm_generate(state: OutreachMailerState, settings,
 
 
 async def litellm_self_review(draft: EmailDraftOutput, settings,
-                             job_id: str | None = None) -> SelfReviewResult:
+                             job_id: str | None = None,
+                             run_id: str | None = None) -> SelfReviewResult:
     import json
 
     prompt = (
@@ -236,7 +241,7 @@ async def litellm_self_review(draft: EmailDraftOutput, settings,
         api_key=_api_key(settings),
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
-        metadata=langfuse_metadata("outreach_mailer", "self_review", job_id=job_id),
+        metadata=langfuse_metadata("outreach_mailer", "self_review", job_id=job_id, run_id=run_id),
     )
     raw = _strip_markdown(resp.choices[0].message.content or "")
     data = json.loads(raw)
@@ -313,7 +318,11 @@ async def discover_email_node(state: OutreachMailerState, config) -> OutreachMai
     exa_api_key = getattr(settings, 'exa_api_key', '')
     hunter_key  = settings.hunter_api_key
 
-    real_domain = await _find_company_domain(company, exa_api_key)
+    with _get_tracer().start_as_current_span("discover_email_domain") as span:
+        span.set_attribute("agent_name", "outreach_mailer")
+        span.set_attribute("job_id", state.get("job_id", ""))
+        span.set_attribute("pipeline_run_id", state.get("run_id") or "")
+        real_domain = await _find_company_domain(company, exa_api_key)
     domain      = real_domain or _company_to_domain(company)
 
     # Resolve contact name from LinkedIn connector if not already in state
@@ -561,45 +570,52 @@ async def generate_emails_node(state: OutreachMailerState, config) -> OutreachMa
     except Exception:
         pass  # fall back to archetype label
 
-    while attempts < max_attempts:
-        attempts += 1
-        try:
-            draft = await litellm_generate(state, settings, candidate_profile=candidate_profile)
-            d1_wc = _word_count(draft.day1_body)
-            d3_wc = _word_count(draft.day3_body)
-            d7_wc = _word_count(draft.day7_body)
-            logger.info("outreach_mailer.draft_generated", cadence_id=cadence_id, attempt=attempts,
-                        day1_words=d1_wc, day3_words=d3_wc, day7_words=d7_wc)
-            review = await litellm_self_review(draft, settings, job_id=state.get("job_id"))
+    with _get_tracer().start_as_current_span("generate_emails") as span:
+        span.set_attribute("agent_name", "outreach_mailer")
+        span.set_attribute("job_id", state.get("job_id", ""))
+        span.set_attribute("pipeline_run_id", state.get("run_id") or "")
 
-            logger.info("outreach_mailer.self_review", cadence_id=cadence_id, attempt=attempts,
-                        passes=review.passes, feedback=review.feedback[:100] if review.feedback else "")
-
-            if review.passes:
-                return {
-                    **state,
-                    "subject": draft.subject,
-                    "day1_body": draft.day1_body,
-                    "day3_body": draft.day3_body,
-                    "day7_body": draft.day7_body,
-                    "generation_attempts": attempts,
-                }
-        except Exception as exc:
-            import traceback
-            last_err = f"[{type(exc).__name__}] {str(exc)[:300]}"
-            logger.warning("outreach_mailer.generation_error", attempt=attempts,
-                           error_type=type(exc).__name__, error=str(exc)[:300],
-                           traceback=traceback.format_exc()[-500:])
-            # Write to DB immediately so it's visible even if overwritten
+        while attempts < max_attempts:
+            attempts += 1
             try:
-                await update_email_cadence(pool, cadence_id,
-                                           error_message=f"Attempt {attempts}/{max_attempts}: {last_err}")
-            except Exception:
-                pass
+                draft = await litellm_generate(state, settings, candidate_profile=candidate_profile)
+                d1_wc = _word_count(draft.day1_body)
+                d3_wc = _word_count(draft.day3_body)
+                d7_wc = _word_count(draft.day7_body)
+                logger.info("outreach_mailer.draft_generated", cadence_id=cadence_id, attempt=attempts,
+                            day1_words=d1_wc, day3_words=d3_wc, day7_words=d7_wc)
+                review = await litellm_self_review(draft, settings,
+                                                  job_id=state.get("job_id"),
+                                                  run_id=state.get("run_id"))
 
-    final_msg = locals().get("last_err", "Self-review failed") + f" (after {attempts} attempts)"
-    await update_email_cadence(pool, cadence_id, status="failed", error_message=final_msg)
-    return {**state, "status": "failed", "generation_attempts": attempts}
+                logger.info("outreach_mailer.self_review", cadence_id=cadence_id, attempt=attempts,
+                            passes=review.passes, feedback=review.feedback[:100] if review.feedback else "")
+
+                if review.passes:
+                    return {
+                        **state,
+                        "subject": draft.subject,
+                        "day1_body": draft.day1_body,
+                        "day3_body": draft.day3_body,
+                        "day7_body": draft.day7_body,
+                        "generation_attempts": attempts,
+                    }
+            except Exception as exc:
+                import traceback
+                last_err = f"[{type(exc).__name__}] {str(exc)[:300]}"
+                logger.warning("outreach_mailer.generation_error", attempt=attempts,
+                               error_type=type(exc).__name__, error=str(exc)[:300],
+                               traceback=traceback.format_exc()[-500:])
+                # Write to DB immediately so it's visible even if overwritten
+                try:
+                    await update_email_cadence(pool, cadence_id,
+                                               error_message=f"Attempt {attempts}/{max_attempts}: {last_err}")
+                except Exception:
+                    pass
+
+        final_msg = locals().get("last_err", "Self-review failed") + f" (after {attempts} attempts)"
+        await update_email_cadence(pool, cadence_id, status="failed", error_message=final_msg)
+        return {**state, "status": "failed", "generation_attempts": attempts}
 
 
 async def write_cadence_checkpoint_node(state: OutreachMailerState, config) -> OutreachMailerState:

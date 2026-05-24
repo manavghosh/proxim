@@ -20,6 +20,7 @@ from agent.db_sqlite import (
     get_candidate_preferences,
     update_outreach_target,
 )
+from agent.telemetry import get_tracer as _get_tracer
 
 
 def _llm_model() -> str:
@@ -222,56 +223,61 @@ async def extract_hiring_team_node(
         logger.info("linkedin.hiring_team_skip", reason="no_job_url")
         return {}
 
-    person = await proxycurl.extract_hiring_team_from_jd(job_url, api_key)
-    if not person or not person.get("name"):
-        logger.info(
-            "linkedin.hiring_team_not_found",
-            company=state["company"],
-            job_url=job_url,
-        )
-        return {}
+    with _get_tracer().start_as_current_span("extract_hiring_team") as span:
+        span.set_attribute("agent_name", "linkedin_connector")
+        span.set_attribute("job_id", state.get("job_id", ""))
+        span.set_attribute("pipeline_run_id", config["configurable"].get("run_id") or "")
 
-    # If Exa extracted a name but no LinkedIn URL, do a global web search to find
-    # their profile. Global search (no category filter) is more reliable than
-    # category="people" because it searches the entire web — news, company bios,
-    # conference pages — all of which may link to the person's LinkedIn /in/ profile.
-    linkedin_url = person.get("linkedin_url", "")
-    if not linkedin_url:
-        logger.info(
-            "linkedin.hiring_team_searching_profile",
-            name=person["name"],
-            company=state["company"],
-        )
-        linkedin_url = await proxycurl.search_person_profile(
-            name=person["name"],
-            company=state["company"],
-            api_key=api_key,
-        ) or ""
-        if linkedin_url:
-            logger.info("linkedin.hiring_team_profile_found",
-                        name=person["name"], url=linkedin_url)
+        person = await proxycurl.extract_hiring_team_from_jd(job_url, api_key)
+        if not person or not person.get("name"):
+            logger.info(
+                "linkedin.hiring_team_not_found",
+                company=state["company"],
+                job_url=job_url,
+            )
+            return {}
 
-    contact = {
-        "name":        person["name"],
-        "title":       person["title"],
-        "profile_url": linkedin_url,
-    }
-    await update_outreach_target(
-        pool,
-        state["outreach_target_id"],
-        status="enriching",
-        name=contact["name"],
-        linkedin_url=contact["profile_url"],
-        title=contact["title"],
-        seniority="JOB_POSTER",
-    )
-    logger.info(
-        "linkedin.hiring_team_found",
-        company=state["company"],
-        name=person["name"],
-        title=person["title"],
-    )
-    return {"contact": contact, "status": "enriching"}
+        # If Exa extracted a name but no LinkedIn URL, do a global web search to find
+        # their profile. Global search (no category filter) is more reliable than
+        # category="people" because it searches the entire web — news, company bios,
+        # conference pages — all of which may link to the person's LinkedIn /in/ profile.
+        linkedin_url = person.get("linkedin_url", "")
+        if not linkedin_url:
+            logger.info(
+                "linkedin.hiring_team_searching_profile",
+                name=person["name"],
+                company=state["company"],
+            )
+            linkedin_url = await proxycurl.search_person_profile(
+                name=person["name"],
+                company=state["company"],
+                api_key=api_key,
+            ) or ""
+            if linkedin_url:
+                logger.info("linkedin.hiring_team_profile_found",
+                            name=person["name"], url=linkedin_url)
+
+        contact = {
+            "name":        person["name"],
+            "title":       person["title"],
+            "profile_url": linkedin_url,
+        }
+        await update_outreach_target(
+            pool,
+            state["outreach_target_id"],
+            status="enriching",
+            name=contact["name"],
+            linkedin_url=contact["profile_url"],
+            title=contact["title"],
+            seniority="JOB_POSTER",
+        )
+        logger.info(
+            "linkedin.hiring_team_found",
+            company=state["company"],
+            name=person["name"],
+            title=person["title"],
+        )
+        return {"contact": contact, "status": "enriching"}
 
 
 # ── Node: discover_contact ────────────────────────────────────────────────────
@@ -285,42 +291,49 @@ async def discover_contact_node(state: LinkedInConnectorState, config: RunnableC
     await update_outreach_target(pool, state["outreach_target_id"], status="discovering")
 
     run_id = config["configurable"].get("run_id")
-    roles = await determine_target_roles(
-        job_title=state["job_title"],
-        company=company,
-        job_id=state.get("job_id"),
-        run_id=run_id,
-    )
 
-    for role in roles:
-        logger.info("proxycurl.employee_search", company=company, role=role)
-        contact = await proxycurl.search_employees(
-            company_name=company, role=role, api_key=api_key
+    with _get_tracer().start_as_current_span("discover_contact") as span:
+        span.set_attribute("agent_name", "linkedin_connector")
+        span.set_attribute("job_id", state.get("job_id", ""))
+        span.set_attribute("pipeline_run_id", run_id or "")
+        span.set_attribute("company", company)
+
+        roles = await determine_target_roles(
+            job_title=state["job_title"],
+            company=company,
+            job_id=state.get("job_id"),
+            run_id=run_id,
         )
-        if contact:
-            seniority = role.upper().replace(" ", "_")
-            await update_outreach_target(
-                pool,
-                state["outreach_target_id"],
-                status="enriching",
-                name=contact.get("name"),
-                linkedin_url=contact.get("profile_url"),
-                title=contact.get("title"),
-                seniority=seniority,
-            )
-            logger.info(
-                "linkedin.contact_found",
-                company=company,
-                role=role,
-                name=contact.get("name"),
-            )
-            return {"contact": contact, "status": "enriching"}
 
-    logger.info("linkedin.no_contact_found", company=company)
-    await update_outreach_target(
-        pool, state["outreach_target_id"], status="no_contact_found"
-    )
-    return {"contact": None, "status": "no_contact_found"}
+        for role in roles:
+            logger.info("proxycurl.employee_search", company=company, role=role)
+            contact = await proxycurl.search_employees(
+                company_name=company, role=role, api_key=api_key
+            )
+            if contact:
+                seniority = role.upper().replace(" ", "_")
+                await update_outreach_target(
+                    pool,
+                    state["outreach_target_id"],
+                    status="enriching",
+                    name=contact.get("name"),
+                    linkedin_url=contact.get("profile_url"),
+                    title=contact.get("title"),
+                    seniority=seniority,
+                )
+                logger.info(
+                    "linkedin.contact_found",
+                    company=company,
+                    role=role,
+                    name=contact.get("name"),
+                )
+                return {"contact": contact, "status": "enriching"}
+
+        logger.info("linkedin.no_contact_found", company=company)
+        await update_outreach_target(
+            pool, state["outreach_target_id"], status="no_contact_found"
+        )
+        return {"contact": None, "status": "no_contact_found"}
 
 
 # ── Node: enrich_profile ──────────────────────────────────────────────────────
@@ -332,34 +345,39 @@ async def enrich_profile_node(state: LinkedInConnectorState, config: RunnableCon
     contact    = state["contact"] or {}
     profile_url = contact.get("profile_url") or contact.get("linkedin_url", "")
 
-    enrichment = await proxycurl.enrich_profile(linkedin_url=profile_url, api_key=api_key)
+    with _get_tracer().start_as_current_span("enrich_profile") as span:
+        span.set_attribute("agent_name", "linkedin_connector")
+        span.set_attribute("job_id", state.get("job_id", ""))
+        span.set_attribute("pipeline_run_id", config["configurable"].get("run_id") or "")
 
-    # Extract the person's REAL current title from the enrichment headline.
-    # search_employees stores the search-role as title; we override it here
-    # with the actual LinkedIn designation so notes reference the correct role.
-    real_title = ""
-    if enrichment:
-        headline = enrichment.get("headline") or ""
-        # Headline format: "Head of AI at Company" or "VP Engineering | LinkedIn"
-        real_title = headline.split("|")[0].split(" at ")[0].strip()
-    if not real_title:
-        # Fall back to the first experience line that looks like a title
-        exps = (enrichment or {}).get("experiences", [])
-        if exps:
-            real_title = exps[0].get("title", "").split(" at ")[0].strip()
-    if not real_title:
-        real_title = contact.get("title", "")
+        enrichment = await proxycurl.enrich_profile(linkedin_url=profile_url, api_key=api_key)
 
-    await update_outreach_target(
-        pool,
-        state["outreach_target_id"],
-        status="generating",
-        title=real_title,
-        enrichment_json=enrichment or {},
-    )
-    # Propagate real title into contact so generate_notes_node sees it
-    updated_contact = {**contact, "title": real_title}
-    return {"enrichment": enrichment, "status": "generating", "contact": updated_contact}
+        # Extract the person's REAL current title from the enrichment headline.
+        # search_employees stores the search-role as title; we override it here
+        # with the actual LinkedIn designation so notes reference the correct role.
+        real_title = ""
+        if enrichment:
+            headline = enrichment.get("headline") or ""
+            # Headline format: "Head of AI at Company" or "VP Engineering | LinkedIn"
+            real_title = headline.split("|")[0].split(" at ")[0].strip()
+        if not real_title:
+            # Fall back to the first experience line that looks like a title
+            exps = (enrichment or {}).get("experiences", [])
+            if exps:
+                real_title = exps[0].get("title", "").split(" at ")[0].strip()
+        if not real_title:
+            real_title = contact.get("title", "")
+
+        await update_outreach_target(
+            pool,
+            state["outreach_target_id"],
+            status="generating",
+            title=real_title,
+            enrichment_json=enrichment or {},
+        )
+        # Propagate real title into contact so generate_notes_node sees it
+        updated_contact = {**contact, "title": real_title}
+        return {"enrichment": enrichment, "status": "generating", "contact": updated_contact}
 
 
 # ── Node: research_contact ────────────────────────────────────────────────────
@@ -380,24 +398,29 @@ async def research_contact_node(state: LinkedInConnectorState, config: RunnableC
     name    = contact.get("name", "")
     company = state["company"]
 
-    person_research  = await proxycurl.research_person(name, company, api_key)
-    # Pass job_title so company research focuses on the relevant function
-    # (e.g. "sales growth" for a Sales role, not generic AI/tech news)
-    company_research = await proxycurl.research_company(
-        company, api_key, job_context=state.get("job_title", "")
-    )
+    with _get_tracer().start_as_current_span("research_contact") as span:
+        span.set_attribute("agent_name", "linkedin_connector")
+        span.set_attribute("job_id", state.get("job_id", ""))
+        span.set_attribute("pipeline_run_id", config["configurable"].get("run_id") or "")
 
-    logger.info(
-        "linkedin.research_complete",
-        contact=name,
-        company=company,
-        has_person=bool(person_research),
-        has_company=bool(company_research),
-    )
-    return {
-        "person_research":  person_research,
-        "company_research": company_research,
-    }
+        person_research  = await proxycurl.research_person(name, company, api_key)
+        # Pass job_title so company research focuses on the relevant function
+        # (e.g. "sales growth" for a Sales role, not generic AI/tech news)
+        company_research = await proxycurl.research_company(
+            company, api_key, job_context=state.get("job_title", "")
+        )
+
+        logger.info(
+            "linkedin.research_complete",
+            contact=name,
+            company=company,
+            has_person=bool(person_research),
+            has_company=bool(company_research),
+        )
+        return {
+            "person_research":  person_research,
+            "company_research": company_research,
+        }
 
 
 # ── Node: generate_notes ──────────────────────────────────────────────────────
@@ -516,58 +539,62 @@ async def generate_notes_node(state: LinkedInConnectorState, config: RunnableCon
 
     await update_outreach_target(pool, state["outreach_target_id"], status="generating")
 
-    from agent.telemetry import get_tracer as _get_tracer
     last_error: str = ""
-    for attempt in range(1, MAX_NOTE_RETRIES + 1):
-        logger.info(
-            "linkedin.generate_notes",
-            attempt=attempt,
-            candidate_id=state["candidate_id"],
-            has_research=bool(person_research or company_research),
-        )
-        response = litellm.completion(
-            model=_llm_model(),
-            api_key=_llm_api_key(),
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user",   "content": prompt},
-            ],
-            response_format={"type": "json_object"},
-            metadata=langfuse_metadata("linkedin_connector", "linkedin", job_id=state.get("job_id"), run_id=config["configurable"].get("run_id")),
-        )
-        raw = response.choices[0].message.content or "{}"
-        try:
-            parsed   = json.loads(raw)
-            variants = NoteVariants(**parsed)
-            await update_outreach_target(
-                pool,
-                state["outreach_target_id"],
-                status="notes_ready",
-                note_a=variants.note_a,
-                note_b=variants.note_b,
-            )
-            return {
-                "note_a":              variants.note_a,
-                "note_b":              variants.note_b,
-                "generation_attempts": attempt,
-                "status":              "notes_ready",
-            }
-        except Exception as exc:
-            last_error = str(exc)
-            logger.warning(
-                "linkedin.note_validation_failed",
-                attempt=attempt,
-                error=last_error,
-            )
+    with _get_tracer().start_as_current_span("generate_notes") as span:
+        span.set_attribute("agent_name", "linkedin_connector")
+        span.set_attribute("job_id", state.get("job_id", ""))
+        span.set_attribute("pipeline_run_id", config["configurable"].get("run_id") or "")
 
-    await update_outreach_target(
-        pool,
-        state["outreach_target_id"],
-        status="failed",
-        error_message=f"Note generation failed after {MAX_NOTE_RETRIES} attempts: {last_error}",
-    )
-    return {
-        "generation_attempts": MAX_NOTE_RETRIES,
-        "status":              "failed",
-        "error":               last_error,
-    }
+        for attempt in range(1, MAX_NOTE_RETRIES + 1):
+            logger.info(
+                "linkedin.generate_notes",
+                attempt=attempt,
+                candidate_id=state["candidate_id"],
+                has_research=bool(person_research or company_research),
+            )
+            response = litellm.completion(
+                model=_llm_model(),
+                api_key=_llm_api_key(),
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user",   "content": prompt},
+                ],
+                response_format={"type": "json_object"},
+                metadata=langfuse_metadata("linkedin_connector", "linkedin", job_id=state.get("job_id"), run_id=config["configurable"].get("run_id")),
+            )
+            raw = response.choices[0].message.content or "{}"
+            try:
+                parsed   = json.loads(raw)
+                variants = NoteVariants(**parsed)
+                await update_outreach_target(
+                    pool,
+                    state["outreach_target_id"],
+                    status="notes_ready",
+                    note_a=variants.note_a,
+                    note_b=variants.note_b,
+                )
+                return {
+                    "note_a":              variants.note_a,
+                    "note_b":              variants.note_b,
+                    "generation_attempts": attempt,
+                    "status":              "notes_ready",
+                }
+            except Exception as exc:
+                last_error = str(exc)
+                logger.warning(
+                    "linkedin.note_validation_failed",
+                    attempt=attempt,
+                    error=last_error,
+                )
+
+        await update_outreach_target(
+            pool,
+            state["outreach_target_id"],
+            status="failed",
+            error_message=f"Note generation failed after {MAX_NOTE_RETRIES} attempts: {last_error}",
+        )
+        return {
+            "generation_attempts": MAX_NOTE_RETRIES,
+            "status":              "failed",
+            "error":               last_error,
+        }
