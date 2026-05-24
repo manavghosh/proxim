@@ -1,13 +1,15 @@
 """One-time script to get Gmail OAuth2 tokens. Run once, store the output in DB."""
 from google_auth_oauthlib.flow import InstalledAppFlow
 
+from agent.config import settings
+
 SCOPES = [
     'https://www.googleapis.com/auth/gmail.send',
     'https://www.googleapis.com/auth/gmail.readonly',
 ]
 
-CLIENT_ID = '1010079959820-9i2jn90plfap44puoqsj9qgcbj2rvaij.apps.googleusercontent.com'
-CLIENT_SECRET = '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'
+CLIENT_ID = settings.gmail_client_id
+CLIENT_SECRET = settings.gmail_client_secret
 
 client_config = {
     "installed": {

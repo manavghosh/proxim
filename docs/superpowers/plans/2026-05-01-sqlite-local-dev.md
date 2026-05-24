@@ -428,14 +428,14 @@ git commit -m "fix: replace PG-only INTERVAL raw SQL with dialect-agnostic Drizz
 
 ```
 # Neon PostgreSQL (production) — uncomment to switch back
-# DATABASE_URL=postgresql://neondb_owner:npg_STfzaEB8lcP2@ep-wispy-boat-amakq0i7-pooler.c-5.us-east-1.aws.neon.tech/neondb?sslmode=require
+# DATABASE_URL=postgresql://user:password@host/dbname?sslmode=require
 
 # SQLite (local dev)
 DATABASE_URL=./proxim-dev.db
 
-LLM_PROVIDER=anthropic
-LLM_MODEL=claude-sonnet-4-6
-ANTHROPIC_API_KEY=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
+LLM_PROVIDER=gemini
+LLM_MODEL=gemini-2.5-flash
+GEMINI_API_KEY=your-gemini-api-key-here
 ```
 
 - [x] **Step 2: Start the dev server**
@@ -1276,7 +1276,7 @@ git commit -m "feat: rewrite db.py as SQLite/PG driver dispatcher"
 
 ```
 # Neon PostgreSQL (production) — uncomment to switch back
-# DATABASE_URL=postgresql://neondb_owner:npg_STfzaEB8lcP2@ep-wispy-boat-amakq0i7-pooler.c-5.us-east-1.aws.neon.tech/neondb?sslmode=require
+# DATABASE_URL=postgresql://user:password@host/dbname?sslmode=require
 
 # SQLite (local dev) — path is relative to the agent/ directory
 DATABASE_URL=../proxim-dev.db
