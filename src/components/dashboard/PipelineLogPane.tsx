@@ -257,7 +257,7 @@ export function PipelineLogPane({ chainJobIds, onReviewRequired }: Props) {
             <p className="text-[#334155]">
               {activeJobId
                 ? 'Waiting for pipeline to start…'
-                : 'Click ▶ Run Pipeline to begin job discovery'}
+                : 'Search for new jobs from the Dashboard to begin'}
             </p>
           ) : (
             logs.map((entry) => {

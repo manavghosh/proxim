@@ -19,7 +19,7 @@ describe('PipelineLogPane', () => {
   it('shows idle hint when chainJobIds is empty', () => {
     render(<PipelineLogPane chainJobIds={[]} />)
     expect(screen.getByText(/Pipeline Log/i)).toBeInTheDocument()
-    expect(screen.getByText(/Run Pipeline/i)).toBeInTheDocument()
+    expect(screen.getByText(/Search for new jobs from the Dashboard/i)).toBeInTheDocument()
   })
 
   it('shows waiting message when chainJobIds has a job', () => {

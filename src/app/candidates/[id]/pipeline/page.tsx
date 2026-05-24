@@ -348,7 +348,7 @@ export default function PipelinePage() {
                   className="text-[11px] border-[#1e2d4a] text-[#64748b] hover:text-[#94a3b8]"
                   onClick={() => router.push(`/candidates/${candidateId}/dashboard`)}
                 >
-                  Run Pipeline →
+                  Search for New Jobs →
                 </Button>
               </>
             )}
