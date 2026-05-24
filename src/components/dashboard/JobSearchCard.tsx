@@ -80,6 +80,7 @@ export function JobSearchCard({
   const [dismissTimer, setDismissTimer] = useState<number>(8)
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const dismissRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const discoveryRunRef = useRef<{ jobsDiscovered: number; jobsDeduplicated: number } | null>(null)
 
   // Cleanup on unmount
   useEffect(() => {
@@ -98,7 +99,6 @@ export function JobSearchCard({
         if (t <= 1) {
           clearInterval(interval)
           setMode('idle')
-          onSearchComplete()
           return 0
         }
         return t - 1
@@ -106,7 +106,7 @@ export function JobSearchCard({
     }, 1000)
     dismissRef.current = interval
     return () => clearInterval(interval)
-  }, [mode, onSearchComplete])
+  }, [mode])
 
   // ─── Polling ───────────────────────────────────────────────────────────────
 
@@ -116,6 +116,14 @@ export function JobSearchCard({
         try {
           const status = await getPipelineStatus(jobId)
           const stepIdx = JOB_TYPE_TO_STEP[status.jobType] ?? 0
+
+          // Fix 1: track discovery_only counts separately
+          if (status.jobType === 'discovery_only' && status.pipelineRun) {
+            discoveryRunRef.current = {
+              jobsDiscovered: status.pipelineRun.jobsDiscovered,
+              jobsDeduplicated: status.pipelineRun.jobsDeduplicated,
+            }
+          }
 
           setSteps(
             STEP_LABELS.map((label, i) => {
@@ -141,17 +149,20 @@ export function JobSearchCard({
             if (rescoreOnly) {
               setCompleteResult({ discovered: 0, newJobs: 0, duplicatesSkipped: 0 })
             } else {
-              const discovered = status.pipelineRun?.jobsDiscovered ?? 0
-              const deduped = status.pipelineRun?.jobsDeduplicated ?? 0
-              // jobsDiscovered from pipeline_run = total found before dedup
-              // newJobs = discovered - duplicatesSkipped (deduped count)
+              // Fix 1: use discoveryRunRef if available (score_jobs doesn't record discovery counts)
+              const runData = discoveryRunRef.current ?? {
+                jobsDiscovered: status.pipelineRun?.jobsDiscovered ?? 0,
+                jobsDeduplicated: status.pipelineRun?.jobsDeduplicated ?? 0,
+              }
               setCompleteResult({
-                discovered,
-                newJobs: Math.max(0, discovered - deduped),
-                duplicatesSkipped: deduped,
+                discovered: runData.jobsDiscovered,
+                newJobs: Math.max(0, runData.jobsDiscovered - runData.jobsDeduplicated),
+                duplicatesSkipped: runData.jobsDeduplicated,
               })
             }
             setMode('complete')
+            // Fix 4: call onSearchComplete immediately on completion, not after 8s delay
+            onSearchComplete()
             return
           }
 
@@ -169,12 +180,15 @@ export function JobSearchCard({
         }
       }, 5000)
     },
-    [],
+    [onSearchComplete],
   )
 
   // ─── Handlers ─────────────────────────────────────────────────────────────
 
   async function handleSearch() {
+    // Fix 2: guard against double-click concurrent polls
+    if (mode !== 'idle') return
+    discoveryRunRef.current = null  // Fix 1: reset stale discovery data
     try {
       const { jobId } = await triggerPipeline('discovery_only', candidateId)
       setSteps(
@@ -193,6 +207,9 @@ export function JobSearchCard({
   }
 
   async function handleRescore() {
+    // Fix 2: guard against double-click concurrent polls
+    if (mode !== 'idle') return
+    discoveryRunRef.current = null  // Fix 1: reset stale discovery data
     try {
       const { jobId } = await triggerPipeline('score_jobs', candidateId)
       setSteps(
@@ -304,12 +321,14 @@ export function JobSearchCard({
             ))}
           </div>
           <div className="flex justify-end">
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={handleCancel}
-              className="text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
+              className="text-[10px] text-slate-500 hover:text-slate-300 h-auto p-0"
             >
               Cancel
-            </button>
+            </Button>
           </div>
         </CardContent>
       )}
