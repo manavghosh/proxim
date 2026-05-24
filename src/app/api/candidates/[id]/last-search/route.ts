@@ -17,6 +17,7 @@ export async function GET(
         jobsDeduplicated: pipelineRuns.jobsDeduplicated,
       })
       .from(pipelineRuns)
+      // Inner join is needed to filter by jobType, which only exists on pipelineJobs
       .innerJoin(pipelineJobs, eq(pipelineRuns.pipelineJobId, pipelineJobs.id))
       .where(
         and(
