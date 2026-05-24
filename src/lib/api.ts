@@ -193,6 +193,23 @@ export async function getJobStats(candidateId: string): Promise<{
   }
 }
 
+// ── Last Search ───────────────────────────────────────────────────────────────
+
+export interface LastSearch {
+  lastSearchAt: string | null
+  jobsDiscovered: number | null
+  newJobs: number | null
+  duplicatesSkipped: number | null
+}
+
+export async function getLastSearch(candidateId: string): Promise<LastSearch> {
+  try {
+    return await request(`/api/candidates/${candidateId}/last-search`)
+  } catch {
+    return { lastSearchAt: null, jobsDiscovered: null, newJobs: null, duplicatesSkipped: null }
+  }
+}
+
 export async function resetFailedJobs(candidateId: string): Promise<{ reset: number }> {
   return request(`/api/jobs/reset-failed${qs(candidateId)}`, { method: 'POST' })
 }
@@ -300,6 +317,7 @@ export interface HitlJob {
   source: string
   sourceUrl: string
   postedAt: string | null
+  createdAt: string
   status: string
   grade: string | null
   numericScore: number | null

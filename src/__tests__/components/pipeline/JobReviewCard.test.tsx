@@ -11,6 +11,7 @@ const baseJob: HitlJob = {
   source: 'naukri',
   sourceUrl: 'https://naukri.com/1',
   postedAt: '2026-05-01T00:00:00Z',
+  createdAt: '2026-05-01T00:00:00Z',
   status: 'awaiting',
   grade: 'A',
   numericScore: 4.6,
