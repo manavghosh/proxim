@@ -33,28 +33,45 @@ CONFIG = {"configurable": {"pool": MagicMock(), "settings": MagicMock(hunter_api
 
 @pytest.mark.asyncio
 async def test_discover_email_node_uses_finder_when_name_available_and_score_above_threshold():
+    """Hunter Finder finds a deliverable domain-matched email → accepted immediately."""
     state = {**BASE_STATE}
 
-    with patch("agent.nodes.outreach_mailer.hunter_io.find_email",
+    with patch("agent.nodes.outreach_mailer._find_company_domain",
+               new=AsyncMock(return_value="acme.com")), \
+         patch("agent.nodes.outreach_mailer.hunter_io.find_email",
                new=AsyncMock(return_value={"email": "sarah@acme.com", "score": 85})), \
+         patch("agent.nodes.outreach_mailer.hunter_io.verify_email",
+               new=AsyncMock(return_value="deliverable")), \
          patch("agent.nodes.outreach_mailer.update_email_cadence", new=AsyncMock()):
 
         from agent.nodes.outreach_mailer import discover_email_node
         result = await discover_email_node(state, CONFIG)
 
     assert result["discovered_email"] == "sarah@acme.com"
-    assert result["email_confidence"] == 85
+    assert result["email_confidence"] == 95   # max(85, 95) — deliverable + domain match
     assert result["email_source"] == "finder"
+    assert result["status"] == "generating"
 
 
 @pytest.mark.asyncio
-async def test_discover_email_node_falls_back_to_domain_search_when_finder_score_below_70():
+async def test_discover_email_node_falls_back_to_domain_search_when_earlier_passes_yield_nothing():
+    """Finder/EXA/pattern passes all fail → domain search produces the winning email."""
     state = {**BASE_STATE}
 
-    with patch("agent.nodes.outreach_mailer.hunter_io.find_email",
-               new=AsyncMock(return_value={"email": "s@acme.com", "score": 45})), \
+    with patch("agent.nodes.outreach_mailer._find_company_domain",
+               new=AsyncMock(return_value="acme.com")), \
+         patch("agent.nodes.outreach_mailer.hunter_io.find_email",
+               new=AsyncMock(return_value=None)), \
+         patch("agent.proxycurl.search_person_email",
+               new=AsyncMock(return_value=None)), \
+         patch("agent.nodes.outreach_mailer.hunter_io.infer_domain_pattern",
+               new=AsyncMock(return_value=None)), \
+         patch("agent.nodes.outreach_mailer.hunter_io.generate_email_candidates",
+               return_value=[]), \
          patch("agent.nodes.outreach_mailer.hunter_io.domain_search",
-               new=AsyncMock(return_value=[{"value": "sarah.chen@acme.com", "confidence": 82, "type": "personal"}])), \
+               new=AsyncMock(return_value=[{"value": "sarah.chen@acme.com", "confidence": 82}])), \
+         patch("agent.nodes.outreach_mailer.hunter_io.verify_email",
+               new=AsyncMock(return_value="deliverable")), \
          patch("agent.nodes.outreach_mailer.update_email_cadence", new=AsyncMock()):
 
         from agent.nodes.outreach_mailer import discover_email_node
@@ -62,30 +79,80 @@ async def test_discover_email_node_falls_back_to_domain_search_when_finder_score
 
     assert result["discovered_email"] == "sarah.chen@acme.com"
     assert result["email_source"] == "domain_search"
+    assert result["email_confidence"] == 95   # max(82, 95) — deliverable + domain match
 
 
 @pytest.mark.asyncio
-async def test_discover_email_node_sets_low_confidence_when_best_score_below_70():
+async def test_discover_email_node_sets_low_confidence_when_best_result_is_risky():
+    """All passes return only risky results → best candidate surfaced as low_confidence."""
     state = {**BASE_STATE}
 
-    with patch("agent.nodes.outreach_mailer.hunter_io.find_email",
+    with patch("agent.nodes.outreach_mailer._find_company_domain",
+               new=AsyncMock(return_value="acme.com")), \
+         patch("agent.nodes.outreach_mailer.hunter_io.find_email",
                new=AsyncMock(return_value=None)), \
+         patch("agent.proxycurl.search_person_email",
+               new=AsyncMock(return_value=None)), \
+         patch("agent.nodes.outreach_mailer.hunter_io.infer_domain_pattern",
+               new=AsyncMock(return_value=None)), \
+         patch("agent.nodes.outreach_mailer.hunter_io.generate_email_candidates",
+               return_value=[]), \
          patch("agent.nodes.outreach_mailer.hunter_io.domain_search",
-               new=AsyncMock(return_value=[{"value": "s@acme.com", "confidence": 45, "type": "personal"}])), \
+               new=AsyncMock(return_value=[{"value": "s@acme.com", "confidence": 45}])), \
+         patch("agent.nodes.outreach_mailer.hunter_io.verify_email",
+               new=AsyncMock(return_value="risky")), \
          patch("agent.nodes.outreach_mailer.update_email_cadence", new=AsyncMock()):
 
         from agent.nodes.outreach_mailer import discover_email_node
         result = await discover_email_node(state, CONFIG)
 
+    # risky + domain-match → min(45, 65)=45 < threshold(75) → stored as risky fallback
     assert result["status"] == "low_confidence"
 
 
 @pytest.mark.asyncio
+async def test_discover_email_node_domain_matched_accept_all_beats_non_domain_deliverable():
+    """Key regression: accept_all on company domain wins over deliverable on unrelated domain.
+
+    Reproduces the Crisis24 scenario where anna.veazey@crisis24.com (Hunter, accept_all)
+    was wrongly beaten by sales@leadiq.com (EXA, deliverable).
+    """
+    state = {**BASE_STATE, "company": "Crisis24", "hiring_manager_name": "Anna Veazey"}
+
+    with patch("agent.nodes.outreach_mailer._find_company_domain",
+               new=AsyncMock(return_value="crisis24.com")), \
+         patch("agent.nodes.outreach_mailer.hunter_io.find_email",
+               new=AsyncMock(return_value={"email": "anna@crisis24.com", "score": 85})), \
+         patch("agent.nodes.outreach_mailer.hunter_io.verify_email",
+               new=AsyncMock(return_value="accept_all")), \
+         patch("agent.nodes.outreach_mailer.update_email_cadence", new=AsyncMock()):
+
+        from agent.nodes.outreach_mailer import discover_email_node
+        result = await discover_email_node(state, CONFIG)
+
+    # accept_all + domain match: min(85, 88)=85 ≥ threshold(75) → accepted from Pass 1
+    # EXA's deliverable non-domain email is never reached
+    assert result["discovered_email"] == "anna@crisis24.com"
+    assert result["email_confidence"] == 85   # min(85, 88)
+    assert result["email_source"] == "finder"
+    assert result["status"] == "generating"
+
+
+@pytest.mark.asyncio
 async def test_discover_email_node_sets_email_not_found_when_no_address_returned():
+    """All four passes return nothing → email_not_found status."""
     state = {**BASE_STATE}
 
-    with patch("agent.nodes.outreach_mailer.hunter_io.find_email",
+    with patch("agent.nodes.outreach_mailer._find_company_domain",
+               new=AsyncMock(return_value="acme.com")), \
+         patch("agent.nodes.outreach_mailer.hunter_io.find_email",
                new=AsyncMock(return_value=None)), \
+         patch("agent.proxycurl.search_person_email",
+               new=AsyncMock(return_value=None)), \
+         patch("agent.nodes.outreach_mailer.hunter_io.infer_domain_pattern",
+               new=AsyncMock(return_value=None)), \
+         patch("agent.nodes.outreach_mailer.hunter_io.generate_email_candidates",
+               return_value=[]), \
          patch("agent.nodes.outreach_mailer.hunter_io.domain_search",
                new=AsyncMock(return_value=[])), \
          patch("agent.nodes.outreach_mailer.update_email_cadence", new=AsyncMock()):

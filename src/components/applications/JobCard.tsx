@@ -140,6 +140,22 @@ export function JobCard({
     }
   }, [job.emailCadence?.id, job.emailCadence?.status])
 
+  // Poll cadence status while the daemon is processing (e.g. after retry) so the
+  // UI transitions to pending_approval without requiring a manual page refresh.
+  useEffect(() => {
+    const id = emailCadence?.id
+    if (!id || id === '' || !EMAIL_TRANSIENT.includes(emailCadence!.status)) return
+    const interval = setInterval(async () => {
+      try {
+        const fresh = await getEmailCadence(id, candidateId)
+        if (!EMAIL_TRANSIENT.includes(fresh.status)) {
+          setEmailCadence(fresh)
+        }
+      } catch { /* ignore transient polling errors */ }
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [emailCadence?.id, emailCadence?.status, candidateId])
+
   // Sync outreach status when the parent's silentRefresh delivers an update
   // (e.g. generating → notes_ready after the LinkedIn agent finishes).
   useEffect(() => {

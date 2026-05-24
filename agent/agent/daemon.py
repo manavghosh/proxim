@@ -12,9 +12,12 @@ logger = structlog.get_logger()
 _stop_event = asyncio.Event()
 
 
-def _handle_sigterm(*_):
-    logger.info("sigterm_received", message="Shutting down daemon gracefully")
-    _stop_event.set()
+async def _sleep_until_stopped(seconds: float) -> None:
+    """Sleep for `seconds` but wake immediately when _stop_event is set."""
+    try:
+        await asyncio.wait_for(_stop_event.wait(), timeout=seconds)
+    except asyncio.TimeoutError:
+        pass
 
 
 async def _dispatch_job(pool, job: dict) -> None:
@@ -331,7 +334,10 @@ async def _dispatch_job(pool, job: dict) -> None:
             OutreachMailerState, discover_email_node, generate_emails_node,
             write_cadence_checkpoint_node,
         )
-        from agent.db import insert_email_cadence, update_pipeline_job_status, update_email_cadence
+        from agent.db import (
+            insert_email_cadence, update_pipeline_job_status, update_email_cadence,
+            insert_pipeline_log,
+        )
         from agent.config import settings as _settings
         from langchain_core.runnables import RunnableConfig
 
@@ -343,11 +349,19 @@ async def _dispatch_job(pool, job: dict) -> None:
         arch_conf  = float(payload.get('archetype_confidence', 0))
         cand_id    = str(job['candidate_id'])
         pj_id      = job['id']
+        is_retry   = job['job_type'] == 'outreach_mailer_generate'
 
         logger.info("job_dispatching", job_id=pj_id, job_type=job['job_type'],
                     target_job_id=job_id, company=company)
 
-        if job['job_type'] == 'outreach_mailer':
+        async def _log(step: str, message: str, data: dict | None = None) -> None:
+            try:
+                await insert_pipeline_log(pool, pj_id, level="info", step=step,
+                                          message=message, data=data)
+            except Exception:
+                pass
+
+        if not is_retry:
             cadence_id = await insert_email_cadence(pool, job_id, cand_id)
         else:
             cadence_id = str(payload.get('cadence_id', ''))
@@ -402,19 +416,84 @@ async def _dispatch_job(pool, job: dict) -> None:
         }
 
         try:
-            if job['job_type'] == 'outreach_mailer':
+            if not is_retry:
+                await _log("outreach_mailer",
+                           f"Starting email outreach for {job_title} at {company}",
+                           {"company": company, "job_title": job_title})
                 state = {**state, **(await discover_email_node(state, config))}
+                disc_status = state["status"]
+                if disc_status == "generating":
+                    await _log("discover_email",
+                               f"Email found: {state['discovered_email']} "
+                               f"({state['email_confidence']}% confidence via {state['email_source']})",
+                               {"email": state["discovered_email"],
+                                "confidence": state["email_confidence"],
+                                "source": state["email_source"]})
+                elif disc_status == "email_not_found":
+                    await _log("discover_email",
+                               f"No email found for {company} — drafts will be generated for manual entry",
+                               {"company": company})
+                elif disc_status == "low_confidence":
+                    await _log("discover_email",
+                               f"Low confidence email ({state['email_confidence']}%): "
+                               f"{state['discovered_email']} — awaiting user review",
+                               {"email": state["discovered_email"],
+                                "confidence": state["email_confidence"],
+                                "source": state["email_source"]})
+            else:
+                # Retry (outreach_mailer_generate): load contact name and existing email
+                # from DB so the regenerated drafts are as personalised as the first run.
+                if job_id:
+                    async with pool.execute(
+                        "SELECT name FROM outreach_targets "
+                        "WHERE job_id = ? AND name IS NOT NULL AND name != '' "
+                        "ORDER BY created_at DESC LIMIT 1",
+                        (job_id,)
+                    ) as _ot_cur:
+                        _ot_row = await _ot_cur.fetchone()
+                    if _ot_row and _ot_row[0]:
+                        state = {**state, "hiring_manager_name": _ot_row[0]}
+
+                async with pool.execute(
+                    "SELECT hiring_manager_email, email_confidence, email_source "
+                    "FROM email_cadences WHERE id = ?", (cadence_id,)
+                ) as _ec_cur:
+                    _ec_row = await _ec_cur.fetchone()
+                if _ec_row and _ec_row[0]:
+                    state = {**state, "discovered_email": _ec_row[0],
+                             "email_confidence": _ec_row[1], "email_source": _ec_row[2]}
+                    await _log("outreach_mailer",
+                               f"Retrying email generation for {_ec_row[0]} at {company}",
+                               {"email": _ec_row[0], "company": company, "job_title": job_title})
+                else:
+                    await _log("outreach_mailer",
+                               f"Retrying email generation for {company} (no email on file — drafts will be ready for manual send)",
+                               {"company": company, "job_title": job_title})
+
             # Always generate drafts — even when no email found, so a manual
             # override can proceed to pending_approval without a second wait.
+            await _log("generate_emails",
+                       f"Generating 3-touch email sequence for {job_title} at {company}…",
+                       {"company": company, "job_title": job_title})
             state = {**state, **(await generate_emails_node(state, config))}
             if state["status"] == "failed":
-                await update_pipeline_job_status(pool, pj_id, 'failed',
-                                                  error=state.get("error") or "Generation failed")
+                err_msg = state.get("error") or "Generation failed"
+                await _log("generate_emails",
+                           f"Email generation failed after {state.get('generation_attempts', 0)} attempt(s): {err_msg}",
+                           {"attempts": state.get("generation_attempts", 0), "error": err_msg})
+                await update_pipeline_job_status(pool, pj_id, 'failed', error=err_msg)
                 return
+            await _log("generate_emails",
+                       f"Drafts generated ({state.get('generation_attempts', 1)} attempt(s)) — saving to cadence",
+                       {"attempts": state.get("generation_attempts", 1)})
             await write_cadence_checkpoint_node(state, config)
+            await _log("outreach_mailer",
+                       "Email cadence ready — pending approval",
+                       {"cadence_id": cadence_id})
             await update_pipeline_job_status(pool, pj_id, 'completed')
         except Exception as exc:
             logger.error("outreach_mailer.error", cadence_id=cadence_id, error=str(exc))
+            await _log("outreach_mailer", f"Error: {exc}", {"error": str(exc)})
             await update_email_cadence(pool, cadence_id, status="failed", error_message=str(exc))
             await update_pipeline_job_status(pool, pj_id, 'failed', error=str(exc))
 
@@ -504,7 +583,7 @@ async def _linkedin_acceptance_poll_loop(pool) -> None:
             await _linkedin_acceptance_poll_once(pool)
         except Exception as exc:
             logger.error("linkedin.poll_loop_error", error=str(exc))
-        await asyncio.sleep(86400)
+        await _sleep_until_stopped(86400)
 
 
 async def _linkedin_queued_send_once(pool) -> None:
@@ -578,7 +657,7 @@ async def _linkedin_queued_send_loop(pool) -> None:
             await _linkedin_queued_send_once(pool)
         except Exception as exc:
             logger.error("linkedin.queued_loop_error", error=str(exc))
-        await asyncio.sleep(3600)
+        await _sleep_until_stopped(3600)
 
 
 async def _snooze_resurface_loop(pool) -> None:
@@ -597,7 +676,7 @@ async def _snooze_resurface_loop(pool) -> None:
                 )
         except Exception as exc:
             logger.error("snooze_resurface_error", error=str(exc))
-        await asyncio.sleep(60)
+        await _sleep_until_stopped(60)
 
 
 async def _outreach_send_once(pool) -> None:
@@ -719,7 +798,7 @@ async def _outreach_send_loop(pool) -> None:
             await _outreach_send_once(pool)
         except Exception as exc:
             logger.error("outreach_send_loop.error", error=str(exc))
-        await asyncio.sleep(180)
+        await _sleep_until_stopped(180)
 
 
 async def _reply_bounce_detection_once(pool) -> None:
@@ -775,7 +854,7 @@ async def _reply_bounce_detection_loop(pool) -> None:
             await _reply_bounce_detection_once(pool)
         except Exception as exc:
             logger.error("detection_loop.error", error=str(exc))
-        await asyncio.sleep(3600)
+        await _sleep_until_stopped(3600)
 
 
 def _check_langsmith_guard(settings) -> None:
@@ -826,15 +905,19 @@ async def main() -> None:
 
     loop = asyncio.get_running_loop()
 
-    def _handle_shutdown(*_):
-        logger.info("shutdown_signal", message="Shutting down — cancelling all tasks")
+    def _do_shutdown():
+        # Runs inside the event loop — safe to call all_tasks / task.cancel here.
+        logger.info("sigterm_received", message="Shutting down — cancelling all tasks")
         _stop_event.set()
         for task in asyncio.all_tasks(loop):
             if task is not asyncio.current_task():
                 task.cancel()
 
-    signal.signal(signal.SIGTERM, _handle_shutdown)
-    signal.signal(signal.SIGINT, _handle_shutdown)
+    # SIGTERM: graceful shutdown in Docker/k8s — schedule inside the event loop.
+    signal.signal(signal.SIGTERM, lambda *_: loop.call_soon_threadsafe(_do_shutdown))
+    # SIGINT (Ctrl+C): do NOT override — asyncio.run() installs its own handler
+    # that cancels the main task, which cascades through asyncio.gather() cleanly.
+    # Overriding it on Windows breaks that cascade.
 
     logger.info("daemon_starting", polling_interval_seconds=settings.polling_interval_seconds)
 
@@ -868,7 +951,7 @@ async def main() -> None:
                     await _dispatch_job(pool, job)
                 else:
                     logger.debug("poll_idle", message="No jobs queued")
-                await asyncio.sleep(settings.polling_interval_seconds)
+                await _sleep_until_stopped(settings.polling_interval_seconds)
         except asyncio.CancelledError:
             pass
         finally:
@@ -889,4 +972,7 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        pass

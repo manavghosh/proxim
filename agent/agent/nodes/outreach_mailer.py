@@ -346,25 +346,65 @@ async def discover_email_node(state: OutreachMailerState, config) -> OutreachMai
     # ── Shared verification helper ────────────────────────────────────────────
 
     async def _verify(email: str, source: str, base_confidence: int) -> tuple[str | None, int, str]:
-        """Plausibility check then live verification. Returns (email, conf, src) or (None,0,'')."""
+        """Plausibility check then live verification. Returns (email, conf, src) or (None,0,'').
+
+        Confidence combines two independent signals:
+          1. Source score  — how sure are we this is the right address for this person?
+                             (Hunter Finder score, EXA web base, etc.)
+          2. Domain match  — does the email domain equal the resolved company domain?
+
+        Verification status adjusts confidence but never fully overrides domain relevance.
+        Per Hunter.io research, 38% of corporate domains are catch-all — accept_all is
+        a property of the mail server, not evidence the individual mailbox is fake.
+        A high Finder score (e.g. 85) on the company's own domain is a stronger signal
+        than a deliverable address at an unrelated domain (e.g. sales@leadiq.com).
+
+        Final confidence ranking (high → low):
+          deliverable  + domain match   → 95+   (confirmed mailbox, right company)
+          accept_all   + domain match   → 75–88  (catch-all server, right company, high Finder score)
+          deliverable  + other domain   → 75–84  (confirmed mailbox, wrong company)
+          risky        + domain match   → ≤ 65
+          risky        + other domain   → ≤ 40
+          accept_all   + other domain   → ≤ 30   (catch-all for an unrelated company)
+        """
         if not _is_plausible_email(email):
             logger.debug("outreach_mailer.email_implausible", email=email, source=source)
             return None, 0, ""
+
+        email_domain = email.split('@')[1].lower() if '@' in email else ""
+        domain_match = email_domain == domain.lower()
+
         status = await hunter_io.verify_email(email, hunter_key)
         logger.info("outreach_mailer.email_verification", email=email,
-                    status=status, source=source)
+                    status=status, source=source, domain_match=domain_match)
+
         if status == "deliverable":
-            return email, max(base_confidence, 90), source
-        if status == "risky":
-            return email, min(base_confidence, 65), source   # cap risky at 65
+            if domain_match:
+                # Best case: confirmed mailbox on the company's own domain.
+                return email, max(base_confidence, 95), source
+            # Deliverable but wrong domain (e.g. sales@leadiq.com for a crisis24.com role).
+            # Capped below 85 so a domain-matched accept_all can outrank it.
+            return email, min(max(base_confidence, 75), 84), source
+
         if status == "accept_all":
-            # Catch-all domain: server accepts all mail; can't verify individual
-            # address exists. Treat as a low-confidence suggestion (cap at 55)
-            # so the user is shown the best candidate rather than a blank input.
-            return email, min(base_confidence, 55), source
+            if domain_match:
+                # 38% of corporate domains use catch-all servers — common at real companies.
+                # When Hunter's Finder returns a high score AND the domain matches the target,
+                # this is a strong candidate. Use base_confidence directly, capped just below
+                # the deliverable+domain ceiling so ordering is preserved.
+                return email, min(base_confidence, 88), source
+            # Accept-all on an unrelated domain: the server accepts everything for a different
+            # company — essentially no signal about this person's email.
+            return email, min(base_confidence, 30), source
+
+        if status == "risky":
+            if domain_match:
+                return email, min(base_confidence, 65), source
+            return email, min(base_confidence, 40), source
+
         return None, 0, ""   # undeliverable / unknown
 
-    # Track a risky result in case nothing deliverable is found
+    # Track the best below-threshold candidate in case no pass yields a confident email.
     risky_email: str | None = None
     risky_conf:  int        = 0
     risky_src:   str        = ""
@@ -372,10 +412,31 @@ async def discover_email_node(state: OutreachMailerState, config) -> OutreachMai
     async def _try(email: str, source: str, base_confidence: int) -> tuple[str | None, int, str]:
         nonlocal risky_email, risky_conf, risky_src
         e, c, s = await _verify(email, source, base_confidence)
-        if e and c >= 90:
+        if not e or c == 0:
+            return None, 0, ""
+
+        email_domain = e.split('@')[1].lower() if '@' in e else ""
+        is_domain_match = email_domain == domain.lower()
+
+        # Domain-matched emails use a lower acceptance threshold (75 vs 90).
+        # A Hunter Finder score ≥ 75 on the company's own domain outweighs deliverability
+        # confirmation on an unrelated domain.
+        accept_threshold = 75 if is_domain_match else 90
+        if c >= accept_threshold:
             return e, c, s
-        if e and c > 0 and not risky_email:   # first risky result wins
-            risky_email, risky_conf, risky_src = e, c, s
+
+        # Below threshold — update the risky fallback.
+        # Priority: domain-matched > non-domain; within same group, higher confidence wins.
+        if risky_email:
+            existing_domain = risky_email.split('@')[1].lower() if '@' in risky_email else ""
+            existing_is_domain_match = existing_domain == domain.lower()
+            keep_existing = (
+                (existing_is_domain_match and not is_domain_match) or
+                (existing_is_domain_match == is_domain_match and risky_conf >= c)
+            )
+            if keep_existing:
+                return None, 0, ""
+        risky_email, risky_conf, risky_src = e, c, s
         return None, 0, ""
 
     # ── Pass 1: Hunter.io Email Finder ────────────────────────────────────────

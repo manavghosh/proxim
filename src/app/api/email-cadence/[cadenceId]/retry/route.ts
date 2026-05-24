@@ -30,7 +30,7 @@ export async function POST(
 
     // Load job details for generation context
     const [job] = await db
-      .select({ company: jobs.company, title: jobs.title, archetype: jobs.archetype })
+      .select({ company: jobs.company, title: jobs.title, archetype: jobs.archetype, archetypeConfidence: jobs.archetypeConfidence })
       .from(jobs)
       .where(eq(jobs.id, cadence.jobId))
       .limit(1)
@@ -51,12 +51,13 @@ export async function POST(
         jobType: 'outreach_mailer_generate',
         candidateId,
         payload: {
-          cadence_id:   cadenceId,
-          job_id:       cadence.jobId,
-          candidate_id: candidateId,
-          company:      job?.company ?? '',
-          job_title:    job?.title ?? '',
-          archetype:    job?.archetype ?? '',
+          cadence_id:           cadenceId,
+          job_id:               cadence.jobId,
+          candidate_id:         candidateId,
+          company:              job?.company ?? '',
+          job_title:            job?.title ?? '',
+          archetype:            job?.archetype ?? '',
+          archetype_confidence: job?.archetypeConfidence ?? 0,
         },
       })
       .returning({ id: pipelineJobs.id })
