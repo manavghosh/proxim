@@ -24,6 +24,7 @@ BASE_STATE = {
     "generation_attempts": 0,
     "status": "discovering",
     "error": None,
+    "run_id": None,
 }
 
 CONFIG = {"configurable": {"pool": MagicMock(), "settings": MagicMock(hunter_api_key="key", tracking_host="http://localhost:3000")}}

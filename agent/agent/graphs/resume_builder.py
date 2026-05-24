@@ -163,7 +163,7 @@ async def extract_keywords(state: ResumeBuilderState) -> dict:
         from agent.config import settings
         from agent.resume_engine import extract_keywords as _extract
         try:
-            keyword_set = _extract(state.jd_raw, settings)
+            keyword_set = _extract(state.jd_raw, settings, job_id=state.job_id, run_id=state.pipeline_run_id)
             await _log(pool, state.pipeline_job_id, "extract_keywords",
                        f"Extracted {len(keyword_set.keywords)} keywords")
             return {"keywords": keyword_set.keywords}
@@ -309,6 +309,7 @@ async def generate_cover_letter(state: ResumeBuilderState) -> dict:
             {"id": state.job_id, "title": state.job_title,
              "company": state.job_company, "jd_raw": state.jd_raw},
             state.parsed_profile, arch_config, settings,
+            job_id=state.job_id, run_id=state.pipeline_run_id,
         )
         if not cl.company_research_used:
             await _log(pool, state.pipeline_job_id, "cover_letter_fallback",

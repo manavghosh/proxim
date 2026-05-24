@@ -151,7 +151,8 @@ async def check_dnc_node(state: LinkedInConnectorState, config: RunnableConfig) 
 # ── LLM-driven role determination ────────────────────────────────────────────
 
 async def determine_target_roles(job_title: str, company: str,
-                                 job_id: str | None = None) -> list[str]:
+                                 job_id: str | None = None,
+                                 run_id: str | None = None) -> list[str]:
     """Use the LLM to determine 3-5 ideal contact roles for this specific job.
 
     The LLM reasons from the job title and company context — NOT from the
@@ -183,7 +184,7 @@ async def determine_target_roles(job_title: str, company: str,
             response_format={"type": "json_object"},
             temperature=0.2,
             max_tokens=200,
-            metadata=langfuse_metadata("linkedin_connector", "role_determination", job_id=job_id),
+            metadata=langfuse_metadata("linkedin_connector", "role_determination", job_id=job_id, run_id=run_id),
         )
         raw   = (resp.choices[0].message.content or "").strip() or "{}"
         data  = json.loads(raw)
@@ -283,10 +284,12 @@ async def discover_contact_node(state: LinkedInConnectorState, config: RunnableC
 
     await update_outreach_target(pool, state["outreach_target_id"], status="discovering")
 
+    run_id = config["configurable"].get("run_id")
     roles = await determine_target_roles(
         job_title=state["job_title"],
         company=company,
         job_id=state.get("job_id"),
+        run_id=run_id,
     )
 
     for role in roles:
@@ -530,7 +533,7 @@ async def generate_notes_node(state: LinkedInConnectorState, config: RunnableCon
                 {"role": "user",   "content": prompt},
             ],
             response_format={"type": "json_object"},
-            metadata=langfuse_metadata("linkedin_connector", "linkedin", job_id=state.get("job_id")),
+            metadata=langfuse_metadata("linkedin_connector", "linkedin", job_id=state.get("job_id"), run_id=config["configurable"].get("run_id")),
         )
         raw = response.choices[0].message.content or "{}"
         try:

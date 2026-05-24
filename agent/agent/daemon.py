@@ -103,6 +103,7 @@ async def _dispatch_job(pool, job: dict) -> None:
         config = _RC(configurable={
             "pool": pool,
             "proxycurl_api_key": getattr(_settings_regen, 'exa_api_key', ''),
+            "run_id": run_id,
         })
 
         async with pool.execute(
@@ -188,6 +189,7 @@ async def _dispatch_job(pool, job: dict) -> None:
         config    = RunnableConfig(configurable={
             "pool": pool,
             "proxycurl_api_key": getattr(settings, 'exa_api_key', ''),
+            "run_id": run_id,
         })
 
         state: LinkedInConnectorState = {
@@ -413,6 +415,7 @@ async def _dispatch_job(pool, job: dict) -> None:
             "generation_attempts": 0,
             "status": "discovering",
             "error": None,
+            "run_id": run_id,
         }
 
         try:

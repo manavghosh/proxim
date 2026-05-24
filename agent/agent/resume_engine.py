@@ -177,6 +177,8 @@ def generate_cover_letter(
     parsed_profile: dict,
     archetype_config: ArchetypeConfig,
     settings,
+    job_id: str | None = None,
+    run_id: str | None = None,
 ) -> CoverLetterContent:
     """Generate a 3-section cover letter tailored to the job and archetype."""
     prompt = f"""You are a career writer crafting a one-page cover letter.
@@ -202,12 +204,14 @@ Respond with JSON:
   "company_research_used": false
 }}"""
 
-    raw = _call_llm(prompt, settings)
+    raw = _call_llm(prompt, settings, job_id=job_id or job.get("id"), run_id=run_id)
     parsed = json.loads(raw)
     return CoverLetterContent.model_validate(parsed)
 
 
-def extract_keywords(jd_raw: str, settings) -> KeywordSet:
+def extract_keywords(jd_raw: str, settings,
+                     job_id: str | None = None,
+                     run_id: str | None = None) -> KeywordSet:
     """Extract 15–20 high-signal ATS keywords from the JD."""
     prompt = f"""Extract 15–20 high-signal ATS keywords from this job description.
 Focus on: technical skills, domain expertise, leadership terms, methodologies.
@@ -224,7 +228,7 @@ Return exactly 15–20 keywords as strings in the array."""
 
     for attempt in range(2):
         try:
-            raw = _call_llm(prompt, settings)
+            raw = _call_llm(prompt, settings, job_id=job_id, run_id=run_id)
             parsed = json.loads(raw)
             kws = parsed.get("keywords", [])
             return KeywordSet(keywords=kws)
