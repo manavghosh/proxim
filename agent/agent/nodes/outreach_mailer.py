@@ -215,7 +215,8 @@ async def litellm_generate(state: OutreachMailerState, settings,
     return draft
 
 
-async def litellm_self_review(draft: EmailDraftOutput, settings) -> SelfReviewResult:
+async def litellm_self_review(draft: EmailDraftOutput, settings,
+                             job_id: str | None = None) -> SelfReviewResult:
     import json
 
     prompt = (
@@ -235,7 +236,7 @@ async def litellm_self_review(draft: EmailDraftOutput, settings) -> SelfReviewRe
         api_key=_api_key(settings),
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
-        metadata=langfuse_metadata("outreach_mailer", "email"),
+        metadata=langfuse_metadata("outreach_mailer", "self_review", job_id=job_id),
     )
     raw = _strip_markdown(resp.choices[0].message.content or "")
     data = json.loads(raw)
@@ -569,7 +570,7 @@ async def generate_emails_node(state: OutreachMailerState, config) -> OutreachMa
             d7_wc = _word_count(draft.day7_body)
             logger.info("outreach_mailer.draft_generated", cadence_id=cadence_id, attempt=attempts,
                         day1_words=d1_wc, day3_words=d3_wc, day7_words=d7_wc)
-            review = await litellm_self_review(draft, settings)
+            review = await litellm_self_review(draft, settings, job_id=state.get("job_id"))
 
             logger.info("outreach_mailer.self_review", cadence_id=cadence_id, attempt=attempts,
                         passes=review.passes, feedback=review.feedback[:100] if review.feedback else "")

@@ -373,8 +373,8 @@ async def generate_report(
             messages=[{"role": "user", "content": summary_prompt}],
             response_format={"type": "json_object"},
             temperature=0.1,
-            metadata={"agent_name": "scoring_engine", "feature": "scoring",
-                      "job_id": job.get("id"), "run_id": run_id},
+            metadata=langfuse_metadata("scoring_engine", "report",
+                                       job_id=str(job.get("id") or ""), run_id=run_id),
         )
         raw_f = response.choices[0].message.content or ""
         raw_f = re.sub(r'^```(?:json)?\s*\n?', '', raw_f.strip())
@@ -392,8 +392,8 @@ async def generate_report(
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
         temperature=0.2,
-        metadata={"agent_name": "scoring_engine", "feature": "scoring",
-                  "job_id": job.get("id"), "run_id": run_id},
+        metadata=langfuse_metadata("scoring_engine", "report",
+                                   job_id=str(job.get("id") or ""), run_id=run_id),
     )
     raw_r = response.choices[0].message.content or ""
     raw_r = re.sub(r'^```(?:json)?\s*\n?', '', raw_r.strip())

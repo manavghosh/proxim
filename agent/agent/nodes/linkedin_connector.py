@@ -150,7 +150,8 @@ async def check_dnc_node(state: LinkedInConnectorState, config: RunnableConfig) 
 
 # ── LLM-driven role determination ────────────────────────────────────────────
 
-async def determine_target_roles(job_title: str, company: str) -> list[str]:
+async def determine_target_roles(job_title: str, company: str,
+                                 job_id: str | None = None) -> list[str]:
     """Use the LLM to determine 3-5 ideal contact roles for this specific job.
 
     The LLM reasons from the job title and company context — NOT from the
@@ -182,7 +183,7 @@ async def determine_target_roles(job_title: str, company: str) -> list[str]:
             response_format={"type": "json_object"},
             temperature=0.2,
             max_tokens=200,
-            metadata=langfuse_metadata("linkedin_connector", "linkedin"),
+            metadata=langfuse_metadata("linkedin_connector", "role_determination", job_id=job_id),
         )
         raw   = (resp.choices[0].message.content or "").strip() or "{}"
         data  = json.loads(raw)
@@ -285,6 +286,7 @@ async def discover_contact_node(state: LinkedInConnectorState, config: RunnableC
     roles = await determine_target_roles(
         job_title=state["job_title"],
         company=company,
+        job_id=state.get("job_id"),
     )
 
     for role in roles:
