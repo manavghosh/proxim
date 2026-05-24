@@ -38,7 +38,7 @@ export async function GET(
     }
 
     const run = rows[0]
-    const lastSearchAt = run.completedAt ? String(run.completedAt) : null
+    const lastSearchAt = run.completedAt ? run.completedAt.toISOString() : null
     const jobsDiscovered = run.jobsDiscovered
     const duplicatesSkipped = run.jobsDeduplicated
     const newJobs = Math.max(0, jobsDiscovered - duplicatesSkipped)
