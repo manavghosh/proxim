@@ -42,7 +42,7 @@ class _LangfuseLogger:
         usage = getattr(response_obj, "usage", None)
         meta: dict = kwargs.get("metadata") or {}
         cost: float = kwargs.get("response_cost") or 0.0
-        trace_id: str = meta.get("trace_id") or str(uuid.uuid4())
+        trace_id: str = meta.get("langfuse_trace_id") or meta.get("trace_id") or str(uuid.uuid4())
         agent_name: str = meta.get("agent_name", "proxim")
         job_id: str | None = meta.get("session_id")  # set by langfuse_metadata when job_id provided
 
@@ -207,7 +207,7 @@ def langfuse_metadata(
         "feature": feature,
     }
     if run_id:
-        meta["trace_id"] = run_id
+        meta["langfuse_trace_id"] = run_id
     if job_id:
         meta["session_id"] = str(job_id)
     return meta
