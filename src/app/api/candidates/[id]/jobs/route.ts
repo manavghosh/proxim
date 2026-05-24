@@ -192,7 +192,7 @@ export async function GET(
       reportMd: r.reportMd,
       archetype: r.archetype,
       archetypeConfidence: r.archetypeConfidence,
-      createdAt:           r.createdAt,
+      createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
       errorMessage:        r.jobErrorMessage ?? null,
       hitlCheckpoint: r.hitlCheckpointId
         ? {
