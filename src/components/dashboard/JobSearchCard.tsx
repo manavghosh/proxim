@@ -22,7 +22,7 @@ type Mode = 'idle' | 'running' | 'complete' | 'error'
 
 interface StepState {
   status: 'pending' | 'active' | 'done'
-  count: number | null
+  count: string | null
   label: string
 }
 
@@ -57,7 +57,7 @@ function hoursAgo(dateStr: string): number {
 function formatTimestamp(lastSearchAt: string | null): string {
   if (!lastSearchAt) return 'No searches yet'
   const h = hoursAgo(lastSearchAt)
-  if (h < 1) return `Last searched ${Math.round(h * 60)}m ago`
+  if (h < 1) return `Last searched ${Math.max(1, Math.round(h * 60))}m ago`
   if (h < 24) return `Last searched ${Math.round(h)}h ago`
   if (h < 48) return 'Last searched yesterday'
   return `Last searched ${Math.round(h / 24)} days ago`
@@ -81,6 +81,7 @@ export function JobSearchCard({
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const dismissRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const discoveryRunRef = useRef<{ jobsDiscovered: number; jobsDeduplicated: number } | null>(null)
+  const stepCountsRef = useRef<string[]>(['', '', ''])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -125,19 +126,17 @@ export function JobSearchCard({
             }
           }
 
-          setSteps(
-            STEP_LABELS.map((label, i) => {
-              if (i < stepIdx) return { label, status: 'done', count: null }
-              if (i === stepIdx) {
-                return {
-                  label,
-                  status: 'active',
-                  count: status.pipelineRun?.jobsDiscovered ?? null,
-                }
-              }
-              return { label, status: 'pending', count: null }
-            }),
-          )
+          // Update step count ref for the current active step
+          const discovered = status.pipelineRun?.jobsDiscovered ?? 0
+          if (stepIdx === 0) {
+            stepCountsRef.current[0] = discovered > 0 ? `${discovered} found` : 'Searching…'
+          }
+
+          setSteps(prev => prev.map((s, i) => {
+            if (i < stepIdx) return { ...s, status: 'done', count: stepCountsRef.current[i] || 'Done' }
+            if (i === stepIdx) return { ...s, status: 'active', count: stepCountsRef.current[stepIdx] || 'Running…' }
+            return { ...s, status: 'pending', count: 'Waiting…' }
+          }))
 
           if (status.followUpJobId) {
             // Follow the chain
@@ -189,6 +188,7 @@ export function JobSearchCard({
     // Fix 2: guard against double-click concurrent polls
     if (mode !== 'idle') return
     discoveryRunRef.current = null  // Fix 1: reset stale discovery data
+    stepCountsRef.current = ['', '', '']
     try {
       const { jobId } = await triggerPipeline('discovery_only', candidateId)
       setSteps(
@@ -210,6 +210,7 @@ export function JobSearchCard({
     // Fix 2: guard against double-click concurrent polls
     if (mode !== 'idle') return
     discoveryRunRef.current = null  // Fix 1: reset stale discovery data
+    stepCountsRef.current = ['', '', '']
     try {
       const { jobId } = await triggerPipeline('score_jobs', candidateId)
       setSteps(
@@ -419,15 +420,7 @@ function StepBox({ step }: { step: StepState }) {
         {icon} {step.label}
       </p>
       <p className="text-[9px] text-slate-500">
-        {isDone
-          ? step.count !== null
-            ? `${step.count} found`
-            : 'Done'
-          : isActive
-            ? step.count !== null
-              ? `${step.count} found`
-              : 'Running…'
-            : 'Waiting…'}
+        {step.count ?? (isDone ? 'Done' : isActive ? 'Running…' : 'Waiting…')}
       </p>
     </div>
   )
