@@ -25,11 +25,12 @@ interface Props {
   onOpenChange: (open: boolean) => void
   candidateId: string
   onScored: (pipelineJobId: string) => void
+  autoSelectAll?: boolean
 }
 
 const TOKENS_PER_JOB_ESTIMATE = 3000
 
-export function ScoringBatchSheet({ open, onOpenChange, candidateId, onScored }: Props) {
+export function ScoringBatchSheet({ open, onOpenChange, candidateId, onScored, autoSelectAll }: Props) {
   const [data, setData] = useState<ReadyToScoreResponse | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
@@ -44,7 +45,12 @@ export function ScoringBatchSheet({ open, onOpenChange, candidateId, onScored }:
     setSelected(new Set())
     getReadyToScoreGroups(candidateId)
       .then((res) => {
-        if (!cancelled) setData(res)
+        if (!cancelled) {
+          setData(res)
+          if (autoSelectAll) {
+            setSelected(new Set(res.groups.map((g) => g.position)))
+          }
+        }
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load groups')
@@ -55,7 +61,7 @@ export function ScoringBatchSheet({ open, onOpenChange, candidateId, onScored }:
     return () => {
       cancelled = true
     }
-  }, [open, candidateId])
+  }, [open, candidateId, autoSelectAll])
 
   const groups = data?.groups ?? []
 

@@ -31,7 +31,7 @@ httpx = "^0.28"
 google-api-python-client = "^2.130"
 google-auth = "^2.30"
 google-auth-oauthlib = "^1.2"
-langfuse = ">=2.0,<3.0"
+langfuse = ">=3.0"
 opentelemetry-sdk = ">=1.27"
 opentelemetry-exporter-otlp-proto-grpc = ">=1.27"
 opentelemetry-instrumentation-httpx = {version = ">=0.48b0", allow-prereleases = true}

@@ -16,6 +16,7 @@ export interface JobSearchCardProps {
   awaitingReview: number
   scoreFailed: number
   onSearchComplete: () => void
+  onOpenBatchSheet: () => void
 }
 
 type Mode = 'idle' | 'running' | 'complete' | 'error'
@@ -71,6 +72,7 @@ export function JobSearchCard({
   awaitingReview,
   scoreFailed,
   onSearchComplete,
+  onOpenBatchSheet,
 }: JobSearchCardProps) {
   const router = useRouter()
   const [mode, setMode] = useState<Mode>('idle')
@@ -206,28 +208,6 @@ export function JobSearchCard({
     }
   }
 
-  async function handleRescore() {
-    // Fix 2: guard against double-click concurrent polls
-    if (mode !== 'idle') return
-    discoveryRunRef.current = null  // Fix 1: reset stale discovery data
-    stepCountsRef.current = ['', '', '']
-    try {
-      const { jobId } = await triggerPipeline('score_jobs', candidateId)
-      setSteps(
-        STEP_LABELS.map((label, i) => ({
-          label,
-          status: i === 2 ? 'active' : 'pending',
-          count: null,
-        })),
-      )
-      setMode('running')
-      poll(jobId, true)
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Unknown error')
-      setMode('error')
-    }
-  }
-
   function handleCancel() {
     if (pollRef.current) clearTimeout(pollRef.current)
     pollRef.current = null
@@ -299,9 +279,9 @@ export function JobSearchCard({
             <Button
               variant="outline"
               className="flex-1 text-[12px] h-8 border-[#1e3a5f] text-slate-300"
-              onClick={handleRescore}
+              onClick={onOpenBatchSheet}
             >
-              ↻ Re-score All
+              ⚡ Score Batch
             </Button>
           </div>
 

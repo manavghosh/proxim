@@ -23,6 +23,7 @@ const DEFAULT_PROPS = {
   awaitingReview: 9,
   scoreFailed: 2,
   onSearchComplete: vi.fn(),
+  onOpenBatchSheet: vi.fn(),
 }
 
 describe('JobSearchCard', () => {
@@ -30,7 +31,7 @@ describe('JobSearchCard', () => {
     vi.clearAllMocks()
   })
 
-  it('renders "Search for New Jobs" and "Re-score All" buttons in idle state', () => {
+  it('renders "Search for New Jobs" and "Score Batch" buttons in idle state', () => {
     render(
       <JobSearchCard
         {...DEFAULT_PROPS}
@@ -38,7 +39,7 @@ describe('JobSearchCard', () => {
       />,
     )
     expect(screen.getByRole('button', { name: /search for new jobs/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /re-score all/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /score batch/i })).toBeInTheDocument()
   })
 
   it('shows cooldown note when lastSearchAt is < 6 hours ago', () => {

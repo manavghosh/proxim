@@ -46,6 +46,7 @@ export default function DashboardPage() {
   const [rescoreLoading, setRescoreLoading] = useState(false)
   const [readyToScore, setReadyToScore]   = useState(0)
   const [batchSheetOpen, setBatchSheetOpen] = useState(false)
+  const [batchAutoSelectAll, setBatchAutoSelectAll] = useState(false)
   const [importJobId, setImportJobId]       = useState<string | null>(null)
   const [lastSearch, setLastSearch]       = useState<import('@/lib/api').LastSearch | null>(null)
   const [awaitingReview, setAwaitingReview] = useState(0)
@@ -139,7 +140,7 @@ export default function DashboardPage() {
                 size="sm"
                 variant="outline"
                 className="text-xs border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/10"
-                onClick={() => setBatchSheetOpen(true)}
+                onClick={() => { setBatchAutoSelectAll(false); setBatchSheetOpen(true) }}
               >
                 ⚡ Score Batch ({readyToScore})
               </Button>
@@ -194,6 +195,7 @@ export default function DashboardPage() {
               awaitingReview={awaitingReview}
               scoreFailed={scoreFailed}
               onSearchComplete={refreshStats}
+              onOpenBatchSheet={() => { setBatchAutoSelectAll(true); setBatchSheetOpen(true) }}
             />
             <div className="grid grid-cols-[1fr_320px] gap-4">
               <div className="flex flex-col gap-4">
@@ -214,6 +216,7 @@ export default function DashboardPage() {
         onOpenChange={setBatchSheetOpen}
         candidateId={candidateId}
         onScored={handleBatchScored}
+        autoSelectAll={batchAutoSelectAll}
       />
     </div>
   )
