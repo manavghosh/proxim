@@ -136,15 +136,29 @@ export function JobCard({
   const [isOpen, setIsOpen] = useState(false)
   const [resumeVersion, setResumeVersion] = useState<ResumeVersion | null>(null)
 
-  // Fetch resume version when card expands and resume is ready
+  // Fetch resume version when card expands and resume exists (incl. rejected jobs — read-only)
+  const hasResume = job.status === 'resume_ready' || job.status === 'submitted' || job.status === 'rejected'
   useEffect(() => {
-    if (!isOpen || (job.status !== 'resume_ready' && job.status !== 'submitted')) return
-    getResumeVersions(job.id, candidateId).then(({ versions }) => {
-      if (versions.length === 0) return
-      const best = versions.reduce((a, b) => (b.versionN > a.versionN ? b : a))
-      setResumeVersion(best)
-    }).catch(() => { /* ignore */ })
-  }, [isOpen, job.status, job.id, candidateId])
+    if (!isOpen || !hasResume) return
+    let cancelled = false
+    function fetchVersion() {
+      getResumeVersions(job.id, candidateId).then(({ versions }) => {
+        if (cancelled || versions.length === 0) return
+        const best = versions.reduce((a, b) => (b.versionN > a.versionN ? b : a))
+        setResumeVersion(best)
+      }).catch(() => { /* ignore */ })
+    }
+    fetchVersion()
+    // Poll every 3s while PDF path is still null (generation in progress)
+    const interval = setInterval(() => {
+      setResumeVersion(prev => {
+        if (prev && prev.resumePdfPath) { clearInterval(interval); return prev }
+        fetchVersion()
+        return prev
+      })
+    }, 3000)
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [isOpen, hasResume, job.id, candidateId])
 
   // Sync emailCadence local state when the parent's silentRefresh delivers new
   // data from the backend. Only sync when prop carries a real (non-optimistic)
@@ -359,7 +373,7 @@ export function JobCard({
                 </Button>
               )}
 
-              {(isResumeReady || isSubmitted) && !resumeVersion && (
+              {(isResumeReady || isSubmitted || isRejected) && !resumeVersion && (
                 <>
                   <Button size="sm" variant="outline"
                     className="h-7 text-[11px] gap-1 border-[#1e2d4a] text-[#93c5fd]"
@@ -445,8 +459,8 @@ export function JobCard({
               </div>
             </div>
 
-            {/* Tailored resume card — shown when resume version data is available */}
-            {(isResumeReady || isSubmitted) && resumeVersion && (
+            {/* Tailored resume card — shown when resume version data is available (read-only for rejected) */}
+            {(isResumeReady || isSubmitted || isRejected) && resumeVersion && (
               <TailoredResumeCard
                 version={resumeVersion}
                 onViewResume={() => onViewResume?.(job.id)}

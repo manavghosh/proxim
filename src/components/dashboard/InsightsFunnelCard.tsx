@@ -111,7 +111,11 @@ export function InsightsFunnelCard({ insights }: Props) {
       {/* Rate cards */}
       <div className="grid grid-cols-4 gap-2">
         {RATE_CARDS.map(({ key, label }) => (
-          <div key={key} className="rounded-lg border border-[#1e2d4a] bg-[#0a1628] p-2 flex flex-col items-center gap-1">
+          <div
+            key={key}
+            className="rounded-lg border border-[#1e2d4a] bg-[#0a1628] p-2 flex flex-col items-center gap-1"
+            title={key === 'openRate' ? 'Open tracking may be blocked by some email clients — actual open rate may be higher' : undefined}
+          >
             <span className={`text-sm font-semibold leading-none ${
               rates[key] === null ? 'text-[#475569]' : 'text-[#e2e8f0]'
             }`}>
