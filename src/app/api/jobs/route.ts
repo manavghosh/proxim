@@ -134,6 +134,7 @@ export async function GET(request: Request) {
       interviewCallbackAt: j.interviewCallbackAt ? String(j.interviewCallbackAt) : null,
       errorMessage:        j.errorMessage ?? null,
       pipelineJobStatus:   j.pipelineJobStatus ?? null,
+      jdRaw:               j.jdRaw ?? '',
       outreachTarget: j.outreachId ? ({
         id:           j.outreachId,
         status:       j.outreachStatus as OutreachStatus,
