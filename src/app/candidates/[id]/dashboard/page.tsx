@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
-import { getCV, getReadiness, getJobStats, resetFailedJobs, getReadyToScoreGroups, getLastSearch } from '@/lib/api'
+import { getCV, getReadiness, getJobStats, resetFailedJobs, getReadyToScoreGroups, getLastSearch, cancelPipelineJob, getInsights } from '@/lib/api'
 import { Topbar } from '@/components/layout/Topbar'
 import { CandidateSwitcher } from '@/components/layout/CandidateSwitcher'
 import { StatCard } from '@/components/dashboard/StatCard'
@@ -15,7 +15,8 @@ import { PipelineLogPane } from '@/components/dashboard/PipelineLogPane'
 import { ScoringBatchSheet } from '@/components/dashboard/ScoringBatchSheet'
 import { ImportJobsSheet } from '@/components/pipeline/ImportJobsSheet'
 import { JobSearchCard } from '@/components/dashboard/JobSearchCard'
-import type { CandidateState, PipelineReadiness } from '@/types/candidate'
+import { InsightsFunnelCard } from '@/components/dashboard/InsightsFunnelCard'
+import type { CandidateState, PipelineReadiness, InsightsResponse } from '@/types/candidate'
 
 function parseStatusMeta(candidate: CandidateState | null) {
   if (!candidate) return { value: '—', sub: 'Loading…' }
@@ -48,8 +49,11 @@ export default function DashboardPage() {
   const [batchSheetOpen, setBatchSheetOpen] = useState(false)
   const [batchAutoSelectAll, setBatchAutoSelectAll] = useState(false)
   const [importJobId, setImportJobId]       = useState<string | null>(null)
+  const [isCancelling, setIsCancelling]         = useState(false)
+  const [awaitingCancelledStop, setAwaitingCancelledStop] = useState(false)
   const [lastSearch, setLastSearch]       = useState<import('@/lib/api').LastSearch | null>(null)
   const [awaitingReview, setAwaitingReview] = useState(0)
+  const [insights, setInsights] = useState<InsightsResponse | null>(null)
 
   const refreshReadyToScore = useCallback(async () => {
     try {
@@ -64,12 +68,13 @@ export default function DashboardPage() {
     async function load() {
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
-          const [cv, r, stats, ready, lastSearchData] = await Promise.all([
+          const [cv, r, stats, ready, lastSearchData, insightsRes] = await Promise.all([
             getCV(candidateId),
             getReadiness(candidateId),
             getJobStats(candidateId),
             getReadyToScoreGroups(candidateId).catch(() => ({ totalJobs: 0, groups: [] })),
             getLastSearch(candidateId),
+            getInsights(candidateId),
           ])
           setCandidate(cv)
           setReadiness(r)
@@ -79,6 +84,7 @@ export default function DashboardPage() {
           setAwaitingReview(stats.awaitingReview)
           setReadyToScore(ready.totalJobs)
           setLastSearch(lastSearchData)
+          setInsights(insightsRes)
           setLoading(false)
           return
         } catch {
@@ -121,6 +127,33 @@ export default function DashboardPage() {
 
   function handleBatchScored(pipelineJobId: string) {
     setImportJobId(pipelineJobId)
+    void refreshReadyToScore()
+    void refreshStats()
+  }
+
+  async function handleCancelScoring() {
+    if (!importJobId || isCancelling) return
+    setIsCancelling(true)
+    setAwaitingCancelledStop(true)
+    try {
+      await cancelPipelineJob(importJobId)
+      // importJobId intentionally NOT cleared here — the log pane keeps polling
+      // so the daemon's cancellation summary (X scored, Y not scored) is visible
+      // before the batch sheet opens. handlePipelineStopped drives the transition.
+    } catch {
+      // API failed — reset so user can try again
+      setAwaitingCancelledStop(false)
+    } finally {
+      setIsCancelling(false)
+    }
+  }
+
+  function handlePipelineStopped() {
+    if (!awaitingCancelledStop) return
+    setAwaitingCancelledStop(false)
+    setImportJobId(null)
+    // Refresh counts so the "Score Batch (N)" button re-appears with the correct
+    // remaining count — user can click it when they're ready to resume scoring.
     void refreshReadyToScore()
     void refreshStats()
   }
@@ -197,6 +230,7 @@ export default function DashboardPage() {
               onSearchComplete={refreshStats}
               onOpenBatchSheet={() => { setBatchAutoSelectAll(true); setBatchSheetOpen(true) }}
             />
+            <InsightsFunnelCard insights={insights} />
             <div className="grid grid-cols-[1fr_320px] gap-4">
               <div className="flex flex-col gap-4">
                 {readiness && <ReadinessRing readiness={readiness} candidateId={candidateId} />}
@@ -207,6 +241,10 @@ export default function DashboardPage() {
             <PipelineLogPane
               chainJobIds={importJobId ? [importJobId] : []}
               onReviewRequired={() => setBatchSheetOpen(true)}
+              onCancelRunning={importJobId ? handleCancelScoring : undefined}
+              cancellingRunning={isCancelling}
+              awaitingCancelStop={awaitingCancelledStop}
+              onStopped={handlePipelineStopped}
             />
           </>
         )}

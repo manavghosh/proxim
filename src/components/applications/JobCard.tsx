@@ -22,12 +22,16 @@ import { EmailNotFoundPanel } from '@/components/pipeline/EmailNotFoundPanel'
 import { EmailOutreachPanel } from '@/components/pipeline/EmailOutreachPanel'
 import { OutreachNoteSelector } from '@/components/pipeline/OutreachNoteSelector'
 import { OutreachStatusBadge } from '@/components/pipeline/OutreachStatusBadge'
-import type { ScoredJob, EmailCadenceSummary } from '@/lib/api'
-import { retryLinkedIn, startEmailOutreach, getEmailCadence } from '@/lib/api'
+import { TailoredResumeCard } from '@/components/applications/TailoredResumeCard'
+import type { ScoredJob, EmailCadenceSummary, ResumeVersion } from '@/lib/api'
+import { retryLinkedIn, startEmailOutreach, getEmailCadence, getResumeVersions } from '@/lib/api'
 import type { OutreachTargetSummary, OutreachStatus, EmailOutreachMode, EmailCadenceStatus } from '@/types/candidate'
 
 const LINKEDIN_TRANSIENT: OutreachStatus[] = ['pending', 'discovering', 'enriching', 'generating']
 const EMAIL_TRANSIENT: EmailCadenceStatus[] = ['pending_discovery', 'discovering', 'generating']
+// Extended set for polling: keep alive through email_not_found and low_confidence
+// so the pending_approval transition (written by write_cadence_checkpoint_node) is caught.
+const EMAIL_POLL_ACTIVE: EmailCadenceStatus[] = [...EMAIL_TRANSIENT, 'email_not_found', 'low_confidence']
 
 const GRADE_STYLES: Record<string, { badge: string; glow: string }> = {
   A: { badge: 'bg-emerald-500 text-white border-transparent', glow: 'shadow-[0_0_10px_rgba(16,185,129,0.25)]' },
@@ -130,6 +134,17 @@ export function JobCard({
   const [retryCount, setRetryCount] = useState(0)
 
   const [isOpen, setIsOpen] = useState(false)
+  const [resumeVersion, setResumeVersion] = useState<ResumeVersion | null>(null)
+
+  // Fetch resume version when card expands and resume is ready
+  useEffect(() => {
+    if (!isOpen || (job.status !== 'resume_ready' && job.status !== 'submitted')) return
+    getResumeVersions(job.id, candidateId).then(({ versions }) => {
+      if (versions.length === 0) return
+      const best = versions.reduce((a, b) => (b.versionN > a.versionN ? b : a))
+      setResumeVersion(best)
+    }).catch(() => { /* ignore */ })
+  }, [isOpen, job.status, job.id, candidateId])
 
   // Sync emailCadence local state when the parent's silentRefresh delivers new
   // data from the backend. Only sync when prop carries a real (non-optimistic)
@@ -144,11 +159,11 @@ export function JobCard({
   // UI transitions to pending_approval without requiring a manual page refresh.
   useEffect(() => {
     const id = emailCadence?.id
-    if (!id || id === '' || !EMAIL_TRANSIENT.includes(emailCadence!.status)) return
+    if (!id || id === '' || !EMAIL_POLL_ACTIVE.includes(emailCadence!.status)) return
     const interval = setInterval(async () => {
       try {
         const fresh = await getEmailCadence(id, candidateId)
-        if (!EMAIL_TRANSIENT.includes(fresh.status)) {
+        if (!EMAIL_POLL_ACTIVE.includes(fresh.status) || fresh.drafts.length > 0) {
           setEmailCadence(fresh)
         }
       } catch { /* ignore transient polling errors */ }
@@ -336,14 +351,15 @@ export function JobCard({
                 <Button size="sm" variant="outline"
                   className="h-7 text-[11px] border-blue-700/40 text-blue-400 hover:bg-blue-950/30 gap-1"
                   onClick={() => onGenerateResume(job.id)}
-                  disabled={isPending || buildRunning}
+                  disabled={isPending || buildRunning || !job.jdRaw}
+                  title={!job.jdRaw ? 'Fetch JD first before tailoring' : undefined}
                   isLoading={buildRunning}>
                   <FileTextIcon className="w-3 h-3" />
-                  {buildRunning ? 'AI Agent writing…' : 'Generate Resume'}
+                  {buildRunning ? 'AI Agent writing…' : '✨ Tailor for This Role'}
                 </Button>
               )}
 
-              {(isResumeReady || isSubmitted) && (
+              {(isResumeReady || isSubmitted) && !resumeVersion && (
                 <>
                   <Button size="sm" variant="outline"
                     className="h-7 text-[11px] gap-1 border-[#1e2d4a] text-[#93c5fd]"
@@ -428,6 +444,15 @@ export function JobCard({
                 )}
               </div>
             </div>
+
+            {/* Tailored resume card — shown when resume version data is available */}
+            {(isResumeReady || isSubmitted) && resumeVersion && (
+              <TailoredResumeCard
+                version={resumeVersion}
+                onViewResume={() => onViewResume?.(job.id)}
+                onViewCoverLetter={() => onViewCoverLetter?.(job.id)}
+              />
+            )}
 
             {/* Build progress pane */}
             {(isApproved || isResumeReady || isSubmitted || isResumeFailed) && (
@@ -650,6 +675,7 @@ export function JobCard({
 
                 {emailCadence && (
                   emailCadence.status === 'pending_approval' ||
+                  emailCadence.status === 'generating' ||
                   emailCadence.status === 'active' ||
                   emailCadence.status === 'replied' ||
                   emailCadence.status === 'bounced' ||

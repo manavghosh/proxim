@@ -13,7 +13,7 @@ Use the `mcp__context7__resolve-library-id` and `mcp__context7__query-docs` tool
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan at:
-specs/008-observability-monitoring/plan.md
+specs/009-resume-tailoring-insights/plan.md
 <!-- SPECKIT END -->
 
 ---

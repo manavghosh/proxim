@@ -112,9 +112,16 @@ export function EmailDraftCard({ draft, cadenceId, candidateId, onDraftUpdated }
               </Button>
             </div>
             {draft.sentAt && (
-              <p className="text-[10px] text-[#475569]">
-                Sent {new Date(draft.sentAt).toLocaleString()}
-              </p>
+              <div data-testid="draft-send-status" className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-[#475569]">
+                <span>✉ Sent {new Date(draft.sentAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</span>
+                {draft.openDetectedAt
+                  ? <span>👁 Opened {new Date(draft.openDetectedAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</span>
+                  : <span className="text-[#334155]">Not opened yet</span>
+                }
+                {draft.clickDetectedAt && (
+                  <span>→ Clicked {new Date(draft.clickDetectedAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</span>
+                )}
+              </div>
             )}
           </>
         )}

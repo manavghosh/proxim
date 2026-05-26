@@ -171,3 +171,53 @@ export interface PipelineRunSummary {
   emailsSent:       number
   repliesReceived:  number
 }
+
+// ── Resume Tailoring Visibility (F9) ─────────────────────────────────────────
+
+export interface ResumeVersionSummary {
+  id: string
+  jobId: string
+  candidateId: string | null
+  keywords: string[] | null
+  archetype: string | null
+  archetypeConfidence: number | null
+  versionN: number
+  resumePdfPath: string | null
+  coverLetterPdfPath: string | null
+  baseCvHash: string | null
+  generationStatus: string
+  isStale: boolean
+  createdAt: string
+}
+
+// ── Outreach Insights (F9) ────────────────────────────────────────────────────
+
+export interface InsightsFunnel {
+  discovered: number
+  approved: number
+  day1Sent: number
+  opened: number
+  replied: number
+  callbacks: number
+}
+
+export interface InsightsRates {
+  openRate: number | null
+  replyRate: number | null
+  abGradeRate: number | null
+  callbackRate: number | null
+}
+
+export interface ArchetypeBreakdownRow {
+  archetype: string
+  approved: number
+  sent: number
+  replied: number
+  replyRate: number | null
+}
+
+export interface InsightsResponse {
+  funnel: InsightsFunnel
+  rates: InsightsRates
+  archetypeBreakdown: ArchetypeBreakdownRow[]
+}

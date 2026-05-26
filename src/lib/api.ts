@@ -152,6 +152,7 @@ export interface ScoredJob {
   score10d: Record<string, unknown> | null
   archetype: string | null
   archetypeConfidence: string | null
+  jdRaw: string
   createdAt: string
   updatedAt: string
   interviewCallbackAt: string | null
@@ -456,6 +457,18 @@ export async function exportRunHistory(candidateId: string, range: TimeRange = '
   document.body.removeChild(a)
 }
 
+// ── Outreach Insights (F9) ────────────────────────────────────────────────────
+
+import type { InsightsResponse } from '@/types/candidate'
+
+export async function getInsights(candidateId: string): Promise<InsightsResponse | null> {
+  try {
+    return await request(`/api/candidates/${encodeURIComponent(candidateId)}/insights`)
+  } catch {
+    return null
+  }
+}
+
 export async function markInterview(
   jobId: string,
   candidateId: string,
@@ -658,4 +671,8 @@ export async function cancelCadence(
   candidateId: string,
 ): Promise<{ cadenceId: string; status: string }> {
   return request(`/api/email-cadence/${cadenceId}/cancel${qs(candidateId)}`, { method: 'POST' })
+}
+
+export async function cancelPipelineJob(jobId: string): Promise<{ jobId: string; cancelled: boolean }> {
+  return request(`/api/pipeline/${jobId}/cancel`, { method: 'POST' })
 }

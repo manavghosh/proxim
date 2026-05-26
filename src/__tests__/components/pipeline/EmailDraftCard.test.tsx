@@ -120,4 +120,42 @@ describe('EmailDraftCard', () => {
     )
     expect(screen.getByTestId('draft-open-badge')).toBeDefined()
   })
+
+  it('shows send-status row with sent and opened text when both sentAt and openDetectedAt are set', () => {
+    render(
+      <EmailDraftCard
+        draft={makeDraft({ status: 'sent', sentAt: '2026-05-17T10:00:00Z', openDetectedAt: '2026-05-17T11:00:00Z' })}
+        cadenceId="cad-001"
+        candidateId="cand-001"
+        onDraftUpdated={vi.fn()}
+      />
+    )
+    const row = screen.getByTestId('draft-send-status')
+    expect(row.textContent).toMatch(/sent/i)
+    expect(row.textContent).toMatch(/opened/i)
+  })
+
+  it('shows "Not opened yet" when sentAt is set but openDetectedAt is null', () => {
+    render(
+      <EmailDraftCard
+        draft={makeDraft({ status: 'sent', sentAt: '2026-05-17T10:00:00Z', openDetectedAt: null })}
+        cadenceId="cad-001"
+        candidateId="cand-001"
+        onDraftUpdated={vi.fn()}
+      />
+    )
+    expect(screen.getByText(/not opened yet/i)).toBeInTheDocument()
+  })
+
+  it('does not render draft-send-status element when sentAt is null', () => {
+    render(
+      <EmailDraftCard
+        draft={makeDraft({ status: 'draft', sentAt: null })}
+        cadenceId="cad-001"
+        candidateId="cand-001"
+        onDraftUpdated={vi.fn()}
+      />
+    )
+    expect(screen.queryByTestId('draft-send-status')).not.toBeInTheDocument()
+  })
 })

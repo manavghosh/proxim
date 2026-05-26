@@ -39,10 +39,11 @@ export async function GET(
     }
 
     const run = rows[0]
-    const lastSearchAt = run.completedAt ? run.completedAt.toISOString() : null
+    // completedAt is a Date on Neon (pg) and a string on SQLite — new Date() handles both
+    const lastSearchAt = run.completedAt ? new Date(run.completedAt).toISOString() : null
+    const newJobs = run.jobsDiscovered
     const jobsDiscovered = run.jobsDiscovered
     const duplicatesSkipped = run.jobsDeduplicated
-    const newJobs = Math.max(0, jobsDiscovered - duplicatesSkipped)
 
     return NextResponse.json({ lastSearchAt, jobsDiscovered, newJobs, duplicatesSkipped })
   } catch (e) {

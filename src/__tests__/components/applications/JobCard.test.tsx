@@ -21,6 +21,7 @@ const baseJob: ScoredJob = {
   interviewCallbackAt: null,
   errorMessage: null,
   pipelineJobStatus: null,
+  jdRaw: 'some job description text',
   outreachTarget: null,
   emailCadence: null,
 }

@@ -35,8 +35,21 @@ function formatDue(iso: string): { label: string; overdue: boolean } {
   return { label: `Due in ${diffD}d ${remH}h`, overdue: false }
 }
 
-function buildGmailUrl(to: string, subject: string, bodyText: string): string {
-  return `https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(to)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyText)}`
+function htmlToPlainText(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+}
+
+function buildGmailUrl(to: string, subject: string, bodyHtml: string): string {
+  const body = htmlToPlainText(bodyHtml)
+  return `https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(to)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
 }
 
 export function ManualSendDraftCard({
@@ -58,16 +71,7 @@ export function ManualSendDraftCard({
     }
   }
 
-  function handleOpenGmail() {
-    const url = buildGmailUrl(
-      hiringManagerEmail,
-      draft.subject,
-      draft.bodyText || draft.bodyHtml.replace(/<[^>]+>/g, '')
-    )
-    window.open(url, '_blank', 'noopener,noreferrer')
-    setGmailOpened(true)
-    onGmailOpened?.()
-  }
+  const gmailUrl = buildGmailUrl(hiringManagerEmail, draft.subject, draft.bodyHtml)
 
   if (isAlreadySent) {
     return (
@@ -78,13 +82,22 @@ export function ManualSendDraftCard({
             <span className="text-xs font-medium text-emerald-400">
               {DAY_LABELS[draft.dayNumber]} — Sent
             </span>
-            {draft.sentAt && (
-              <span className="text-[10px] text-[#475569]">
-                {new Date(draft.sentAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-              </span>
-            )}
           </div>
         </CardHeader>
+        {draft.sentAt && (
+          <CardContent className="pt-0 pb-2">
+            <div data-testid="draft-send-status" className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-[#475569]">
+              <span>✉ Sent {new Date(draft.sentAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</span>
+              {draft.openDetectedAt
+                ? <span>👁 Opened {new Date(draft.openDetectedAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</span>
+                : <span className="text-[#334155]">Not opened yet</span>
+              }
+              {draft.clickDetectedAt && (
+                <span>→ Clicked {new Date(draft.clickDetectedAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</span>
+              )}
+            </div>
+          </CardContent>
+        )}
       </Card>
     )
   }
@@ -120,14 +133,21 @@ export function ManualSendDraftCard({
         />
 
         <Button
+          asChild
           size="sm"
           variant="outline"
           className="w-full text-xs border-blue-700/40 text-blue-400 hover:bg-blue-950/20 gap-1.5"
-          onClick={handleOpenGmail}
           data-testid={`open-gmail-day-${draft.dayNumber}`}
         >
-          <ExternalLink className="w-3 h-3" />
-          Open in Gmail →
+          <a
+            href={gmailUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => { setGmailOpened(true); onGmailOpened?.() }}
+          >
+            <ExternalLink className="w-3 h-3" />
+            Open in Gmail →
+          </a>
         </Button>
 
         {gmailOpened && (

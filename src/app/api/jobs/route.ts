@@ -37,6 +37,7 @@ export async function GET(request: Request) {
         score10d:            jobs.score10d,
         archetype:           jobs.archetype,
         archetypeConfidence: jobs.archetypeConfidence,
+        jdRaw:               jobs.jdRaw,
         createdAt:           jobs.createdAt,
         updatedAt:           jobs.updatedAt,
         interviewCallbackAt: jobs.interviewCallbackAt,
