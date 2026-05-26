@@ -150,7 +150,7 @@ No new packages, no migrations, no new environment variables. This feature is pu
 - [ ] T034 Manual smoke test — JD guard: find job with empty `jd_raw` → "✨ Tailor for This Role" button is disabled; hover shows tooltip "Fetch JD first before tailoring"
 - [ ] T035 Manual smoke test — InsightsFunnelCard: open dashboard for candidate with sent outreach → funnel counts match DB; open dashboard for brand-new candidate → all rates show "—" and empty state message appears
 - [ ] T036 Manual smoke test — per-draft timestamps: open email outreach panel for a cadence with a sent Day 1 draft → status row shows "✉ Sent [date]" and either "👁 Opened [date]" or "Not opened yet"
-- [ ] T037 Commit all changes with message: `feat(009): resume tailoring visibility + outreach insights dashboard`
+- [x] T037 Commit all changes with message: `feat(009): resume tailoring visibility + outreach insights dashboard`
 
 ---
 
