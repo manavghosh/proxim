@@ -6,7 +6,7 @@ function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
     <div
       data-slot="card"
       className={cn(
-        'bg-[#0d1f3c] border border-[#1e2d4a] rounded-xl flex flex-col transition-colors hover:border-[#2d4a6e]',
+        'bg-card border border-border rounded-xl flex flex-col transition-colors hover:border-border-strong',
         className
       )}
       {...props}
@@ -34,14 +34,14 @@ function CardFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement
 
 function CardTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
   return (
-    <h3 data-slot="card-title" className={cn('font-semibold text-[#f1f5f9] leading-tight', className)} {...props} />
+    <h3 data-slot="card-title" className={cn('font-semibold text-foreground leading-tight', className)} {...props} />
   )
 }
 
 // Added for analytics components (F7)
 function CardDescription({ className, ...props }: React.HTMLAttributes<HTMLParagraphElement>) {
   return (
-    <p data-slot="card-description" className={cn('text-sm text-[#64748b]', className)} {...props} />
+    <p data-slot="card-description" className={cn('text-sm text-muted-foreground', className)} {...props} />
   )
 }
 

@@ -90,7 +90,7 @@ export default function ApplicationsPage() {
   // Auto-poll every 5 s while any approved job has pending outreach/email data
   useEffect(() => {
     const OUTREACH_TRANSIENT = new Set<OutreachStatus>(['pending', 'discovering', 'enriching', 'generating'])
-    const EMAIL_TRANSIENT    = new Set<EmailCadenceStatus>(['pending_discovery', 'discovering', 'generating'])
+    const EMAIL_TRANSIENT    = new Set<EmailCadenceStatus>(['pending_discovery', 'discovering', 'generating', 'email_not_found'])
 
     const needsPolling = jobs.some(j => {
       if (!['approved', 'resume_ready', 'submitted'].includes(j.status)) return false
@@ -257,7 +257,7 @@ export default function ApplicationsPage() {
           </div>
         }
       />
-      <main className="flex-1 overflow-y-auto bg-[#0d1829]">
+      <main className="flex-1 min-h-0 overflow-hidden bg-muted">
         <Tabs
           defaultValue="jobs"
           className="flex flex-col h-full"
@@ -265,29 +265,29 @@ export default function ApplicationsPage() {
             if (v === 'history') void loadHistory(historyPage, analyticsRange)
           }}
         >
-          <div className="px-6 pt-4 border-b border-[#1e3a5f]">
-            <TabsList className="bg-[#0d1f3c] border border-[#1e3a5f]">
-              <TabsTrigger value="jobs" className="data-[state=active]:bg-[#1e3a5f] data-[state=active]:text-white text-[#64748b]">
+          <div className="px-6 pt-4 border-b border-border-strong">
+            <TabsList className="bg-card border border-border-strong">
+              <TabsTrigger value="jobs" className="data-[state=active]:bg-border-strong data-[state=active]:text-white text-muted-foreground">
                 Jobs
               </TabsTrigger>
-              <TabsTrigger value="analytics" className="data-[state=active]:bg-[#1e3a5f] data-[state=active]:text-white text-[#64748b]">
+              <TabsTrigger value="analytics" className="data-[state=active]:bg-border-strong data-[state=active]:text-white text-muted-foreground">
                 Analytics
               </TabsTrigger>
-              <TabsTrigger value="history" className="data-[state=active]:bg-[#1e3a5f] data-[state=active]:text-white text-[#64748b]">
+              <TabsTrigger value="history" className="data-[state=active]:bg-border-strong data-[state=active]:text-white text-muted-foreground">
                 History
               </TabsTrigger>
             </TabsList>
           </div>
 
           {/* ── Jobs Tab ─────────────────────────────────────────────────────── */}
-          <TabsContent value="jobs" className="flex-1 overflow-y-auto p-6 mt-0">
+          <TabsContent value="jobs" className="flex-1 overflow-x-hidden overflow-y-auto p-6 mt-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {error && (
-              <div className="mb-4 px-4 py-3 bg-[#450a0a] border border-[#7f1d1d] rounded-lg text-[12px] text-[#fca5a5] flex items-center justify-between gap-3">
+              <div className="mb-4 px-4 py-3 bg-destructive/15 border border-destructive/40 rounded-lg text-[12px] text-destructive flex items-center justify-between gap-3">
                 <span>{error}</span>
                 <button
                   onClick={() => setError(null)}
                   aria-label="Dismiss"
-                  className="shrink-0 text-[#fca5a5] hover:text-white transition-colors"
+                  className="shrink-0 text-destructive hover:text-white transition-colors"
                 >
                   ✕
                 </button>
@@ -298,18 +298,18 @@ export default function ApplicationsPage() {
             </div>
             {loading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-[140px] rounded-xl bg-[#0d1f3c]" />)}
+                {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-[140px] rounded-xl bg-card" />)}
               </div>
             ) : jobs.length === 0 ? (
               <div className="text-center py-20">
-                <p className="text-[#475569] text-sm">{emptyMessage}</p>
+                <p className="text-muted-foreground text-sm">{emptyMessage}</p>
               </div>
             ) : (
               // Two independent flex columns so collapsed cards don't inherit
               // the row-height of an expanded neighbour (CSS grid limitation).
               <div className="hidden md:flex gap-4">
                 {[0, 1].map((col) => (
-                  <div key={col} className="flex-1 flex flex-col gap-4">
+                  <div key={col} className="flex-1 min-w-0 flex flex-col gap-4">
                     {jobs.filter((_, i) => i % 2 === col).map((job) => (
                       <JobCard
                         key={job.id}
@@ -360,7 +360,7 @@ export default function ApplicationsPage() {
           </TabsContent>
 
           {/* ── Analytics Tab ────────────────────────────────────────────────── */}
-          <TabsContent value="analytics" className="flex-1 overflow-y-auto p-6 mt-0">
+          <TabsContent value="analytics" className="flex-1 overflow-x-hidden overflow-y-auto p-6 mt-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <AnalyticsPanel
               candidateId={candidateId}
               range={analyticsRange}
@@ -372,7 +372,7 @@ export default function ApplicationsPage() {
           {/* ── History Tab ──────────────────────────────────────────────────── */}
           <TabsContent
             value="history"
-            className="flex-1 overflow-y-auto p-6 mt-0"
+            className="flex-1 overflow-x-hidden overflow-y-auto p-6 mt-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             <RunHistoryTable
               runs={historyRuns}

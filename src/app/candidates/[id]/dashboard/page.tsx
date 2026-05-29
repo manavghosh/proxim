@@ -9,6 +9,7 @@ import { StatCard } from '@/components/dashboard/StatCard'
 import { ReadinessRing } from '@/components/dashboard/ReadinessRing'
 import { ActivityFeed } from '@/components/dashboard/ActivityFeed'
 import { ProfileCard } from '@/components/dashboard/ProfileCard'
+import { DashboardSection } from '@/components/dashboard/DashboardSection'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { PipelineLogPane } from '@/components/dashboard/PipelineLogPane'
@@ -21,17 +22,17 @@ import type { CandidateState, PipelineReadiness, InsightsResponse } from '@/type
 function parseStatusMeta(candidate: CandidateState | null) {
   if (!candidate) return { value: '—', sub: 'Loading…' }
   const s = candidate.parseStatus
-  if (s === 'ready')   return { value: 'Ready',    sub: 'Profile extracted',  dot: '#10b981' }
-  if (s === 'parsing') return { value: 'Parsing…', sub: 'In progress',        dot: '#f59e0b' }
-  if (s === 'failed')  return { value: 'Failed',   sub: 'Re-upload CV',       dot: '#ef4444' }
-  return { value: 'Pending', sub: 'No CV yet', dot: '#475569' }
+  if (s === 'ready')   return { value: 'Ready',    sub: 'Profile extracted',  dot: 'hsl(var(--success))' }
+  if (s === 'parsing') return { value: 'Parsing…', sub: 'In progress',        dot: 'hsl(var(--warning))' }
+  if (s === 'failed')  return { value: 'Failed',   sub: 'Re-upload CV',       dot: 'hsl(var(--destructive))' }
+  return { value: 'Pending', sub: 'No CV yet', dot: 'hsl(var(--muted-foreground))' }
 }
 
 function pipelineMeta(readiness: PipelineReadiness | null) {
   if (!readiness) return { value: '—', sub: 'Loading…' }
-  if (readiness.ready) return { value: 'Ready', sub: 'All criteria met', dot: '#10b981' }
+  if (readiness.ready) return { value: 'Ready', sub: 'All criteria met', dot: 'hsl(var(--success))' }
   const n = readiness.missing.length
-  return { value: 'Not ready', sub: `${n} item${n > 1 ? 's' : ''} missing`, dot: '#f59e0b' }
+  return { value: 'Not ready', sub: `${n} item${n > 1 ? 's' : ''} missing`, dot: 'hsl(var(--warning))' }
 }
 
 export default function DashboardPage() {
@@ -137,11 +138,7 @@ export default function DashboardPage() {
     setAwaitingCancelledStop(true)
     try {
       await cancelPipelineJob(importJobId)
-      // importJobId intentionally NOT cleared here — the log pane keeps polling
-      // so the daemon's cancellation summary (X scored, Y not scored) is visible
-      // before the batch sheet opens. handlePipelineStopped drives the transition.
     } catch {
-      // API failed — reset so user can try again
       setAwaitingCancelledStop(false)
     } finally {
       setIsCancelling(false)
@@ -152,8 +149,6 @@ export default function DashboardPage() {
     if (!awaitingCancelledStop) return
     setAwaitingCancelledStop(false)
     setImportJobId(null)
-    // Refresh counts so the "Score Batch (N)" button re-appears with the correct
-    // remaining count — user can click it when they're ready to resume scoring.
     void refreshReadyToScore()
     void refreshStats()
   }
@@ -193,61 +188,93 @@ export default function DashboardPage() {
           </div>
         }
       />
-      <main className="flex-1 overflow-y-auto p-6 bg-[#0d1829]">
-        {error && (
-          <div className="mx-6 mt-4 px-4 py-3 bg-[#450a0a] border border-[#7f1d1d] rounded-lg text-[12px] text-[#fca5a5]">{error}</div>
-        )}
-        {loading ? (
-          <div className="space-y-4">
-            <div className="grid grid-cols-4 gap-4">
-              {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-[88px] rounded-xl bg-[#0d1f3c]" />)}
-            </div>
-            <Skeleton className="h-[200px] rounded-xl bg-[#0d1f3c]" />
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-4 gap-4 mb-5">
-              <StatCard label="Pipeline Status" value={pMeta.value} sub={pMeta.sub} dotColor={pMeta.dot} />
-              <StatCard label="CV Parse" value={cvMeta.value} sub={cvMeta.sub} dotColor={cvMeta.dot} />
-              <StatCard
-                label="Jobs Matched"
-                value={jobsMatched === null ? '—' : String(jobsMatched)}
-                sub={jobsMatched === null ? 'Loading…' : jobsMatched === 0 ? 'Start AI Agent to discover roles' : `${jobsMatched} evaluated role${jobsMatched !== 1 ? 's' : ''}`}
-                dotColor={jobsMatched !== null && jobsMatched > 0 ? '#10b981' : undefined}
-              />
-              <StatCard
-                label="Applications"
-                value={applications === null ? '—' : String(applications)}
-                sub={applications === null ? 'Loading…' : applications === 0 ? 'None approved yet' : `${applications} approved`}
-                dotColor={applications !== null && applications > 0 ? '#06b6d4' : undefined}
-              />
-            </div>
-            <JobSearchCard
-              candidateId={candidateId}
-              lastSearch={lastSearch}
-              awaitingReview={awaitingReview}
-              scoreFailed={scoreFailed}
-              onSearchComplete={refreshStats}
-              onOpenBatchSheet={() => { setBatchAutoSelectAll(true); setBatchSheetOpen(true) }}
-            />
-            <InsightsFunnelCard insights={insights} />
-            <div className="grid grid-cols-[1fr_320px] gap-4">
-              <div className="flex flex-col gap-4">
-                {readiness && <ReadinessRing readiness={readiness} candidateId={candidateId} />}
-                <ActivityFeed candidate={candidate} />
+      {/*
+        Split-pane layout.
+        <main> is the flex row — no intermediate wrapper div.
+        min-h-0 lets a flex-1 item honour overflow on its children.
+        Left column scrolls independently; right sidebar is a separate flex
+        sibling so it never participates in the left column's reflow.
+      */}
+      <main className="flex-1 min-h-0 bg-muted flex flex-row gap-6 p-6 overflow-hidden">
+        {/* Left — scrolls vertically; scrollbar hidden so opening sections doesn't cause visual jump */}
+        <div className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto pb-6 space-y-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {error && (
+            <div className="px-4 py-3 bg-destructive/10 border border-destructive/40 rounded-lg text-[12px] text-destructive">{error}</div>
+          )}
+
+          {loading ? (
+            <div className="space-y-5">
+              <div className="grid grid-cols-4 gap-4">
+                {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-[88px] rounded-xl bg-card" />)}
               </div>
-              <ProfileCard candidate={candidate} candidateId={candidateId} />
+              <Skeleton className="h-[200px] rounded-xl bg-card" />
             </div>
-            <PipelineLogPane
-              chainJobIds={importJobId ? [importJobId] : []}
-              onReviewRequired={() => setBatchSheetOpen(true)}
-              onCancelRunning={importJobId ? handleCancelScoring : undefined}
-              cancellingRunning={isCancelling}
-              awaitingCancelStop={awaitingCancelledStop}
-              onStopped={handlePipelineStopped}
-            />
-          </>
-        )}
+          ) : (
+            <>
+              {/* Stat cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <StatCard label="Pipeline Status" value={pMeta.value} sub={pMeta.sub} dotColor={pMeta.dot} />
+                <StatCard label="CV Parse" value={cvMeta.value} sub={cvMeta.sub} dotColor={cvMeta.dot} />
+                <StatCard
+                  label="Jobs Matched"
+                  value={jobsMatched === null ? '—' : String(jobsMatched)}
+                  sub={jobsMatched === null ? 'Loading…' : jobsMatched === 0 ? 'Start AI Agent to discover roles' : `${jobsMatched} evaluated role${jobsMatched !== 1 ? 's' : ''}`}
+                  dotColor={jobsMatched !== null && jobsMatched > 0 ? 'hsl(var(--success))' : undefined}
+                />
+                <StatCard
+                  label="Applications"
+                  value={applications === null ? '—' : String(applications)}
+                  sub={applications === null ? 'Loading…' : applications === 0 ? 'None approved yet' : `${applications} approved`}
+                  dotColor={applications !== null && applications > 0 ? 'hsl(var(--info))' : undefined}
+                />
+              </div>
+
+              {/* Job search */}
+              <JobSearchCard
+                candidateId={candidateId}
+                lastSearch={lastSearch}
+                awaitingReview={awaitingReview}
+                scoreFailed={scoreFailed}
+                onSearchComplete={refreshStats}
+                onOpenBatchSheet={() => { setBatchAutoSelectAll(true); setBatchSheetOpen(true) }}
+              />
+
+              {/* Outreach insights */}
+              <DashboardSection title="Outreach Insights" storageKey="insights">
+                <InsightsFunnelCard insights={insights} />
+              </DashboardSection>
+
+              {/* Pipeline readiness */}
+              <DashboardSection title="Pipeline Readiness" storageKey="readiness">
+                {readiness && <ReadinessRing readiness={readiness} candidateId={candidateId} />}
+              </DashboardSection>
+
+              {/* Recent activity */}
+              <DashboardSection title="Recent Activity" defaultOpen={false} storageKey="activity">
+                <ActivityFeed candidate={candidate} />
+              </DashboardSection>
+
+              {/* Pipeline log — only when a job is active */}
+              {importJobId && (
+                <DashboardSection title="Pipeline Log" storageKey="log">
+                  <PipelineLogPane
+                    chainJobIds={[importJobId]}
+                    onReviewRequired={() => setBatchSheetOpen(true)}
+                    onCancelRunning={handleCancelScoring}
+                    cancellingRunning={isCancelling}
+                    awaitingCancelStop={awaitingCancelledStop}
+                    onStopped={handlePipelineStopped}
+                  />
+                </DashboardSection>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Right — pinned; separate flex sibling, never scrolls with left column */}
+        <aside className="w-[260px] shrink-0 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {!loading && <ProfileCard candidate={candidate} candidateId={candidateId} />}
+        </aside>
       </main>
       <ScoringBatchSheet
         open={batchSheetOpen}

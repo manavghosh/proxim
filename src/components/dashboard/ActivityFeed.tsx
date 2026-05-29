@@ -19,11 +19,8 @@ interface ActivityItem {
 export function ActivityFeed({ candidate }: ActivityFeedProps) {
   if (!candidate) {
     return (
-      <div className="bg-[#0d1f3c] border border-[#1e3a5f] rounded-xl p-5">
-        <h2 className="text-[13px] font-semibold text-[#e2e8f0] mb-3">
-          Recent Activity
-        </h2>
-        <p className="text-[12px] text-[#475569]">
+      <div className="bg-card border border-border-strong rounded-xl p-5">
+        <p className="text-[12px] text-muted-foreground">
           No activity yet — start by uploading your CV.
         </p>
       </div>
@@ -49,13 +46,9 @@ export function ActivityFeed({ candidate }: ActivityFeedProps) {
   }
 
   return (
-    <div className="bg-[#0d1f3c] border border-[#1e3a5f] rounded-xl p-5">
-      <h2 className="text-[13px] font-semibold text-[#e2e8f0] mb-4">
-        Recent Activity
-      </h2>
-
+    <div className="bg-card border border-border-strong rounded-xl p-5">
       {items.length === 0 ? (
-        <p className="text-[12px] text-[#475569]">
+        <p className="text-[12px] text-muted-foreground">
           No activity yet — start by uploading your CV.
         </p>
       ) : (
@@ -67,9 +60,9 @@ export function ActivityFeed({ candidate }: ActivityFeedProps) {
                 style={{ background: DOT[item.color] }}
               />
               <div>
-                <p className="text-[12px] text-[#94a3b8]">{item.text}</p>
+                <p className="text-[12px] text-muted-foreground">{item.text}</p>
                 {item.time && (
-                  <p className="text-[10px] text-[#334155]">{item.time}</p>
+                  <p className="text-[10px] text-muted-foreground">{item.time}</p>
                 )}
               </div>
             </div>

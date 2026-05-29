@@ -63,7 +63,7 @@ export function AvatarUploadSection({ candidateId, candidateName, avatarData, on
           <Button
             size="sm"
             variant="outline"
-            className="text-xs border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c]"
+            className="text-xs border-border-strong text-primary hover:bg-card"
             onClick={() => inputRef.current?.click()}
           >
             Upload photo
@@ -72,7 +72,7 @@ export function AvatarUploadSection({ candidateId, candidateName, avatarData, on
             <Button
               size="sm"
               variant="ghost"
-              className="text-xs text-[#475569] hover:text-destructive"
+              className="text-xs text-muted-foreground hover:text-destructive"
               onClick={handleRemove}
               isLoading={removing}
             >
@@ -80,7 +80,7 @@ export function AvatarUploadSection({ candidateId, candidateName, avatarData, on
             </Button>
           )}
         </div>
-        <p className="text-[10px] text-[#475569]">JPG, PNG or GIF · will be cropped to square</p>
+        <p className="text-[10px] text-muted-foreground">JPG, PNG or GIF · will be cropped to square</p>
         <input
           ref={inputRef}
           type="file"

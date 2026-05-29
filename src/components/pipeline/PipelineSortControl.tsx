@@ -29,19 +29,19 @@ export function PipelineSortControl({ value, onChange }: PipelineSortControlProp
         <Button
           variant="outline"
           size="sm"
-          className="h-7 text-[11px] px-3 border-[#1e2d4a] bg-[#0d1829] text-[#94a3b8] hover:bg-[#0d1f3c] gap-1"
+          className="h-7 text-[11px] px-3 border-border bg-muted text-muted-foreground hover:bg-card gap-1"
         >
           Sort: {SORT_LABELS[value]}
           <ChevronDown className="w-3 h-3" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="bg-[#0d1829] border-[#1e2d4a]" align="end">
+      <DropdownMenuContent className="bg-muted border-border" align="end">
         {(Object.keys(SORT_LABELS) as SortOption[]).map(opt => (
           <DropdownMenuItem
             key={opt}
             onClick={() => onChange(opt)}
             className={`text-[11px] cursor-pointer ${
-              value === opt ? 'text-[#93c5fd]' : 'text-[#94a3b8]'
+              value === opt ? 'text-primary' : 'text-muted-foreground'
             }`}
           >
             {SORT_LABELS[opt]}

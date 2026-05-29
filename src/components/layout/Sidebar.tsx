@@ -17,11 +17,11 @@ function NavItem({ href, label, icon: Icon, soon, active }: {
 }) {
   return (
     <Link href={href} className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors ${
-      active ? 'bg-[#0d1f3c] text-[#93c5fd] border border-[#1d4ed8]' : 'text-[#64748b] hover:bg-[#0d1829] hover:text-[#94a3b8]'
+      active ? 'bg-card text-primary border border-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
     }`}>
       <Icon className="w-4 h-4 flex-shrink-0" />
       <span className="flex-1">{label}</span>
-      {soon && <span className="text-[10px] text-[#334155] font-medium">soon</span>}
+      {soon && <span className="text-xs text-muted-foreground/70 font-medium">soon</span>}
     </Link>
   )
 }
@@ -29,8 +29,8 @@ function NavItem({ href, label, icon: Icon, soon, active }: {
 export function Sidebar() {
   const pathname = usePathname()
   return (
-    <aside className="w-[220px] bg-[#060d1f] border-r border-[#1e2d4a] flex flex-col flex-shrink-0 h-screen">
-      <div className="px-4 py-5 border-b border-[#0d1829]">
+    <aside className="w-[220px] bg-background border-r border-border flex flex-col flex-shrink-0 h-screen">
+      <div className="px-4 py-5 border-b border-border">
         <Link
           href="/"
           aria-label="Proxim — back to home"
@@ -39,16 +39,16 @@ export function Sidebar() {
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
             <span className="text-white text-xs font-bold">P</span>
           </div>
-          <div className="text-[13px] font-bold text-[#f1f5f9] tracking-widest">PROXIM</div>
+          <div className="text-[13px] font-bold text-foreground tracking-widest">PROXIM</div>
         </Link>
       </div>
       <nav className="flex-1 px-2.5 py-3 space-y-0.5">
-        <p className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase px-2 pb-1.5">Main</p>
+        <p className="text-[10px] font-semibold text-muted-foreground/70 tracking-widest uppercase px-2 pb-1.5">Main</p>
         {NAV_MAIN.map((item) => (
           <NavItem key={item.href} {...item} active={pathname === item.href || pathname.startsWith(item.href + '/')} />
         ))}
         <div className="pt-3">
-          <p className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase px-2 pb-1.5">Account</p>
+          <p className="text-[10px] font-semibold text-muted-foreground/70 tracking-widest uppercase px-2 pb-1.5">Account</p>
           {NAV_ACCOUNT.map((item) => <NavItem key={item.href} {...item} active={pathname === item.href} />)}
         </div>
       </nav>

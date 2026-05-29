@@ -86,11 +86,11 @@ export function ManualSendDraftCard({
         </CardHeader>
         {draft.sentAt && (
           <CardContent className="pt-0 pb-2">
-            <div data-testid="draft-send-status" className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-[#475569]">
+            <div data-testid="draft-send-status" className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
               <span>✉ Sent {new Date(draft.sentAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</span>
               {draft.openDetectedAt
                 ? <span>👁 Opened {new Date(draft.openDetectedAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</span>
-                : <span className="text-[#334155]">Not opened yet</span>
+                : <span className="text-muted-foreground">Not opened yet</span>
               }
               {draft.clickDetectedAt && (
                 <span>→ Clicked {new Date(draft.clickDetectedAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</span>
@@ -103,18 +103,18 @@ export function ManualSendDraftCard({
   }
 
   return (
-    <Card className="border border-[#1e2d4a]" data-testid={`manual-draft-day-${draft.dayNumber}`}>
+    <Card className="border border-border" data-testid={`manual-draft-day-${draft.dayNumber}`}>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-semibold text-[#94a3b8]">{DAY_LABELS[draft.dayNumber]}</span>
-            <span className="text-[9px] text-[#475569]">{DAY_SUBLABELS[draft.dayNumber]}</span>
+            <span className="text-xs font-semibold text-muted-foreground">{DAY_LABELS[draft.dayNumber]}</span>
+            <span className="text-[9px] text-muted-foreground">{DAY_SUBLABELS[draft.dayNumber]}</span>
           </div>
           {dueInfo && (
             <Badge className={`text-[10px] flex items-center gap-1 ${
               dueInfo.overdue
                 ? 'bg-red-950/40 text-red-400 border-red-800/40'
-                : 'bg-[#0d1829] text-[#64748b] border-[#1e2d4a]'
+                : 'bg-muted text-muted-foreground border-border'
             }`}>
               {dueInfo.overdue
                 ? <AlertTriangle className="w-2.5 h-2.5" />
@@ -123,12 +123,12 @@ export function ManualSendDraftCard({
             </Badge>
           )}
         </div>
-        <p className="text-[10px] text-[#475569] mt-0.5">{draft.subject}</p>
+        <p className="text-[10px] text-muted-foreground mt-0.5">{draft.subject}</p>
       </CardHeader>
 
       <CardContent className="space-y-2">
         <div
-          className="text-xs text-[#94a3b8] prose prose-invert prose-sm max-w-none max-h-[120px] overflow-y-auto"
+          className="text-xs text-muted-foreground prose prose-invert prose-sm max-w-none max-h-[120px] overflow-y-auto"
           dangerouslySetInnerHTML={{ __html: draft.bodyHtml }}
         />
 

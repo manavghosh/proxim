@@ -63,7 +63,7 @@ export function ImportJobsSheet({ candidateId, onImported, label = '+ Add Jobs' 
       <Button
         size="sm"
         variant="outline"
-        className="h-8 text-[11px] gap-1.5 border-[#1e2d4a] text-[#94a3b8] hover:text-white hover:border-[#334155]"
+        className="h-8 text-[11px] gap-1.5 border-border text-muted-foreground hover:text-white hover:border-border-strong"
         onClick={() => setOpen(true)}
       >
         <PlusCircle className="w-3.5 h-3.5" />
@@ -71,10 +71,10 @@ export function ImportJobsSheet({ candidateId, onImported, label = '+ Add Jobs' 
       </Button>
 
       <Sheet open={open} onOpenChange={handleClose}>
-        <SheetContent className="w-full sm:max-w-lg bg-[#0d1829] border-[#1e2d4a] text-[#e2e8f0]">
+        <SheetContent className="w-full sm:max-w-lg bg-muted border-border text-foreground">
           <SheetHeader className="mb-4">
-            <SheetTitle className="text-[#e2e8f0]">Import Jobs</SheetTitle>
-            <SheetDescription className="text-[#64748b] text-xs">
+            <SheetTitle className="text-foreground">Import Jobs</SheetTitle>
+            <SheetDescription className="text-muted-foreground text-xs">
               Paste one job URL per line. Supports LinkedIn and Naukri.
               Each job will be scraped, scored, and added to your pipeline.
             </SheetDescription>
@@ -89,11 +89,11 @@ export function ImportJobsSheet({ candidateId, onImported, label = '+ Add Jobs' 
                   'https://www.linkedin.com/jobs/view/4415158878/\nhttps://www.linkedin.com/jobs/view/4398234521/\nhttps://www.naukri.com/job-listings-...'
                 }
                 rows={10}
-                className="bg-[#0d1f3c] border-[#1e2d4a] text-[#e2e8f0] text-xs font-mono placeholder:text-[#334155] resize-none"
+                className="bg-card border-border text-foreground text-xs font-mono placeholder:text-muted-foreground resize-none"
               />
 
               <div className="flex items-center justify-between">
-                <span className="text-[11px] text-[#475569]">
+                <span className="text-[11px] text-muted-foreground">
                   {lineCount > 0 ? `${lineCount} URL${lineCount > 1 ? 's' : ''} detected` : 'Paste URLs above'}
                 </span>
                 <div className="flex gap-2">
@@ -130,27 +130,27 @@ export function ImportJobsSheet({ candidateId, onImported, label = '+ Add Jobs' 
                       : `${result?.imported} job${(result?.imported ?? 0) > 1 ? 's' : ''} queued for import`}
                   </p>
                   {(result?.skipped ?? 0) > 0 && (
-                    <p className="text-xs text-[#64748b] mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                       {result?.skipped} URL{(result?.skipped ?? 0) > 1 ? 's' : ''} already in your pipeline — skipped
                     </p>
                   )}
                   {(result?.imported ?? 0) > 0 && (
                     <>
-                      <p className="text-xs text-[#64748b] mt-2">
+                      <p className="text-xs text-muted-foreground mt-2">
                         The AI Agent is processing each URL, extracting the job description, and scoring it against your CV.
                         This usually takes 1–2 minutes per job.
                       </p>
-                      <div className="mt-3 flex flex-col gap-2 text-[11px] text-[#475569]">
+                      <div className="mt-3 flex flex-col gap-2 text-[11px] text-muted-foreground">
                         <div className="flex items-center gap-1.5">
-                          <span className="w-4 h-4 rounded-full bg-[#1e2d4a] flex items-center justify-center text-[9px] text-[#64748b]">1</span>
+                          <span className="w-4 h-4 rounded-full bg-border flex items-center justify-center text-[9px] text-muted-foreground">1</span>
                           Scraping job pages — extracting title, company &amp; description
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <span className="w-4 h-4 rounded-full bg-[#1e2d4a] flex items-center justify-center text-[9px] text-[#64748b]">2</span>
+                          <span className="w-4 h-4 rounded-full bg-border flex items-center justify-center text-[9px] text-muted-foreground">2</span>
                           Scoring against your CV — 10-dimension analysis
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <span className="w-4 h-4 rounded-full bg-[#1e2d4a] flex items-center justify-center text-[9px] text-[#64748b]">3</span>
+                          <span className="w-4 h-4 rounded-full bg-border flex items-center justify-center text-[9px] text-muted-foreground">3</span>
                           Jobs appear in Pipeline for your review
                         </div>
                       </div>
@@ -163,13 +163,13 @@ export function ImportJobsSheet({ candidateId, onImported, label = '+ Add Jobs' 
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-[11px] text-[#475569]"
+                  className="text-[11px] text-muted-foreground"
                   onClick={() => { setStatus('idle'); setResult(null); setUrls('') }}
                 >
                   + Add More
                 </Button>
                 <div className="flex gap-2">
-                  <Button size="sm" variant="outline" className="text-[11px] border-[#1e2d4a]" onClick={handleClose}>
+                  <Button size="sm" variant="outline" className="text-[11px] border-border" onClick={handleClose}>
                     Stay here
                   </Button>
                   <Button
@@ -191,18 +191,18 @@ export function ImportJobsSheet({ candidateId, onImported, label = '+ Add Jobs' 
           {/* Tips */}
           {status === 'idle' && lineCount === 0 && (
             <div className="mt-6 space-y-2">
-              <p className="text-[10px] font-semibold text-[#334155] uppercase tracking-wider">Tips</p>
-              <ul className="text-[11px] text-[#475569] space-y-1.5">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Tips</p>
+              <ul className="text-[11px] text-muted-foreground space-y-1.5">
                 <li className="flex items-start gap-1.5">
-                  <ExternalLink className="w-3 h-3 shrink-0 mt-0.5 text-[#334155]" />
+                  <ExternalLink className="w-3 h-3 shrink-0 mt-0.5 text-muted-foreground" />
                   LinkedIn tracking params are stripped automatically
                 </li>
                 <li className="flex items-start gap-1.5">
-                  <ExternalLink className="w-3 h-3 shrink-0 mt-0.5 text-[#334155]" />
+                  <ExternalLink className="w-3 h-3 shrink-0 mt-0.5 text-muted-foreground" />
                   Duplicate URLs (already in your pipeline) are skipped
                 </li>
                 <li className="flex items-start gap-1.5">
-                  <ExternalLink className="w-3 h-3 shrink-0 mt-0.5 text-[#334155]" />
+                  <ExternalLink className="w-3 h-3 shrink-0 mt-0.5 text-muted-foreground" />
                   Maximum 50 URLs per import
                 </li>
               </ul>

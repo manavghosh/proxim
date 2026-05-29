@@ -44,16 +44,16 @@ export function CandidateSwitcher({ candidateId }: Props) {
   const trigger = (
     <button
       type="button"
-      className={`flex items-center gap-2 rounded-lg border border-[#1e2d4a] bg-[#0d1f3c] px-3 py-1.5 text-xs font-medium text-[#94a3b8] transition-colors focus:outline-none ${
+      className={`flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors focus:outline-none ${
         hasMultiple
-          ? 'hover:border-[#2d4a6e] hover:text-[#e2e8f0] cursor-pointer'
+          ? 'hover:border-border-strong hover:text-foreground cursor-pointer'
           : 'cursor-default'
       }`}
       aria-label={`Current candidate: ${currentName}`}
     >
       <CandidateAvatar name={currentName} avatarData={current?.avatarData} size="sm" />
-      <span className="text-[#e2e8f0] max-w-[160px] truncate">{currentName}</span>
-      {hasMultiple && <ChevronDownIcon className="size-3 text-[#475569]" />}
+      <span className="text-foreground max-w-[160px] truncate">{currentName}</span>
+      {hasMultiple && <ChevronDownIcon className="size-3 text-muted-foreground" />}
     </button>
   )
 
@@ -69,12 +69,12 @@ export function CandidateSwitcher({ candidateId }: Props) {
           <DropdownMenuItem
             key={c.id}
             onClick={() => router.push(`/candidates/${c.id}/${section}`)}
-            className={c.id === candidateId ? 'text-[#93c5fd]' : ''}
+            className={c.id === candidateId ? 'text-primary' : ''}
           >
             <CandidateAvatar name={c.name} avatarData={c.avatarData} size="sm" className="mr-1.5" />
             <span className="flex-1 truncate">{c.name}</span>
             {c.id === candidateId && (
-              <span className="text-[10px] text-[#475569] ml-2">current</span>
+              <span className="text-[10px] text-muted-foreground ml-2">current</span>
             )}
           </DropdownMenuItem>
         ))}

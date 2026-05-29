@@ -46,12 +46,12 @@ export function GradeDistributionChart({ distribution }: GradeDistributionChartP
           dataKey="grade"
           tickLine={false}
           axisLine={false}
-          tick={{ fill: '#64748b', fontSize: 11 }}
+          tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
         />
         <YAxis
           tickLine={false}
           axisLine={false}
-          tick={{ fill: '#64748b', fontSize: 10 }}
+          tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
           allowDecimals={false}
         />
         <ChartTooltip content={<ChartTooltipContent />} />

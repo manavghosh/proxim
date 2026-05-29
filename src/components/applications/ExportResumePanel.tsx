@@ -34,13 +34,13 @@ function VersionCard({
   const isPending = submitting === version.id
 
   return (
-    <div className={`rounded-xl border p-4 space-y-3 ${isStale ? 'border-amber-700/30 bg-amber-950/10' : 'border-[#1e2d4a] bg-[#060d1f]'}`}>
+    <div className={`rounded-xl border p-4 space-y-3 ${isStale ? 'border-amber-700/30 bg-amber-950/10' : 'border-border bg-background'}`}>
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[11px] font-semibold text-[#e2e8f0]">v{version.versionN}</span>
-            <Badge variant="outline" className="text-[10px] border-[#1e2d4a] text-teal-300 bg-teal-950/40">
+            <span className="text-[11px] font-semibold text-foreground">v{version.versionN}</span>
+            <Badge variant="outline" className="text-[10px] border-border text-teal-300 bg-teal-950/40">
               {version.archetype}
             </Badge>
             {isSubmitted && (
@@ -54,7 +54,7 @@ function VersionCard({
               </Badge>
             )}
           </div>
-          <p className="text-[10px] text-[#475569] mt-0.5">
+          <p className="text-[10px] text-muted-foreground mt-0.5">
             {new Date(version.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
           </p>
         </div>
@@ -63,7 +63,7 @@ function VersionCard({
             ? 'bg-emerald-950/40 text-emerald-400'
             : version.generationStatus === 'failed'
               ? 'bg-red-950/40 text-red-400'
-              : 'bg-[#0d1f3c] text-[#475569]'
+              : 'bg-card text-muted-foreground'
         }`}>
           {version.generationStatus}
         </span>
@@ -73,14 +73,14 @@ function VersionCard({
       {version.generationStatus === 'completed' && (
         <div className="flex gap-2 flex-wrap">
           <Button size="sm" variant="outline"
-            className="h-7 text-[10px] border-[#1e2d4a] text-[#93c5fd] gap-1.5"
+            className="h-7 text-[10px] border-border text-primary gap-1.5"
             asChild>
             <a href={downloadResumeUrl(jobId, version.id, 'resume')} download>
               <DownloadIcon className="w-3 h-3" /> Resume PDF
             </a>
           </Button>
           <Button size="sm" variant="outline"
-            className="h-7 text-[10px] border-[#1e2d4a] text-[#93c5fd] gap-1.5"
+            className="h-7 text-[10px] border-border text-primary gap-1.5"
             asChild>
             <a href={downloadResumeUrl(jobId, version.id, 'cover-letter')} download>
               <DownloadIcon className="w-3 h-3" /> Cover Letter
@@ -145,9 +145,9 @@ export function ExportResumePanel({ jobId, candidateId, versions, currentCvHash,
   return (
     <Sheet open onOpenChange={(open) => { if (!open) onClose() }}>
       <SheetContent side="right"
-        className="w-full max-w-xl bg-[#060d1f] border-l border-[#1e2d4a] overflow-y-auto">
+        className="w-full max-w-xl bg-background border-l border-border overflow-y-auto">
         <SheetHeader>
-          <SheetTitle className="text-[#e2e8f0] text-sm font-semibold flex items-center justify-between">
+          <SheetTitle className="text-foreground text-sm font-semibold flex items-center justify-between">
             Resume &amp; Cover Letter
             <Button size="sm" className="text-xs bg-blue-600 hover:bg-blue-500"
               onClick={handleGenerate} isLoading={generating}>
@@ -158,7 +158,7 @@ export function ExportResumePanel({ jobId, candidateId, versions, currentCvHash,
 
         <div className="px-6 pb-6 space-y-3 mt-2">
           {localVersions.length === 0 ? (
-            <p className="text-[#475569] text-sm text-center py-8">
+            <p className="text-muted-foreground text-sm text-center py-8">
               No versions yet. Click "Generate New" to create your first resume.
             </p>
           ) : (

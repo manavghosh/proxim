@@ -56,11 +56,11 @@ export function GradeFilterDropdown({ selected, onChange, counts }: Props) {
           <Button
             variant="outline"
             size="sm"
-            className="gap-2 border-[#1e2d4a] bg-[#0d1f3c] text-[#94a3b8] hover:border-[#2d4a6e] hover:text-[#e2e8f0]"
+            className="gap-2 border-border bg-card text-muted-foreground hover:border-border-strong hover:text-foreground"
           >
-            <span className="text-[#64748b] text-[10px] font-semibold uppercase tracking-wider">Grade</span>
-            <span className="text-[#e2e8f0]">{triggerLabel()}</span>
-            <ChevronDownIcon className="size-3 text-[#475569]" />
+            <span className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider">Grade</span>
+            <span className="text-foreground">{triggerLabel()}</span>
+            <ChevronDownIcon className="size-3 text-muted-foreground" />
           </Button>
         </DropdownMenuTrigger>
 
@@ -84,9 +84,9 @@ export function GradeFilterDropdown({ selected, onChange, counts }: Props) {
                   >
                     {grade}
                   </span>
-                  <span className="flex-1 text-[#cbd5e1]">{meta.label.split('—')[1].trim()}</span>
+                  <span className="flex-1 text-foreground">{meta.label.split('—')[1].trim()}</span>
                   {count > 0 && (
-                    <span className="text-[10px] text-[#475569]">{count}</span>
+                    <span className="text-[10px] text-muted-foreground">{count}</span>
                   )}
                 </DropdownMenuCheckboxItem>
               )
@@ -97,7 +97,7 @@ export function GradeFilterDropdown({ selected, onChange, counts }: Props) {
             <Button
               variant="ghost"
               size="sm"
-              className="flex-1 text-[10px] h-7 text-[#64748b]"
+              className="flex-1 text-[10px] h-7 text-muted-foreground"
               onClick={() => onChange([...ALL_GRADES])}
             >
               All
@@ -105,7 +105,7 @@ export function GradeFilterDropdown({ selected, onChange, counts }: Props) {
             <Button
               variant="ghost"
               size="sm"
-              className="flex-1 text-[10px] h-7 text-[#64748b]"
+              className="flex-1 text-[10px] h-7 text-muted-foreground"
               onClick={() => onChange([])}
             >
               None
@@ -129,7 +129,7 @@ export function GradeFilterDropdown({ selected, onChange, counts }: Props) {
             </Badge>
           )
         })}
-        <span className="text-[10px] text-[#334155]">
+        <span className="text-[10px] text-muted-foreground">
           {Object.values(counts).reduce((a, b) => a + (b ?? 0), 0)} shown
         </span>
       </div>

@@ -20,7 +20,7 @@ export function OutreachStatusBadge({ status }: Props) {
   if (isTransientOutreachStatus(status)) {
     return (
       <span
-        className="flex items-center gap-1 text-[10px] text-[#475569]"
+        className="flex items-center gap-1 text-[10px] text-muted-foreground"
         data-testid="outreach-status-badge"
       >
         <Loader2 className="w-3 h-3 animate-spin" />

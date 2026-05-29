@@ -55,14 +55,14 @@ export default function RosterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#060d1f]">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-[#1e2d4a] bg-[#060d1f] px-8 py-5 flex items-center justify-between">
+      <header className="border-b border-border bg-background px-8 py-5 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
             <span className="text-white text-sm font-bold">P</span>
           </div>
-          <span className="text-[15px] font-bold text-[#f1f5f9] tracking-widest">PROXIM</span>
+          <span className="text-[15px] font-bold text-foreground tracking-widest">PROXIM</span>
         </div>
         <Button onClick={handleCreate} isLoading={creating}>
           + Add Candidate
@@ -71,8 +71,8 @@ export default function RosterPage() {
 
       <main className="px-8 py-8 max-w-6xl">
         <div className="mb-6">
-          <h1 className="text-xl font-semibold text-[#f1f5f9]">All Candidates</h1>
-          <p className="text-sm text-[#475569] mt-0.5">
+          <h1 className="text-xl font-semibold text-foreground">All Candidates</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
             {candidates.length} candidate{candidates.length !== 1 ? 's' : ''}
           </p>
         </div>
@@ -80,12 +80,12 @@ export default function RosterPage() {
         {loading ? (
           <div className="grid grid-cols-3 gap-4">
             {[...Array(3)].map((_, i) => (
-              <Skeleton key={i} className="h-40 rounded-xl bg-[#0d1f3c]" />
+              <Skeleton key={i} className="h-40 rounded-xl bg-card" />
             ))}
           </div>
         ) : candidates.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
-            <p className="text-[#475569] text-sm mb-4">No candidates yet.</p>
+            <p className="text-muted-foreground text-sm mb-4">No candidates yet.</p>
             <Button onClick={handleCreate} isLoading={creating}>
               Add your first candidate
             </Button>
@@ -115,7 +115,7 @@ export default function RosterPage() {
                               if (e.key === 'Enter') void handleRename(c.id)
                               if (e.key === 'Escape') setEditingId(null)
                             }}
-                            className="h-7 text-sm bg-[#060d1f] border-[#2d4a6e] text-[#f1f5f9]"
+                            className="h-7 text-sm bg-background border-border-strong text-foreground"
                           />
                           <Button
                             size="xs"
@@ -129,7 +129,7 @@ export default function RosterPage() {
                       ) : (
                         <Button
                           variant="ghost"
-                          className="h-auto p-0 text-[13px] font-semibold text-[#f1f5f9] hover:text-blue-300 truncate justify-start w-full"
+                          className="h-auto p-0 text-[13px] font-semibold text-foreground hover:text-blue-300 truncate justify-start w-full"
                           onClick={() => { setEditingId(c.id); setEditName(c.name) }}
                           title="Click to rename"
                         >
@@ -144,20 +144,20 @@ export default function RosterPage() {
 
                   {/* Stats */}
                   <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-[#060d1f] rounded-lg px-3 py-2">
-                      <p className="text-[10px] text-[#475569] uppercase tracking-wider">Jobs Matched</p>
-                      <p className="text-[18px] font-bold text-[#f1f5f9] mt-0.5">{c.jobsMatched}</p>
+                    <div className="bg-background rounded-lg px-3 py-2">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Jobs Matched</p>
+                      <p className="text-[18px] font-bold text-foreground mt-0.5">{c.jobsMatched}</p>
                     </div>
-                    <div className="bg-[#060d1f] rounded-lg px-3 py-2">
-                      <p className="text-[10px] text-[#475569] uppercase tracking-wider">Applications</p>
-                      <p className="text-[18px] font-bold text-[#f1f5f9] mt-0.5">{c.applications}</p>
+                    <div className="bg-background rounded-lg px-3 py-2">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Applications</p>
+                      <p className="text-[18px] font-bold text-foreground mt-0.5">{c.applications}</p>
                     </div>
                   </div>
 
                   {/* Open button */}
                   <Button
                     variant="outline"
-                    className="w-full border-[#1e3a5f] text-[#93c5fd] hover:bg-[#1e3a5f] hover:text-[#93c5fd]"
+                    className="w-full border-border-strong text-primary hover:bg-border-strong hover:text-primary"
                     onClick={() => router.push(`/candidates/${c.id}/dashboard`)}
                   >
                     Open Dashboard →

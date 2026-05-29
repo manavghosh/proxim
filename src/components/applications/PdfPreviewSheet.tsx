@@ -34,20 +34,20 @@ export function PdfPreviewSheet({ jobId, type = 'resume', url, title: titleProp,
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="bg-[#060d1f] border-l border-[#1e2d4a] flex flex-col gap-0 p-0 sm:max-w-2xl w-full"
+        className="bg-background border-l border-border flex flex-col gap-0 p-0 sm:max-w-2xl w-full"
       >
-        <SheetHeader className="border-b border-[#1e2d4a] px-5 py-4 flex-row items-center justify-between flex-shrink-0">
+        <SheetHeader className="border-b border-border px-5 py-4 flex-row items-center justify-between flex-shrink-0">
           <div>
-            <SheetTitle className="text-[#f1f5f9] text-sm">{title}</SheetTitle>
+            <SheetTitle className="text-foreground text-sm">{title}</SheetTitle>
             {candidateName && (
-              <p className="text-[11px] text-[#475569] mt-0.5">{candidateName}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">{candidateName}</p>
             )}
           </div>
           <Button
             asChild
             size="sm"
             variant="outline"
-            className="border-[#1e2d4a] text-[#93c5fd] gap-1.5 mr-8"
+            className="border-border text-primary gap-1.5 mr-8"
           >
             <a href={downloadUrl} download={filename}>
               <DownloadIcon className="w-3 h-3" />

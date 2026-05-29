@@ -39,10 +39,10 @@ export function EmailDraftCard({ draft, cadenceId, candidateId, onDraftUpdated }
   const displayHtml = showOriginal ? draft.originalBodyHtml : draft.bodyHtml
 
   return (
-    <Card data-testid={`email-draft-card-day-${draft.dayNumber}`} className="border border-[#1e2d45]">
+    <Card data-testid={`email-draft-card-day-${draft.dayNumber}`} className="border border-border">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             {DAY_LABELS[draft.dayNumber] ?? `Day ${draft.dayNumber}`}
           </span>
           <div className="flex items-center gap-1.5">
@@ -61,7 +61,7 @@ export function EmailDraftCard({ draft, cadenceId, candidateId, onDraftUpdated }
             </Badge>
           </div>
         </div>
-        <p className="text-xs text-[#94a3b8] mt-1">{draft.subject}</p>
+        <p className="text-xs text-muted-foreground mt-1">{draft.subject}</p>
       </CardHeader>
 
       <CardContent className="space-y-2">
@@ -90,11 +90,11 @@ export function EmailDraftCard({ draft, cadenceId, candidateId, onDraftUpdated }
         ) : (
           <>
             <div
-              className="text-xs text-[#94a3b8] prose prose-invert prose-sm max-w-none"
+              className="text-xs text-muted-foreground prose prose-invert prose-sm max-w-none"
               dangerouslySetInnerHTML={{ __html: displayHtml }}
             />
             {showOriginal && (
-              <p className="text-[10px] text-[#475569] italic">Showing original generated version</p>
+              <p className="text-[10px] text-muted-foreground italic">Showing original generated version</p>
             )}
             <div className="flex gap-2">
               {!['sent', 'sending', 'cancelled', 'bounced'].includes(draft.status) && (
@@ -112,11 +112,11 @@ export function EmailDraftCard({ draft, cadenceId, candidateId, onDraftUpdated }
               </Button>
             </div>
             {draft.sentAt && (
-              <div data-testid="draft-send-status" className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-[#475569]">
+              <div data-testid="draft-send-status" className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
                 <span>✉ Sent {new Date(draft.sentAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</span>
                 {draft.openDetectedAt
                   ? <span>👁 Opened {new Date(draft.openDetectedAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</span>
-                  : <span className="text-[#334155]">Not opened yet</span>
+                  : <span className="text-muted-foreground">Not opened yet</span>
                 }
                 {draft.clickDetectedAt && (
                   <span>→ Clicked {new Date(draft.clickDetectedAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</span>

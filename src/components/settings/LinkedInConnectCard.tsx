@@ -59,7 +59,7 @@ export function LinkedInConnectCard({ candidateId, flash }: Props) {
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <LinkedInIcon className="w-4 h-4 text-[#0A66C2]" />
-        <p className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase">
+        <p className="text-[9px] font-semibold text-muted-foreground tracking-widest uppercase">
           LinkedIn
         </p>
       </div>
@@ -78,7 +78,7 @@ export function LinkedInConnectCard({ candidateId, flash }: Props) {
       )}
 
       {loading ? (
-        <div className="flex items-center gap-2 text-xs text-[#475569]">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Loader2 className="w-3.5 h-3.5 animate-spin" />
           Checking connection…
         </div>
@@ -91,7 +91,7 @@ export function LinkedInConnectCard({ candidateId, flash }: Props) {
           <Button
             variant="outline"
             size="sm"
-            className="text-xs border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c]"
+            className="text-xs border-border-strong text-primary hover:bg-card"
             onClick={handleDisconnect}
             isLoading={disconnecting}
           >
@@ -113,7 +113,7 @@ export function LinkedInConnectCard({ candidateId, flash }: Props) {
               Connect LinkedIn
             </a>
           </Button>
-          <p className="text-[10px] text-[#334155]">
+          <p className="text-[10px] text-muted-foreground">
             Authorise Proxim to send connection requests on your behalf.
           </p>
         </div>

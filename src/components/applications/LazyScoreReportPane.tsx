@@ -35,7 +35,7 @@ export function LazyScoreReportPane({ jobId }: Props) {
         variant="ghost"
         size="sm"
         onClick={() => setOpen((p) => !p)}
-        className="text-[11px] text-[#64748b] hover:text-[#94a3b8] px-0 h-auto gap-1"
+        className="text-[11px] text-muted-foreground hover:text-muted-foreground px-0 h-auto gap-1"
       >
         {open ? (
           <>Hide Report <ChevronUp className="w-3 h-3" /></>
@@ -45,11 +45,11 @@ export function LazyScoreReportPane({ jobId }: Props) {
       </Button>
 
       {open && (
-        <div className="mt-2 p-3 rounded-md bg-[#080f1e] border border-[#1e2d4a] max-h-80 overflow-y-auto">
-          {loading && <p className="text-[11px] text-[#64748b]">Loading report…</p>}
+        <div className="mt-2 p-3 rounded-md bg-background border border-border max-h-80 overflow-y-auto">
+          {loading && <p className="text-[11px] text-muted-foreground">Loading report…</p>}
           {error && <p className="text-[11px] text-red-400">{error}</p>}
           {reportMd && !loading && !error && (
-            <pre className="text-[11px] text-[#94a3b8] whitespace-pre-wrap font-mono leading-relaxed">
+            <pre className="text-[11px] text-muted-foreground whitespace-pre-wrap font-mono leading-relaxed">
               {reportMd}
             </pre>
           )}

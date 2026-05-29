@@ -196,7 +196,7 @@ export function BuildProgressPane({ jobId, autoOpen = false, onBuildFailed, onBu
         variant="ghost"
         size="sm"
         onClick={() => setOpen((p) => !p)}
-        className="text-[11px] text-[#64748b] hover:text-[#94a3b8] px-0 h-auto gap-1"
+        className="text-[11px] text-muted-foreground hover:text-muted-foreground px-0 h-auto gap-1"
       >
         {open ? (
           <>Hide agent log <ChevronUp className="w-3 h-3" /></>
@@ -204,22 +204,22 @@ export function BuildProgressPane({ jobId, autoOpen = false, onBuildFailed, onBu
           <>Agent log <ChevronDown className="w-3 h-3" /></>
         )}
         {pipelineStatus && !TERMINAL_STATUSES.has(pipelineStatus) && (
-          <Loader2 className="w-3 h-3 animate-spin text-[#93c5fd]" />
+          <Loader2 className="w-3 h-3 animate-spin text-primary" />
         )}
       </Button>
 
       {open && (
-        <div className="mt-2 p-3 rounded-md bg-[#080f1e] border border-[#1e2d4a] max-h-72 overflow-y-auto font-mono text-[10px]">
-          {loadingLookup && <p className="text-[#475569]">Connecting to AI Agent…</p>}
+        <div className="mt-2 p-3 rounded-md bg-background border border-border max-h-72 overflow-y-auto font-mono text-[10px]">
+          {loadingLookup && <p className="text-muted-foreground">Connecting to AI Agent…</p>}
           {error && !loadingLookup && (
-            <p className="text-[#475569]">
+            <p className="text-muted-foreground">
               {error === 'No build has run for this job yet.'
                 ? 'No activity yet — the AI Agent hasn\'t started on this role.'
                 : 'Unable to reach AI Agent.'}
             </p>
           )}
           {!error && !loadingLookup && logs.length === 0 && (
-            <p className="text-[#475569]">AI Agent queued — starting shortly…</p>
+            <p className="text-muted-foreground">AI Agent queued — starting shortly…</p>
           )}
           {logs.map((l) => (
             <div
@@ -229,11 +229,11 @@ export function BuildProgressPane({ jobId, autoOpen = false, onBuildFailed, onBu
                   ? 'text-amber-400'
                   : l.level === 'error'
                     ? 'text-red-400'
-                    : 'text-[#94a3b8]'
+                    : 'text-muted-foreground'
               }`}
             >
-              <span className="text-[#334155] shrink-0 tabular-nums text-[9px]">{formatTime(l.createdAt)}</span>
-              <span className="shrink-0 text-[#475569]">{stepIcon(l.level, l.step)}</span>
+              <span className="text-muted-foreground shrink-0 tabular-nums text-[9px]">{formatTime(l.createdAt)}</span>
+              <span className="shrink-0 text-muted-foreground">{stepIcon(l.level, l.step)}</span>
               <span className="break-all">{humanizeMessage(l.step, l.message, l.level)}</span>
             </div>
           ))}

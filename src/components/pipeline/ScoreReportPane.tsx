@@ -18,7 +18,7 @@ export function ScoreReportPane({ reportMd, isOpen, onToggle }: ScoreReportPaneP
         variant="ghost"
         size="sm"
         onClick={onToggle}
-        className="text-[11px] text-[#64748b] hover:text-[#94a3b8] px-0 h-auto gap-1"
+        className="text-[11px] text-muted-foreground hover:text-muted-foreground px-0 h-auto gap-1"
         data-testid="report-toggle"
       >
         {isOpen ? (
@@ -29,8 +29,8 @@ export function ScoreReportPane({ reportMd, isOpen, onToggle }: ScoreReportPaneP
       </Button>
 
       {isOpen && (
-        <div className="mt-2 p-3 rounded-md bg-[#080f1e] border border-[#1e2d4a] max-h-80 overflow-y-auto">
-          <pre className="text-[11px] text-[#94a3b8] whitespace-pre-wrap font-mono leading-relaxed">
+        <div className="mt-2 p-3 rounded-md bg-background border border-border max-h-80 overflow-y-auto">
+          <pre className="text-[11px] text-muted-foreground whitespace-pre-wrap font-mono leading-relaxed">
             {reportMd}
           </pre>
         </div>

@@ -48,7 +48,7 @@ export function ScoreFailedSection({ jobs, candidateId, onRetried }: Props) {
   }
 
   return (
-    <div className="max-w-3xl mt-4 border border-amber-800/40 rounded-xl overflow-hidden bg-[#0d1829]">
+    <div className="max-w-3xl mt-4 border border-amber-800/40 rounded-xl overflow-hidden bg-muted">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 bg-amber-950/20">
         <Button
@@ -83,22 +83,22 @@ export function ScoreFailedSection({ jobs, candidateId, onRetried }: Props) {
 
       {/* Body */}
       {open && (
-        <div className="divide-y divide-[#1e2d4a]">
+        <div className="divide-y divide-border">
           {jobs.map(job => (
             <div key={job.id} className="flex items-start justify-between gap-3 px-4 py-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-[12px] font-medium text-[#e2e8f0] truncate">
+                  <span className="text-[12px] font-medium text-foreground truncate">
                     {job.title}
                   </span>
-                  <span className="text-[11px] text-[#475569] shrink-0">
+                  <span className="text-[11px] text-muted-foreground shrink-0">
                     · {job.company}
                   </span>
                   <a
                     href={job.sourceUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[#475569] hover:text-[#93c5fd] shrink-0"
+                    className="text-muted-foreground hover:text-primary shrink-0"
                     title="Open original job listing"
                   >
                     <ExternalLink className="w-3 h-3" />
@@ -112,7 +112,7 @@ export function ScoreFailedSection({ jobs, candidateId, onRetried }: Props) {
               <Button
                 size="sm"
                 variant="outline"
-                className="h-6 text-[10px] border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c] gap-1 shrink-0"
+                className="h-6 text-[10px] border-border-strong text-primary hover:bg-card gap-1 shrink-0"
                 onClick={() => handleRetryOne(job.id)}
                 disabled={retryingId === job.id}
                 isLoading={retryingId === job.id}
@@ -127,7 +127,7 @@ export function ScoreFailedSection({ jobs, candidateId, onRetried }: Props) {
       )}
 
       {error && (
-        <p className="px-4 py-2 text-[10px] text-red-400 border-t border-[#1e2d4a]">{error}</p>
+        <p className="px-4 py-2 text-[10px] text-red-400 border-t border-border">{error}</p>
       )}
     </div>
   )

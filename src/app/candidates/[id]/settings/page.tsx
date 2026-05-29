@@ -97,10 +97,10 @@ export default function SettingsPage() {
     return (
       <div className="flex flex-col flex-1 overflow-hidden">
         <Topbar title="Settings" actions={<CandidateSwitcher candidateId={candidateId} />} />
-        <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-[#0d1829]">
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-muted">
           {loadError ? (
             <>
-              <p className="text-[#475569] text-sm">Retrying…</p>
+              <p className="text-muted-foreground text-sm">Retrying…</p>
               <Button
                 size="sm"
                 variant="outline"
@@ -111,7 +111,7 @@ export default function SettingsPage() {
               </Button>
             </>
           ) : (
-            <p className="text-[#475569] text-sm">Loading…</p>
+            <p className="text-muted-foreground text-sm">Loading…</p>
           )}
         </div>
       </div>
@@ -123,18 +123,18 @@ export default function SettingsPage() {
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <Topbar title="Settings" actions={<CandidateSwitcher candidateId={candidateId} />} />
-      <main className="flex-1 overflow-y-auto p-6 bg-[#0d1829]">
+      <main className="flex-1 overflow-y-auto p-6 bg-muted">
         <div className="grid grid-cols-[2fr_1fr] gap-6 max-w-6xl">
-          <section className="bg-[#0d1f3c] border border-[#1e3a5f] rounded-xl p-5 space-y-4">
+          <section className="bg-card border border-border-strong rounded-xl p-5 space-y-4">
             <div className="flex items-center gap-3">
-              <p className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase">CV</p>
+              <p className="text-[9px] font-semibold text-muted-foreground tracking-widest uppercase">CV</p>
               {candidate && <ParseStatusBadge initialStatus={candidate.parseStatus} candidateId={candidateId} />}
               {candidate && candidate.parseStatus !== 'parsing' &&
                 (candidate.baseCvMd || candidate.parseStatus === 'failed') && (
                 <div className="ml-auto flex items-center gap-2">
                   {reparseError && <p className="text-[10px] text-destructive">{reparseError}</p>}
                   <Button variant="outline" size="sm"
-                    className="text-xs border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c]"
+                    className="text-xs border-border-strong text-primary hover:bg-card"
                     onClick={handleReparse} isLoading={reparsing}>
                     ↺ Re-parse
                   </Button>
@@ -150,14 +150,14 @@ export default function SettingsPage() {
               />
             ) : (
               candidate?.baseCvMd && (
-                <p className="text-sm text-[#475569]">CV saved. Upload a new file to replace it.</p>
+                <p className="text-sm text-muted-foreground">CV saved. Upload a new file to replace it.</p>
               )
             )}
           </section>
 
           <div className="flex flex-col gap-6">
-            <section className="bg-[#0d1f3c] border border-[#1e3a5f] rounded-xl p-5 space-y-4">
-              <p className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase">Profile Photo</p>
+            <section className="bg-card border border-border-strong rounded-xl p-5 space-y-4">
+              <p className="text-[9px] font-semibold text-muted-foreground tracking-widest uppercase">Profile Photo</p>
               <AvatarUploadSection
                 candidateId={candidateId}
                 candidateName={candidate?.parsedProfile?.name ?? 'Candidate'}
@@ -166,8 +166,8 @@ export default function SettingsPage() {
               />
             </section>
 
-            <section className="bg-[#0d1f3c] border border-[#1e3a5f] rounded-xl p-5 space-y-4">
-              <p className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase">Preferences</p>
+            <section className="bg-card border border-border-strong rounded-xl p-5 space-y-4">
+              <p className="text-[9px] font-semibold text-muted-foreground tracking-widest uppercase">Preferences</p>
               <PreferencesForm
                 initialPreferences={candidate?.preferences ?? {}}
                 onSaved={handlePreferencesSaved}
@@ -175,18 +175,18 @@ export default function SettingsPage() {
               />
             </section>
 
-            <section className="bg-[#0d1f3c] border border-[#1e3a5f] rounded-xl p-5">
+            <section className="bg-card border border-border-strong rounded-xl p-5">
               <LinkedInConnectCard candidateId={candidateId} flash={linkedinFlash} />
             </section>
 
-            <section className="bg-[#0d1f3c] border border-[#1e3a5f] rounded-xl p-5">
+            <section className="bg-card border border-border-strong rounded-xl p-5">
               <EmailOutreachModeCard
                 candidateId={candidateId}
                 flash={gmailFlash}
               />
             </section>
 
-            <section className="bg-[#0d1f3c] border border-[#1e3a5f] rounded-xl p-5">
+            <section className="bg-card border border-border-strong rounded-xl p-5">
               <ResumeAttachmentCard candidateId={candidateId} />
             </section>
           </div>

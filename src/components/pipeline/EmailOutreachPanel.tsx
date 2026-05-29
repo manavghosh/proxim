@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -50,6 +50,20 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, jobId
   const [isRetrying, setIsRetrying]         = useState(false)
   const [day1GmailOpened, setDay1GmailOpened] = useState(false)
   const [usingSuggestion, setUsingSuggestion] = useState(false)
+
+  // When JobCard polling delivers a status change (e.g. generating → pending_approval),
+  // sync local cadence + drafts state and clear the retry spinner.
+  useEffect(() => {
+    if (initialCadence.status === cadence.status && initialCadence.drafts.length === cadence.drafts.length) return
+    const seen = new Map<number, EmailDraftSummary>()
+    for (const d of initialCadence.drafts) seen.set(d.dayNumber, d)
+    const deduped = [1, 3, 7].flatMap(day => seen.has(day) ? [seen.get(day)!] : [])
+    setCadence(initialCadence)
+    setDrafts(deduped)
+    if (!['pending_discovery', 'discovering', 'generating'].includes(initialCadence.status)) {
+      setIsRetrying(false)
+    }
+  }, [initialCadence.status, initialCadence.drafts.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleDraftUpdated(updated: EmailDraftSummary) {
     setDrafts(prev => prev.map(d => d.id === updated.id ? updated : d))
@@ -152,7 +166,7 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, jobId
 
   return (
     <div data-testid="email-outreach-panel" className="space-y-3">
-      <p className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase">Email Outreach</p>
+      <p className="text-[9px] font-semibold text-muted-foreground tracking-widest uppercase">Email Outreach</p>
 
       {/* Editable recipient email — shown whenever an email address is known */}
       {cadence.hiringManagerEmail && (
@@ -160,14 +174,14 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, jobId
           <div className="flex items-center gap-2">
           {!editingEmail ? (
             <>
-              <span className="text-[10px] text-[#475569] shrink-0">To:</span>
-              <span className="text-[10px] text-[#94a3b8] font-mono truncate flex-1">
+              <span className="text-[10px] text-muted-foreground shrink-0">To:</span>
+              <span className="text-[10px] text-muted-foreground font-mono truncate flex-1">
                 {cadence.hiringManagerEmail}
               </span>
               <Button
                 size="xs"
                 variant="ghost"
-                className="h-5 w-5 p-0 text-[#475569] hover:text-[#93c5fd] shrink-0"
+                className="h-5 w-5 p-0 text-muted-foreground hover:text-primary shrink-0"
                 onClick={() => { setEmailDraft(cadence.hiringManagerEmail ?? ''); setEditingEmail(true) }}
                 title="Change recipient email"
               >
@@ -181,7 +195,7 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, jobId
                 value={emailDraft}
                 onChange={e => setEmailDraft(e.target.value)}
                 placeholder="recipient@company.com"
-                className="h-6 text-[10px] bg-[#060d1f] border-[#2d4a6e] text-[#f1f5f9] flex-1"
+                className="h-6 text-[10px] bg-background border-border-strong text-foreground flex-1"
                 onKeyDown={e => {
                   if (e.key === 'Enter') void handleSaveEmail()
                   if (e.key === 'Escape') setEditingEmail(false)
@@ -200,7 +214,7 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, jobId
               <Button
                 size="xs"
                 variant="ghost"
-                className="h-5 w-5 p-0 text-[#475569] hover:text-[#94a3b8] shrink-0"
+                className="h-5 w-5 p-0 text-muted-foreground hover:text-muted-foreground shrink-0"
                 onClick={() => setEditingEmail(false)}
                 title="Cancel"
               >
@@ -232,7 +246,7 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, jobId
               <span className="text-[10px] text-blue-400/70">· {suggestedEmailConfidence}% confidence</span>
             )}
           </div>
-          <p className="text-[11px] font-mono text-[#f1f5f9]">{suggestedEmail}</p>
+          <p className="text-[11px] font-mono text-foreground">{suggestedEmail}</p>
           <Button
             data-testid="use-linkedin-email-btn"
             size="sm"
@@ -263,7 +277,7 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, jobId
               value={emailDraft}
               onChange={e => setEmailDraft(e.target.value)}
               placeholder="hiring@company.com"
-              className="h-7 flex-1 rounded-md border border-[#2d4a6e] bg-[#060d1f] px-2 text-[11px] text-[#f1f5f9] outline-none focus:border-blue-500"
+              className="h-7 flex-1 rounded-md border border-border-strong bg-background px-2 text-[11px] text-foreground outline-none focus:border-blue-500"
               onKeyDown={e => { if (e.key === 'Enter') void handleSaveEmail() }}
             />
             <Button
@@ -275,6 +289,21 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, jobId
             >
               Save
             </Button>
+          </div>
+        </div>
+      )}
+
+      {isRetrying && drafts.length === 0 && (
+        <div className="space-y-2 animate-pulse">
+          <div className="flex gap-1">
+            {[1, 3, 7].map(d => (
+              <div key={d} className="flex-1 h-9 rounded-md bg-border" />
+            ))}
+          </div>
+          <div className="h-24 rounded-md bg-border" />
+          <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+            <Spinner className="size-3" />
+            AI Agent writing emails…
           </div>
         </div>
       )}
@@ -318,12 +347,12 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, jobId
 
           {/* Attachment indicator + View Resume — shows what will be sent with Day 1 */}
           {cadence.status === 'pending_approval' && (
-            <div className="rounded-lg border border-[#1e2d4a] bg-[#080f1e] px-3 py-2 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-1.5 text-[10px] text-[#475569] min-w-0">
-                <Paperclip className="w-3 h-3 shrink-0 text-[#60a5fa]" />
+            <div className="rounded-lg border border-border bg-background px-3 py-2 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground min-w-0">
+                <Paperclip className="w-3 h-3 shrink-0 text-primary" />
                 <span className="truncate">
                   Day 1 will include{' '}
-                  <span className="text-[#93c5fd]">
+                  <span className="text-primary">
                     {attachmentMode === 'original'
                       ? 'your original resume'
                       : 'the tailored AI resume for this role'}
@@ -334,7 +363,7 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, jobId
               <Button
                 size="sm"
                 variant="outline"
-                className="h-6 text-[10px] shrink-0 border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c] gap-1"
+                className="h-6 text-[10px] shrink-0 border-border-strong text-primary hover:bg-card gap-1"
                 onClick={() => setResumePreviewOpen(true)}
                 disabled={attachmentMode === 'tailored' && !jobId}
               >
@@ -387,7 +416,7 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, jobId
           {/* Manual: approved → Start countdown (enabled after Day 1 Gmail opened) */}
           {cadence.status === 'approved' && isManual && (
             <div className="space-y-2">
-              <p className="text-[10px] text-[#64748b]">
+              <p className="text-[10px] text-muted-foreground">
                 Open Day 1 in Gmail, send it, then start the countdown for Day 3 and Day 7.
               </p>
               <Button
@@ -401,7 +430,7 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, jobId
                 Start Day 3/7 Countdown
               </Button>
               {!day1GmailOpened && (
-                <p className="text-[10px] text-[#475569]">Open Day 1 in Gmail first to enable this button.</p>
+                <p className="text-[10px] text-muted-foreground">Open Day 1 in Gmail first to enable this button.</p>
               )}
             </div>
           )}
@@ -434,14 +463,14 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, jobId
 
       {(cadence.status === 'failed' || cadence.status === 'email_not_found') && (
         <div className="space-y-2">
-          <p className="text-xs text-[#475569]">
+          <p className="text-xs text-muted-foreground">
             {cadence.status === 'failed'
               ? 'Email draft generation failed — the AI Agent will retry, or you can trigger it now.'
               : 'No email address found for this company domain.'}
           </p>
           <Button
             size="sm" variant="outline"
-            className="text-xs border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c] gap-1.5"
+            className="text-xs border-border-strong text-primary hover:bg-card gap-1.5"
             isLoading={isRetrying}
             data-testid="retry-email-btn"
             onClick={async () => {
@@ -451,7 +480,11 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, jobId
                 const updated: EmailCadenceSummary = { ...cadence, status: 'generating' }
                 setCadence(updated)
                 onCadenceUpdated(updated)
-              } finally { setIsRetrying(false) }
+                // isRetrying stays true — cleared by the useEffect above when
+                // polling delivers the final pending_approval state with drafts.
+              } catch {
+                setIsRetrying(false)
+              }
             }}
           >
             <span>↺</span>
@@ -470,10 +503,10 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, jobId
         </Alert>
       )}
       {cadence.status === 'cancelled' && (
-        <p className="text-xs text-[#475569]">Cadence cancelled.</p>
+        <p className="text-xs text-muted-foreground">Cadence cancelled.</p>
       )}
       {cadence.status === 'cadence_complete' && (
-        <p className="text-xs text-[#475569]">Cadence complete — no reply received after 3 emails.</p>
+        <p className="text-xs text-muted-foreground">Cadence complete — no reply received after 3 emails.</p>
       )}
       {cadence.status === 'auth_expired' && (
         <Alert className="border-orange-700/40 bg-orange-950/20" data-testid="auth-expired-banner">
@@ -481,7 +514,7 @@ export function EmailOutreachPanel({ cadence: initialCadence, candidateId, jobId
         </Alert>
       )}
       {cadence.status === 'attachment_missing' && (
-        <div data-testid="attachment-missing-notice" className="flex items-center gap-2 text-xs text-[#475569]">
+        <div data-testid="attachment-missing-notice" className="flex items-center gap-2 text-xs text-muted-foreground">
           <Spinner className="size-3" />
           Awaiting resume PDF — Day 1 will send once available.
         </div>

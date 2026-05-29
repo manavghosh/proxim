@@ -58,22 +58,22 @@ export function ResumeAttachmentCard({ candidateId }: Props) {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <FileText className="w-4 h-4 text-[#64748b]" />
-        <p className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase">
+        <FileText className="w-4 h-4 text-muted-foreground" />
+        <p className="text-[9px] font-semibold text-muted-foreground tracking-widest uppercase">
           Resume Attachment
         </p>
-        {saving && <span className="text-[9px] text-[#475569]">Saving…</span>}
+        {saving && <span className="text-[9px] text-muted-foreground">Saving…</span>}
         {saved  && <span className="text-[9px] text-emerald-400">Saved ✓</span>}
       </div>
 
       {loading ? (
-        <p className="text-xs text-[#475569]">Loading…</p>
+        <p className="text-xs text-muted-foreground">Loading…</p>
       ) : (
         <div className="space-y-2">
           <label className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-all ${
             attachMode === 'tailored'
               ? 'border-blue-500 bg-blue-950/20'
-              : 'border-[#1e2d4a] hover:border-[#2d4a6f]'
+              : 'border-border hover:border-border-strong'
           }`}>
             <input
               type="radio"
@@ -85,8 +85,8 @@ export function ResumeAttachmentCard({ candidateId }: Props) {
               data-testid="attach-tailored"
             />
             <div>
-              <span className="text-xs font-medium text-[#e2e8f0]">Tailored AI resume</span>
-              <p className="text-[10px] text-[#64748b] mt-0.5">
+              <span className="text-xs font-medium text-foreground">Tailored AI resume</span>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
                 Attach the job-specific resume Proxim generated.
               </p>
             </div>
@@ -95,7 +95,7 @@ export function ResumeAttachmentCard({ candidateId }: Props) {
           <label className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-all ${
             attachMode === 'original'
               ? 'border-blue-500 bg-blue-950/20'
-              : 'border-[#1e2d4a] hover:border-[#2d4a6f]'
+              : 'border-border hover:border-border-strong'
           }`}>
             <input
               type="radio"
@@ -107,27 +107,27 @@ export function ResumeAttachmentCard({ candidateId }: Props) {
               data-testid="attach-original"
             />
             <div>
-              <span className="text-xs font-medium text-[#e2e8f0]">My original resume</span>
-              <p className="text-[10px] text-[#64748b] mt-0.5">
+              <span className="text-xs font-medium text-foreground">My original resume</span>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
                 Attach a PDF you upload below.
               </p>
             </div>
           </label>
 
           {attachMode === 'original' && (
-            <div className="rounded-lg border border-[#1e2d4a] bg-[#080f1e] p-3 space-y-2">
+            <div className="rounded-lg border border-border bg-background p-3 space-y-2">
               {uploadedName ? (
                 <div className="flex items-center gap-2 text-[10px] text-emerald-400">
                   <CheckCircle2 className="w-3 h-3 shrink-0" />
                   <span className="truncate">{uploadedName}</span>
                 </div>
               ) : (
-                <p className="text-[10px] text-[#475569]">No PDF uploaded yet.</p>
+                <p className="text-[10px] text-muted-foreground">No PDF uploaded yet.</p>
               )}
               <Button
                 size="sm"
                 variant="outline"
-                className="h-7 text-[11px] border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c] gap-1"
+                className="h-7 text-[11px] border-border-strong text-primary hover:bg-card gap-1"
                 isLoading={uploading}
                 onClick={() => inputRef.current?.click()}
                 data-testid="upload-pdf-btn"

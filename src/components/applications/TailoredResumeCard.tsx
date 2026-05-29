@@ -19,7 +19,7 @@ export function TailoredResumeCard({ version, onViewResume, onViewCoverLetter }:
   const isPdfReady = Boolean(version.resumePdfPath)
 
   return (
-    <div className="rounded-lg border border-[#1e2d4a] bg-[#0a1628] p-3 space-y-3">
+    <div className="rounded-lg border border-border bg-background p-3 space-y-3">
       {/* Stale warning */}
       {version.isStale && (
         <div className="rounded-md bg-amber-950/30 border border-amber-800/40 px-2.5 py-1.5">
@@ -41,7 +41,7 @@ export function TailoredResumeCard({ version, onViewResume, onViewCoverLetter }:
                   Low confidence · {Math.round(confidence * 100)}%
                 </Badge>
               ) : (
-                <Badge className="bg-[#0d1f3c] text-slate-400 border-[#1e2d4a] text-[9px] px-1.5 py-0">
+                <Badge className="bg-card text-slate-400 border-border text-[9px] px-1.5 py-0">
                   {Math.round(confidence * 100)}%
                 </Badge>
               )
@@ -78,7 +78,7 @@ export function TailoredResumeCard({ version, onViewResume, onViewCoverLetter }:
             <Button
               size="sm"
               variant="outline"
-              className="h-7 text-[11px] gap-1 border-[#1e2d4a] text-[#93c5fd]"
+              className="h-7 text-[11px] gap-1 border-border text-primary"
               onClick={onViewResume}
             >
               <FileTextIcon className="w-3 h-3" />
@@ -88,7 +88,7 @@ export function TailoredResumeCard({ version, onViewResume, onViewCoverLetter }:
               <Button
                 size="sm"
                 variant="outline"
-                className="h-7 text-[11px] gap-1 border-[#1e2d4a] text-[#93c5fd]"
+                className="h-7 text-[11px] gap-1 border-border text-primary"
                 onClick={onViewCoverLetter}
               >
                 <FileTextIcon className="w-3 h-3" />

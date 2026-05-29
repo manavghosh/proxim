@@ -68,8 +68,8 @@ export function EmailOutreachModeCard({ candidateId, flash }: Props) {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <Mail className="w-4 h-4 text-[#64748b]" />
-        <p className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase">
+        <Mail className="w-4 h-4 text-muted-foreground" />
+        <p className="text-[9px] font-semibold text-muted-foreground tracking-widest uppercase">
           Email Outreach
         </p>
       </div>
@@ -89,12 +89,12 @@ export function EmailOutreachModeCard({ candidateId, flash }: Props) {
       )}
 
       {loading ? (
-        <p className="text-xs text-[#475569]">Loading…</p>
+        <p className="text-xs text-muted-foreground">Loading…</p>
       ) : (
         <div className="space-y-2">
           {/* Manual option */}
           <label className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-all ${
-            selectedMode === 'manual' ? 'border-blue-500 bg-blue-950/20' : 'border-[#1e2d4a] hover:border-[#2d4a6f]'
+            selectedMode === 'manual' ? 'border-blue-500 bg-blue-950/20' : 'border-border hover:border-border-strong'
           }`}>
             <input
               type="radio"
@@ -107,12 +107,12 @@ export function EmailOutreachModeCard({ candidateId, flash }: Props) {
             />
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-[#e2e8f0]">Manual</span>
+                <span className="text-xs font-medium text-foreground">Manual</span>
                 <span className="text-[9px] bg-emerald-900/40 text-emerald-400 border border-emerald-700/40 rounded px-1.5 py-0.5">
                   Recommended
                 </span>
               </div>
-              <p className="text-[10px] text-[#64748b] mt-0.5">
+              <p className="text-[10px] text-muted-foreground mt-0.5">
                 Proxim generates drafts. You review and send from your own Gmail.
                 No Gmail authorisation required.
               </p>
@@ -121,7 +121,7 @@ export function EmailOutreachModeCard({ candidateId, flash }: Props) {
 
           {/* Agentic option */}
           <label className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-all ${
-            selectedMode === 'agentic' ? 'border-blue-500 bg-blue-950/20' : 'border-[#1e2d4a] hover:border-[#2d4a6f]'
+            selectedMode === 'agentic' ? 'border-blue-500 bg-blue-950/20' : 'border-border hover:border-border-strong'
           }`}>
             <input
               type="radio"
@@ -135,9 +135,9 @@ export function EmailOutreachModeCard({ candidateId, flash }: Props) {
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <Zap className="w-3 h-3 text-amber-400" />
-                <span className="text-xs font-medium text-[#e2e8f0]">Agentic</span>
+                <span className="text-xs font-medium text-foreground">Agentic</span>
               </div>
-              <p className="text-[10px] text-[#64748b] mt-0.5">
+              <p className="text-[10px] text-muted-foreground mt-0.5">
                 Proxim sends automatically via Gmail API.
               </p>
 
@@ -197,7 +197,7 @@ export function EmailOutreachModeCard({ candidateId, flash }: Props) {
           )}
 
           {selectedMode === 'agentic' && gmailConnected && !switchingToManual && (
-            <p className="text-[10px] text-[#475569]">
+            <p className="text-[10px] text-muted-foreground">
               Proxim will auto-send Day 1 emails and schedule Day 3/7 for approved cadences.
             </p>
           )}
@@ -218,7 +218,7 @@ export function EmailOutreachModeCard({ candidateId, flash }: Props) {
           </Button>
 
           {selectedMode === 'agentic' && !gmailConnected && (
-            <p className="text-[10px] text-[#475569]">
+            <p className="text-[10px] text-muted-foreground">
               Connect Gmail above to enable Agentic mode.
             </p>
           )}

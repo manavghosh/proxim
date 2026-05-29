@@ -37,7 +37,7 @@ function Toast({ message, type = 'info', onDismiss }: { message: string; type?: 
     return () => clearTimeout(t)
   }, [onDismiss])
 
-  const bg = type === 'success' ? 'bg-emerald-900 border-emerald-700' : type === 'error' ? 'bg-red-900 border-red-700' : 'bg-[#0d1f3c] border-[#1d4ed8]'
+  const bg = type === 'success' ? 'bg-emerald-900 border-emerald-700' : type === 'error' ? 'bg-red-900 border-red-700' : 'bg-card border-primary'
   return (
     <div className={`fixed bottom-4 right-4 z-50 px-4 py-3 rounded-lg border text-[12px] text-white shadow-lg ${bg}`}>
       {message}
@@ -150,7 +150,7 @@ export default function PipelinePage() {
   useEffect(() => {
     if (pendingOutreachIds.size === 0) return
     const OUTREACH_TRANSIENT = new Set<OutreachStatus>(['pending', 'discovering', 'enriching', 'generating'])
-    const EMAIL_TRANSIENT    = new Set<EmailCadenceStatus>(['pending_discovery', 'discovering', 'generating'])
+    const EMAIL_TRANSIENT    = new Set<EmailCadenceStatus>(['pending_discovery', 'discovering', 'generating', 'email_not_found'])
     setPendingOutreachIds(prev => {
       const next = new Set(prev)
       for (const id of prev) {
@@ -294,13 +294,13 @@ export default function PipelinePage() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-[#1e2d4a] bg-[#060d1f] flex items-center justify-between flex-shrink-0">
+      <div className="px-6 py-4 border-b border-border bg-background flex items-center justify-between flex-shrink-0">
         <div>
-          <h1 className="text-[15px] font-semibold text-[#f1f5f9] flex items-center gap-2">
-            <Workflow className="w-4 h-4 text-[#93c5fd]" />
+          <h1 className="text-[15px] font-semibold text-foreground flex items-center gap-2">
+            <Workflow className="w-4 h-4 text-primary" />
             Pipeline Review
           </h1>
-          <p className="text-[11px] text-[#475569] mt-0.5">
+          <p className="text-[11px] text-muted-foreground mt-0.5">
             {loading ? 'Loading…' : `${jobs.length} job${jobs.length !== 1 ? 's' : ''}`}
             {streamConnected && <span className="ml-2 text-emerald-500">● live</span>}
           </p>
@@ -321,7 +321,7 @@ export default function PipelinePage() {
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map(i => (
-              <Skeleton key={i} className="h-40 w-full rounded-xl bg-[#0d1829]" />
+              <Skeleton key={i} className="h-40 w-full rounded-xl bg-muted" />
             ))}
           </div>
         ) : scoredJobs.length === 0 && failedJobs.length === 0 ? (
@@ -329,23 +329,23 @@ export default function PipelinePage() {
             {retryJobIds.length > 0 ? (
               <>
                 <div className="w-8 h-8 rounded-full border-2 border-blue-500 border-t-transparent animate-spin mb-4" />
-                <p className="text-[13px] text-[#94a3b8] mb-1 font-medium">
+                <p className="text-[13px] text-muted-foreground mb-1 font-medium">
                   Scoring your jobs…
                 </p>
-                <p className="text-[11px] text-[#475569]">
+                <p className="text-[11px] text-muted-foreground">
                   Scored cards will appear here automatically. Progress is shown below.
                 </p>
               </>
             ) : (
               <>
-                <Workflow className="w-10 h-10 text-[#1e2d4a] mb-4" />
-                <p className="text-[13px] text-[#64748b] mb-4">
+                <Workflow className="w-10 h-10 text-border mb-4" />
+                <p className="text-[13px] text-muted-foreground mb-4">
                   No matching jobs — try a wider filter or run the pipeline
                 </p>
                 <Button
                   size="sm"
                   variant="outline"
-                  className="text-[11px] border-[#1e2d4a] text-[#64748b] hover:text-[#94a3b8]"
+                  className="text-[11px] border-border text-muted-foreground hover:text-muted-foreground"
                   onClick={() => router.push(`/candidates/${candidateId}/dashboard`)}
                 >
                   Search for New Jobs →

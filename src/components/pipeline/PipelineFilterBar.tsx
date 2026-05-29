@@ -17,7 +17,7 @@ const OPTIONS: { label: string; value: FilterOption }[] = [
 
 export function PipelineFilterBar({ value, onChange }: PipelineFilterBarProps) {
   return (
-    <div className="flex items-center gap-1 bg-[#0d1829] rounded-md p-0.5">
+    <div className="flex items-center gap-1 bg-muted rounded-md p-0.5">
       {OPTIONS.map(opt => (
         <Button
           key={opt.value}
@@ -25,8 +25,8 @@ export function PipelineFilterBar({ value, onChange }: PipelineFilterBarProps) {
           variant={value === opt.value ? 'default' : 'ghost'}
           className={`h-7 text-[11px] px-3 ${
             value === opt.value
-              ? 'bg-[#1d4ed8] text-white'
-              : 'text-[#64748b] hover:text-[#94a3b8]'
+              ? 'bg-primary text-white'
+              : 'text-muted-foreground hover:text-muted-foreground'
           }`}
           onClick={() => onChange(opt.value)}
         >

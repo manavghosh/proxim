@@ -25,16 +25,16 @@ export function PlaceholderPage({
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <Topbar title={title} />
-      <main className="flex-1 flex items-center justify-center bg-[#0d1829]">
+      <main className="flex-1 flex items-center justify-center bg-muted">
         <div className="text-center max-w-md space-y-5">
-          <div className="w-16 h-16 rounded-2xl bg-[#0d1f3c] border border-[#1e3a5f] flex items-center justify-center mx-auto">
-            <Icon className="w-7 h-7 text-[#334155]" />
+          <div className="w-16 h-16 rounded-2xl bg-card border border-border-strong flex items-center justify-center mx-auto">
+            <Icon className="w-7 h-7 text-muted-foreground" />
           </div>
           <div className="space-y-2">
-            <h2 className="text-lg font-semibold text-[#e2e8f0]">{heading}</h2>
-            <p className="text-sm text-[#64748b] leading-relaxed">{body}</p>
+            <h2 className="text-lg font-semibold text-foreground">{heading}</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">{body}</p>
           </div>
-          <Button asChild variant="outline" size="sm" className="border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c]">
+          <Button asChild variant="outline" size="sm" className="border-border-strong text-primary hover:bg-card">
             <Link href={ctaHref}>{ctaLabel}</Link>
           </Button>
         </div>

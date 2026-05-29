@@ -28,7 +28,7 @@ function DropdownMenuContent({
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}
         className={cn(
-          'bg-[#0d1f3c] text-[#e2e8f0] z-50 min-w-[8rem] overflow-hidden rounded-lg border border-[#1e2d4a] p-1 shadow-xl',
+          'bg-card text-foreground z-50 min-w-[8rem] overflow-hidden rounded-lg border border-border p-1 shadow-xl',
           'data-[state=open]:animate-in data-[state=closed]:animate-out',
           'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
           'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
@@ -56,7 +56,7 @@ function DropdownMenuLabel({
       data-slot="dropdown-menu-label"
       data-inset={inset}
       className={cn(
-        'px-2 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#475569]',
+        'px-2 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground',
         inset && 'pl-8',
         className
       )}
@@ -72,7 +72,7 @@ function DropdownMenuSeparator({
   return (
     <DropdownMenu.Separator
       data-slot="dropdown-menu-separator"
-      className={cn('-mx-1 my-1 h-px bg-[#1e2d4a]', className)}
+      className={cn('-mx-1 my-1 h-px bg-border', className)}
       {...props}
     />
   )
@@ -94,10 +94,10 @@ function DropdownMenuItem({
       data-variant={variant}
       className={cn(
         'relative flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none select-none transition-colors',
-        'hover:bg-[#1e3a5f] focus:bg-[#1e3a5f]',
+        'hover:bg-accent focus:bg-accent',
         'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
         inset && 'pl-8',
-        variant === 'destructive' && 'text-red-400 hover:bg-red-950/40 focus:bg-red-950/40',
+        variant === 'destructive' && 'text-destructive hover:bg-destructive/15 focus:bg-destructive/15',
         className
       )}
       {...props}
@@ -116,7 +116,7 @@ function DropdownMenuCheckboxItem({
       data-slot="dropdown-menu-checkbox-item"
       className={cn(
         'relative flex cursor-pointer items-center gap-2 rounded-md py-1.5 pr-2 pl-8 text-sm outline-none select-none transition-colors',
-        'hover:bg-[#1e3a5f] focus:bg-[#1e3a5f]',
+        'hover:bg-accent focus:bg-accent',
         'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
         className
       )}
@@ -149,7 +149,7 @@ function DropdownMenuRadioItem({
       data-slot="dropdown-menu-radio-item"
       className={cn(
         'relative flex cursor-pointer items-center gap-2 rounded-md py-1.5 pr-2 pl-8 text-sm outline-none select-none transition-colors',
-        'hover:bg-[#1e3a5f] focus:bg-[#1e3a5f]',
+        'hover:bg-accent focus:bg-accent',
         'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
         className
       )}
@@ -177,7 +177,7 @@ function DropdownMenuSubTrigger({
       data-inset={inset}
       className={cn(
         'flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none select-none transition-colors',
-        'hover:bg-[#1e3a5f] focus:bg-[#1e3a5f] data-[state=open]:bg-[#1e3a5f]',
+        'hover:bg-accent focus:bg-accent data-[state=open]:bg-accent',
         inset && 'pl-8',
         className
       )}
@@ -197,7 +197,7 @@ function DropdownMenuSubContent({
     <DropdownMenu.SubContent
       data-slot="dropdown-menu-sub-content"
       className={cn(
-        'bg-[#0d1f3c] text-[#e2e8f0] z-50 min-w-[8rem] overflow-hidden rounded-lg border border-[#1e2d4a] p-1 shadow-xl',
+        'bg-card text-foreground z-50 min-w-[8rem] overflow-hidden rounded-lg border border-border p-1 shadow-xl',
         'data-[state=open]:animate-in data-[state=closed]:animate-out',
         'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
         'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',

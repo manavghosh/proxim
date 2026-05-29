@@ -46,12 +46,12 @@ export function OutreachNoteSelector({ target, candidateId, jobId, onStatusChang
   if (effectiveStatus === 'no_contact_found') {
     return (
       <div className="space-y-2">
-        <p className="text-xs text-[#64748b]">
+        <p className="text-xs text-muted-foreground">
           No hiring manager found at this company via LinkedIn search.
         </p>
         <Button
           size="sm" variant="outline"
-          className="text-xs border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c]"
+          className="text-xs border-border-strong text-primary hover:bg-card"
           isLoading={retrying}
           data-testid="linkedin-retry-btn"
           onClick={async () => {
@@ -77,7 +77,7 @@ export function OutreachNoteSelector({ target, candidateId, jobId, onStatusChang
         <p className="text-xs text-red-400">Note generation failed.</p>
         <Button
           size="sm" variant="outline"
-          className="text-xs border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c]"
+          className="text-xs border-border-strong text-primary hover:bg-card"
           isLoading={regenerating}
           data-testid="note-regenerate-btn"
           onClick={async () => {
@@ -198,7 +198,7 @@ export function OutreachNoteSelector({ target, candidateId, jobId, onStatusChang
         {(['A', 'B'] as const).map(tab => (
           <TabsContent key={tab} value={tab} forceMount
             className={tab !== activeTab ? 'hidden' : ''}>
-            <div className="rounded-lg border border-[#1e3a5f] bg-[#0d1829] p-3 text-xs text-[#94a3b8] leading-relaxed min-h-[80px] whitespace-pre-line">
+            <div className="rounded-lg border border-border-strong bg-muted p-3 text-xs text-muted-foreground leading-relaxed min-h-[80px] whitespace-pre-line">
               {tab === 'A' ? target.noteA : target.noteB}
             </div>
           </TabsContent>
@@ -208,7 +208,7 @@ export function OutreachNoteSelector({ target, candidateId, jobId, onStatusChang
       {/* Edit textarea */}
       <div className="space-y-1">
         <Textarea
-          className="text-xs bg-[#0d1829] border-[#1e3a5f] text-[#cbd5e1] resize-none placeholder:text-[#334155]"
+          className="text-xs bg-muted border-border-strong text-foreground resize-none placeholder:text-muted-foreground"
           rows={5}
           placeholder="Edit note (optional)…"
           value={editedText}
@@ -216,7 +216,7 @@ export function OutreachNoteSelector({ target, candidateId, jobId, onStatusChang
           data-testid="note-edit-textarea"
         />
         <div className="flex justify-end">
-          <span className={`text-[10px] ${overLimit ? 'text-red-400' : 'text-[#475569]'}`}>
+          <span className={`text-[10px] ${overLimit ? 'text-red-400' : 'text-muted-foreground'}`}>
             {charCount}/300
           </span>
         </div>
@@ -250,7 +250,7 @@ export function OutreachNoteSelector({ target, candidateId, jobId, onStatusChang
           <div className="flex gap-2">
             <Button
               size="sm" variant="outline"
-              className="h-7 text-[11px] border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c] gap-1 flex-1"
+              className="h-7 text-[11px] border-border-strong text-primary hover:bg-card gap-1 flex-1"
               onClick={handleCopy}
             >
               <ClipboardCopy className="w-3 h-3" />
@@ -258,7 +258,7 @@ export function OutreachNoteSelector({ target, candidateId, jobId, onStatusChang
             </Button>
             {target.linkedinUrl && (
               <Button size="sm" variant="outline" asChild
-                className="h-7 text-[11px] border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c] gap-1 flex-1">
+                className="h-7 text-[11px] border-border-strong text-primary hover:bg-card gap-1 flex-1">
                 <a href={target.linkedinUrl} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="w-3 h-3" />
                   Open profile

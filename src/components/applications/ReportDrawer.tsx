@@ -27,19 +27,19 @@ export function ReportDrawer({ jobId, onClose }: Props) {
     <Sheet open={!!jobId} onOpenChange={(open) => { if (!open) onClose() }}>
       <SheetContent
         side="right"
-        className="w-full max-w-2xl bg-[#060d1f] border-l border-[#1e2d4a] overflow-y-auto"
+        className="w-full max-w-2xl bg-background border-l border-border overflow-y-auto"
       >
         <SheetHeader>
-          <SheetTitle className="text-[#e2e8f0] text-sm font-semibold">Score Report</SheetTitle>
+          <SheetTitle className="text-foreground text-sm font-semibold">Score Report</SheetTitle>
         </SheetHeader>
         {loading ? (
           <div className="px-6 space-y-2">
             {[...Array(8)].map((_, i) => (
-              <Skeleton key={i} className="h-4 rounded bg-[#0d1f3c]" />
+              <Skeleton key={i} className="h-4 rounded bg-card" />
             ))}
           </div>
         ) : (
-          <pre className="px-6 pb-6 whitespace-pre-wrap text-xs font-mono text-[#94a3b8] leading-relaxed">
+          <pre className="px-6 pb-6 whitespace-pre-wrap text-xs font-mono text-muted-foreground leading-relaxed">
             {report ?? 'No report available.'}
           </pre>
         )}

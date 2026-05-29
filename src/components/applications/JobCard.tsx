@@ -47,7 +47,7 @@ const STATUS_BADGE: Record<string, string> = {
   resume_ready:  'bg-blue-600    text-white border-transparent',
   submitted:     'bg-cyan-700    text-white border-transparent',
   resume_failed: 'bg-red-700     text-white border-transparent',
-  snoozed:       'bg-[#1e2d4a]  text-[#64748b] border-[#2d4a6e]',
+  snoozed:       'bg-border  text-muted-foreground border-border-strong',
   rejected:      'bg-red-900/40  text-red-400  border-red-800/40',
 }
 
@@ -212,14 +212,14 @@ export function JobCard({
     <Collapsible
       open={isOpen}
       onOpenChange={setIsOpen}
-      className={`bg-[#0d1f3c] border rounded-xl overflow-hidden transition-all duration-200 ${
+      className={`bg-card border rounded-xl overflow-hidden transition-all duration-200 ${
         gradeStyle?.glow ?? ''
       } ${
         isSnoozed || isRejected
-          ? 'border-[#1e2d4a] opacity-60'
+          ? 'border-border opacity-60'
           : isOpen
-            ? 'border-[#2d4a6e]'
-            : 'border-[#1e2d4a] hover:border-[#2d4a6e]'
+            ? 'border-border-strong'
+            : 'border-border hover:border-border-strong'
       }`}
     >
       {/* ── Collapsed trigger — always visible ───────────────────────────── */}
@@ -239,8 +239,8 @@ export function JobCard({
 
           {/* Title + company */}
           <div className="flex-1 min-w-0">
-            <p className="text-[#e2e8f0] font-medium text-sm leading-tight truncate">{job.title}</p>
-            <p className="text-[#64748b] text-xs mt-0.5 truncate">{job.company}</p>
+            <p className="text-foreground font-medium text-sm leading-snug break-words">{job.title}</p>
+            <p className="text-muted-foreground text-xs mt-0.5 break-words">{job.company}</p>
           </div>
 
           {/* Right chips cluster */}
@@ -252,7 +252,7 @@ export function JobCard({
 
             {/* Elapsed time */}
             {elapsedTime && (
-              <span className="text-[10px] text-[#475569] hidden sm:inline">{elapsedTime}</span>
+              <span className="text-[10px] text-muted-foreground hidden sm:inline">{elapsedTime}</span>
             )}
 
             {/* Agent status badge */}
@@ -282,7 +282,7 @@ export function JobCard({
 
             {/* Score */}
             {score !== undefined && (
-              <span className="text-[10px] text-[#475569] font-mono hidden md:inline">{score.toFixed(1)}</span>
+              <span className="text-[10px] text-muted-foreground font-mono hidden md:inline">{score.toFixed(1)}</span>
             )}
 
             {/* External link — stop propagation so it doesn't toggle card */}
@@ -291,7 +291,7 @@ export function JobCard({
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Open job listing"
-              className="text-[#475569] hover:text-[#94a3b8] transition-colors p-0.5"
+              className="text-muted-foreground hover:text-muted-foreground transition-colors p-0.5"
               onClick={(e) => e.stopPropagation()}
             >
               <ExternalLink className="w-3 h-3" />
@@ -300,8 +300,8 @@ export function JobCard({
 
           {/* Chevron — rotates when open */}
           <ChevronDown
-            className={`w-4 h-4 text-[#475569] transition-transform duration-200 shrink-0 ${
-              isOpen ? 'rotate-180' : 'group-hover:text-[#94a3b8]'
+            className={`w-4 h-4 text-muted-foreground transition-transform duration-200 shrink-0 ${
+              isOpen ? 'rotate-180' : 'group-hover:text-muted-foreground'
             }`}
           />
         </button>
@@ -309,26 +309,26 @@ export function JobCard({
 
       {/* ── Expanded content ─────────────────────────────────────────────── */}
       <CollapsibleContent className="overflow-hidden data-[state=closed]:hidden">
-        <div className="border-t border-[#1e2d4a] px-4 pb-4 pt-3 flex flex-col gap-3">
+        <div className="border-t border-border px-4 pb-4 pt-3 flex flex-col gap-3">
 
             {/* Error card */}
             {agentBadge?.variant === 'error' && (
-              <div className="rounded-lg bg-[#450a0a] border border-[#7f1d1d] p-3 flex flex-col gap-2">
+              <div className="rounded-lg bg-destructive/15 border border-destructive/40 p-3 flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-2">
                   <div>
-                    <p className="text-[11px] font-semibold text-[#fca5a5]">{agentBadge.agentName} failed</p>
+                    <p className="text-[11px] font-semibold text-destructive">{agentBadge.agentName} failed</p>
                     {job.errorMessage && (
-                      <p className="text-[10px] text-[#f87171] mt-0.5 line-clamp-2">{job.errorMessage}</p>
+                      <p className="text-[10px] text-destructive mt-0.5 line-clamp-2">{job.errorMessage}</p>
                     )}
                     {elapsedTime && (
-                      <p className="text-[10px] text-[#ef4444] mt-0.5">Failed {elapsedTime} ago</p>
+                      <p className="text-[10px] text-destructive mt-0.5">Failed {elapsedTime} ago</p>
                     )}
                   </div>
                   {onRetry && (
                     <Button
                       size="sm"
                       variant="outline"
-                      className="text-[10px] h-7 border-[#7f1d1d] text-[#fca5a5] hover:bg-[#7f1d1d] shrink-0"
+                      className="text-[10px] h-7 border-destructive/40 text-destructive hover:bg-destructive/40 shrink-0"
                       onClick={() => onRetry(job.id)}
                       disabled={isPending}
                     >
@@ -344,12 +344,12 @@ export function JobCard({
             {(job.location || job.archetype) && (
               <div className="flex gap-2 flex-wrap">
                 {job.location && (
-                  <Badge variant="outline" className="text-[10px] text-[#475569] border-[#1e2d4a] bg-[#0d1829]">
+                  <Badge variant="outline" className="text-[10px] text-muted-foreground border-border bg-muted">
                     {job.location}
                   </Badge>
                 )}
                 {job.archetype && (
-                  <Badge variant="outline" className="text-[10px] text-[#64748b] border-[#1e2d4a] bg-[#0d1829]">
+                  <Badge variant="outline" className="text-[10px] text-muted-foreground border-border bg-muted">
                     {job.archetype}
                   </Badge>
                 )}
@@ -376,14 +376,14 @@ export function JobCard({
               {(isResumeReady || isSubmitted || isRejected) && !resumeVersion && (
                 <>
                   <Button size="sm" variant="outline"
-                    className="h-7 text-[11px] gap-1 border-[#1e2d4a] text-[#93c5fd]"
+                    className="h-7 text-[11px] gap-1 border-border text-primary"
                     onClick={() => onViewResume?.(job.id)}
                     disabled={isPending}>
                     <FileTextIcon className="w-3 h-3" />
                     View Resume
                   </Button>
                   <Button size="sm" variant="outline"
-                    className="h-7 text-[11px] gap-1 border-[#1e2d4a] text-[#93c5fd]"
+                    className="h-7 text-[11px] gap-1 border-border text-primary"
                     onClick={() => onViewCoverLetter?.(job.id)}
                     disabled={isPending}>
                     <FileTextIcon className="w-3 h-3" />
@@ -426,7 +426,7 @@ export function JobCard({
                   className={`h-7 text-[11px] gap-1 ${
                     isInterviewMarked
                       ? 'border-purple-500/50 text-purple-300 bg-purple-900/20'
-                      : 'border-[#1e2d4a] text-[#64748b] hover:text-[#94a3b8]'
+                      : 'border-border text-muted-foreground hover:text-muted-foreground'
                   }`}
                   onClick={() => onMarkInterview(job.id, !isInterviewMarked)}
                   disabled={isPending}
@@ -441,7 +441,7 @@ export function JobCard({
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button size="sm" variant="ghost"
-                        className="h-7 w-7 p-0 text-[#475569] hover:text-[#94a3b8]"
+                        className="h-7 w-7 p-0 text-muted-foreground hover:text-muted-foreground"
                         aria-label="More actions">
                         <MoreHorizontal className="w-3 h-3" />
                       </Button>
@@ -482,14 +482,14 @@ export function JobCard({
 
             {/* LinkedIn Outreach */}
             {(isApproved || isResumeReady || isSubmitted) && (
-              <div className="border-t border-[#1e2d4a] pt-3 mt-1">
+              <div className="border-t border-border pt-3 mt-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase">
+                  <span className="text-[9px] font-semibold text-muted-foreground tracking-widest uppercase">
                     LinkedIn Outreach
                   </span>
 
                   {!job.outreachTarget && (
-                    <span className="flex items-center gap-1.5 text-[10px] text-[#475569] animate-pulse">
+                    <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground animate-pulse">
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
                       AI Agent identifying hiring contact…
                     </span>
@@ -499,7 +499,7 @@ export function JobCard({
                     (outreachStatus ?? job.outreachTarget.status) as OutreachStatus
                   ) && (
                     <>
-                      <span className="flex items-center gap-1.5 text-[10px] text-[#475569] animate-pulse">
+                      <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground animate-pulse">
                         <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
                         {(outreachStatus ?? job.outreachTarget.status) === 'discovering'  && 'Identifying decision-maker…'}
                         {(outreachStatus ?? job.outreachTarget.status) === 'enriching'    && 'Researching their background…'}
@@ -507,7 +507,7 @@ export function JobCard({
                         {(outreachStatus ?? job.outreachTarget.status) === 'pending'      && 'AI Agent starting…'}
                       </span>
                       <Button size="sm" variant="outline"
-                        className="h-6 text-[10px] border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c] gap-1"
+                        className="h-6 text-[10px] border-border-strong text-primary hover:bg-card gap-1"
                         isLoading={liStarting}
                         onClick={async () => {
                           setLiStarting(true)
@@ -535,14 +535,14 @@ export function JobCard({
                       <Link2 className="w-3 h-3 text-[#0A66C2] flex-shrink-0" />
                       {job.outreachTarget.linkedinUrl ? (
                         <a href={job.outreachTarget.linkedinUrl} target="_blank" rel="noopener noreferrer"
-                          className="text-[10px] text-[#60a5fa] hover:underline truncate">
+                          className="text-[10px] text-primary hover:underline truncate">
                           {job.outreachTarget.name}
-                          {job.outreachTarget.title && <span className="text-[#475569]"> · {job.outreachTarget.title}</span>}
+                          {job.outreachTarget.title && <span className="text-muted-foreground"> · {job.outreachTarget.title}</span>}
                         </a>
                       ) : (
-                        <span className="text-[10px] text-[#64748b]">
+                        <span className="text-[10px] text-muted-foreground">
                           {job.outreachTarget.name}
-                          {job.outreachTarget.title && <span className="text-[#475569]"> · {job.outreachTarget.title}</span>}
+                          {job.outreachTarget.title && <span className="text-muted-foreground"> · {job.outreachTarget.title}</span>}
                         </span>
                       )}
                     </div>
@@ -575,19 +575,19 @@ export function JobCard({
 
             {/* Email Outreach */}
             {(isApproved || isResumeReady || isSubmitted) && (
-              <div className="border-t border-[#1e2d4a] pt-3 mt-1">
+              <div className="border-t border-border pt-3 mt-1">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase">Email</span>
+                  <span className="text-[9px] font-semibold text-muted-foreground tracking-widest uppercase">Email</span>
 
                   {!emailCadence && (
-                    <span className="flex items-center gap-1.5 text-[10px] text-[#475569] animate-pulse">
+                    <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground animate-pulse">
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
                       AI Agent locating email address…
                     </span>
                   )}
 
                   {emailCadence && EMAIL_TRANSIENT.includes(emailCadence.status) && (
-                    <span className="flex items-center gap-1.5 text-[10px] text-[#475569] animate-pulse">
+                    <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground animate-pulse">
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
                       {emailCadence.status === 'pending_discovery' && 'AI Agent starting…'}
                       {emailCadence.status === 'discovering'       && 'Running email discovery…'}
@@ -597,7 +597,7 @@ export function JobCard({
 
                   {!emailCadence && (
                     <Button size="sm" variant="outline"
-                      className="h-6 text-[10px] border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c] gap-1 ml-1"
+                      className="h-6 text-[10px] border-border-strong text-primary hover:bg-card gap-1 ml-1"
                       isLoading={emStarting}
                       onClick={async () => {
                         setEmStarting(true)
@@ -624,7 +624,7 @@ export function JobCard({
 
                   {emailCadence && (EMAIL_TRANSIENT.includes(emailCadence.status) || emailCadence.status === 'cancelled') && (
                     <Button size="sm" variant="outline"
-                      className="h-6 text-[10px] border-[#1e3a5f] text-[#60a5fa] hover:bg-[#0d1f3c] gap-1"
+                      className="h-6 text-[10px] border-border-strong text-primary hover:bg-card gap-1"
                       isLoading={emStarting}
                       onClick={async () => {
                         setEmStarting(true)
@@ -680,8 +680,8 @@ export function JobCard({
 
                 {emailCadence?.hiringManagerEmail && (
                   <div className="flex items-center gap-1.5 mb-2">
-                    <MailIcon className="w-3 h-3 text-[#475569] flex-shrink-0" />
-                    <span className="text-[10px] text-[#64748b] font-mono truncate">
+                    <MailIcon className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                    <span className="text-[10px] text-muted-foreground font-mono truncate">
                       {emailCadence.hiringManagerEmail}
                     </span>
                   </div>

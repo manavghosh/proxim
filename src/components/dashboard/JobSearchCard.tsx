@@ -55,13 +55,21 @@ function hoursAgo(dateStr: string): number {
   return (Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60)
 }
 
-function formatTimestamp(lastSearchAt: string | null): string {
+function formatRelative(lastSearchAt: string | null): string {
   if (!lastSearchAt) return 'No searches yet'
   const h = hoursAgo(lastSearchAt)
-  if (h < 1) return `Last searched ${Math.max(1, Math.round(h * 60))}m ago`
-  if (h < 24) return `Last searched ${Math.round(h)}h ago`
-  if (h < 48) return 'Last searched yesterday'
-  return `Last searched ${Math.round(h / 24)} days ago`
+  if (h < 1) return `${Math.max(1, Math.round(h * 60))}m ago`
+  if (h < 24) return `${Math.round(h)}h ago`
+  if (h < 48) return 'Yesterday'
+  return `${Math.round(h / 24)} days ago`
+}
+
+function formatAbsolute(lastSearchAt: string | null): string | null {
+  if (!lastSearchAt) return null
+  return new Date(lastSearchAt).toLocaleString('en-US', {
+    day: 'numeric', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: true,
+  })
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -156,8 +164,8 @@ export function JobSearchCard({
                 jobsDeduplicated: status.pipelineRun?.jobsDeduplicated ?? 0,
               }
               setCompleteResult({
-                discovered: runData.jobsDiscovered,
-                newJobs: Math.max(0, runData.jobsDiscovered - runData.jobsDeduplicated),
+                discovered: runData.jobsDiscovered + runData.jobsDeduplicated,
+                newJobs: runData.jobsDiscovered,
                 duplicatesSkipped: runData.jobsDeduplicated,
               })
             }
@@ -217,7 +225,8 @@ export function JobSearchCard({
   // ─── Derived values ───────────────────────────────────────────────────────
 
   const lastSearchAt = lastSearch?.lastSearchAt ?? null
-  const timestampStr = formatTimestamp(lastSearchAt)
+  const relativeStr  = formatRelative(lastSearchAt)
+  const absoluteStr  = formatAbsolute(lastSearchAt)
   const hours = lastSearchAt ? hoursAgo(lastSearchAt) : null
   const showCooldown = hours !== null && hours < 6
   const showStaleBadge = hours !== null && hours > 168
@@ -234,19 +243,26 @@ export function JobSearchCard({
         ? 'border-emerald-500'
         : mode === 'error'
           ? 'border-red-700'
-          : 'border-[#1e3a5f]'
+          : 'border-border-strong'
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <Card className={`bg-[#0a1628] ${borderClass} py-4 gap-3`}>
+    <Card className={`bg-background ${borderClass} py-4 gap-3`}>
       {/* ── Header row ── */}
       <CardContent className="flex items-center justify-between pb-0">
         <div className="flex items-center gap-3">
           <span className="text-[9px] font-bold tracking-widest text-blue-300 uppercase">
             Job Search
           </span>
-          <span className="text-[13px] font-semibold text-slate-100">{timestampStr}</span>
+          <div className="flex flex-col">
+            <span className="text-[13px] font-semibold text-slate-100 leading-tight">
+              {lastSearchAt ? `Last searched ${relativeStr}` : 'No searches yet'}
+            </span>
+            {absoluteStr && (
+              <span className="text-[10px] text-slate-500 leading-tight">{absoluteStr}</span>
+            )}
+          </div>
           {showStaleBadge && (
             <Badge
               variant="outline"
@@ -278,7 +294,7 @@ export function JobSearchCard({
             </Button>
             <Button
               variant="outline"
-              className="flex-1 text-[12px] h-8 border-[#1e3a5f] text-slate-300"
+              className="flex-1 text-[12px] h-8 border-border-strong text-slate-300"
               onClick={onOpenBatchSheet}
             >
               ⚡ Score Batch
@@ -373,7 +389,7 @@ function MiniStat({
   valueClass?: string
 }) {
   return (
-    <div className="bg-[#0d1f3c] rounded-lg p-2 flex flex-col gap-0.5">
+    <div className="bg-card rounded-lg p-2 flex flex-col gap-0.5">
       <p className="text-[8px] text-slate-500 uppercase tracking-wide">{label}</p>
       <p className={`text-[15px] font-bold ${valueClass ?? 'text-slate-100'}`}>{value}</p>
     </div>
@@ -390,7 +406,7 @@ function StepBox({ step }: { step: StepState }) {
     ? 'border-emerald-500'
     : isActive
       ? 'border-blue-500'
-      : 'border-[#1e3a5f]'
+      : 'border-border-strong'
 
   return (
     <div

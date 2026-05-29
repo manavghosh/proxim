@@ -8,10 +8,10 @@ interface ProfileCardProps {
 }
 
 const STATUS_STYLE: Record<string, string> = {
-  ready: 'bg-[#064e3b] text-[#6ee7b7]',
-  parsing: 'bg-[#1e3a5f] text-[#60a5fa]',
-  pending: 'bg-[#1e2d4a] text-[#475569]',
-  failed: 'bg-[#450a0a] text-[#fca5a5]',
+  ready: 'bg-success/15 text-success',
+  parsing: 'bg-border-strong text-primary',
+  pending: 'bg-border text-muted-foreground',
+  failed: 'bg-destructive/15 text-destructive',
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -24,16 +24,16 @@ const STATUS_LABEL: Record<string, string> = {
 export function ProfileCard({ candidate, candidateId }: ProfileCardProps) {
   if (!candidate?.parsedProfile) {
     return (
-      <div className="bg-[#0d1f3c] border border-[#1e3a5f] rounded-xl p-5 flex flex-col items-center justify-center min-h-[240px] gap-3 text-center">
-        <div className="w-12 h-12 rounded-xl bg-[#0a1835] border border-[#1e3a5f] flex items-center justify-center text-2xl text-[#334155]">
+      <div className="bg-card border border-border-strong rounded-xl p-5 flex flex-col items-center justify-center min-h-[240px] gap-3 text-center">
+        <div className="w-12 h-12 rounded-xl bg-muted border border-border-strong flex items-center justify-center text-2xl text-muted-foreground">
           ?
         </div>
-        <p className="text-[12px] text-[#475569] max-w-[180px]">
+        <p className="text-[12px] text-muted-foreground max-w-[180px]">
           Upload your CV in Settings to populate your profile.
         </p>
         <Link
           href={`/candidates/${candidateId}/settings`}
-          className="text-[11px] text-[#3b82f6] hover:text-[#60a5fa] transition-colors"
+          className="text-[11px] text-primary hover:text-primary transition-colors"
         >
           Go to Settings →
         </Link>
@@ -54,9 +54,9 @@ export function ProfileCard({ candidate, candidateId }: ProfileCardProps) {
       : []
 
   return (
-    <div className="bg-[#0d1f3c] border border-[#1e3a5f] rounded-xl p-5">
+    <div className="bg-card border border-border-strong rounded-xl p-5">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-[13px] font-semibold text-[#e2e8f0]">Profile</h2>
+        <h2 className="text-[13px] font-semibold text-foreground">Profile</h2>
         <span
           className={`text-[10px] font-medium px-2.5 py-0.5 rounded-full ${STATUS_STYLE[parseStatus]}`}
         >
@@ -66,19 +66,19 @@ export function ProfileCard({ candidate, candidateId }: ProfileCardProps) {
 
       {/* Avatar + name */}
       <CandidateAvatar name={name} avatarData={candidate?.avatarData} size="lg" className="rounded-xl mb-3" />
-      <p className="text-[15px] font-bold text-[#f1f5f9] mb-0.5">{name}</p>
+      <p className="text-[15px] font-bold text-foreground mb-0.5">{name}</p>
       {topRole && (
-        <p className="text-[11px] text-[#60a5fa] mb-4">
+        <p className="text-[11px] text-primary mb-4">
           {topRole.title} · {topRole.company}
         </p>
       )}
 
-      <div className="h-px bg-[#1e2d4a] my-3" />
+      <div className="h-px bg-border my-3" />
 
       {/* Skills */}
       {topSkills.length > 0 && (
         <>
-          <p className="text-[9px] font-semibold text-[#475569] tracking-widest uppercase mb-2">
+          <p className="text-[9px] font-semibold text-muted-foreground tracking-widest uppercase mb-2">
             Top Skills
           </p>
           <div className="flex flex-wrap gap-1.5 mb-4">
@@ -91,14 +91,14 @@ export function ProfileCard({ candidate, candidateId }: ProfileCardProps) {
               </span>
             ))}
           </div>
-          <div className="h-px bg-[#1e2d4a] my-3" />
+          <div className="h-px bg-border my-3" />
         </>
       )}
 
       {/* Target roles */}
       {seniorityLevels.length > 0 && (
         <>
-          <p className="text-[9px] font-semibold text-[#475569] tracking-widest uppercase mb-2">
+          <p className="text-[9px] font-semibold text-muted-foreground tracking-widest uppercase mb-2">
             Target Roles
           </p>
           <div className="flex flex-wrap gap-1.5 mb-4">
@@ -111,14 +111,14 @@ export function ProfileCard({ candidate, candidateId }: ProfileCardProps) {
               </span>
             ))}
           </div>
-          <div className="h-px bg-[#1e2d4a] my-3" />
+          <div className="h-px bg-border my-3" />
         </>
       )}
 
       {/* Geo */}
       {geoPrefs.length > 0 && (
         <>
-          <p className="text-[9px] font-semibold text-[#475569] tracking-widest uppercase mb-1">
+          <p className="text-[9px] font-semibold text-muted-foreground tracking-widest uppercase mb-1">
             Location
           </p>
           <div className="flex flex-wrap gap-1.5">

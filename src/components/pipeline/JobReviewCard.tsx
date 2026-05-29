@@ -100,7 +100,7 @@ export function JobReviewCard({
   const isAgeing     = dayAge !== null && dayAge > AGE_AMBER_DAYS && !isExpired
 
   return (
-    <Card className="bg-[#060d1f] border border-[#1e2d4a] hover:border-[#2d4a6e] transition-colors">
+    <Card className="bg-background border border-border hover:border-border-strong transition-colors">
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
@@ -116,7 +116,7 @@ export function JobReviewCard({
                 </Badge>
               )}
               {job.numericScore !== null && (
-                <span className="text-[12px] font-semibold text-[#93c5fd]">
+                <span className="text-[12px] font-semibold text-primary">
                   {job.numericScore.toFixed(1)} / 5.0
                 </span>
               )}
@@ -140,7 +140,7 @@ export function JobReviewCard({
 
             {/* Title + Company */}
             <div className="flex items-center gap-1">
-              <h3 className="text-[13px] font-semibold text-[#f1f5f9] leading-snug truncate">
+              <h3 className="text-[13px] font-semibold text-foreground leading-snug truncate">
                 {job.title}
               </h3>
               {isNew && (
@@ -150,19 +150,19 @@ export function JobReviewCard({
               )}
             </div>
             <div className="flex items-center gap-3 mt-1">
-              <span className="flex items-center gap-1 text-[11px] text-[#64748b]">
+              <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
                 <Building2 className="w-3 h-3" />
                 {job.company}
               </span>
               {job.location && (
-                <span className="flex items-center gap-1 text-[11px] text-[#64748b]">
+                <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
                   <MapPin className="w-3 h-3" />
                   {job.location}
                 </span>
               )}
               {job.postedAt && (
                 <span className={`flex items-center gap-1 text-[11px] ${
-                  isExpired ? 'text-red-400' : isAgeing ? 'text-amber-400' : 'text-[#64748b]'
+                  isExpired ? 'text-red-400' : isAgeing ? 'text-amber-400' : 'text-muted-foreground'
                 }`}>
                   <Calendar className="w-3 h-3" />
                   {formatDate(job.postedAt)}
@@ -199,7 +199,7 @@ export function JobReviewCard({
             href={job.sourceUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex-shrink-0 text-[#475569] hover:text-[#93c5fd] transition-colors"
+            className="flex-shrink-0 text-muted-foreground hover:text-primary transition-colors"
             title={job.sourceUrl}
           >
             <ExternalLink className="w-4 h-4" />
@@ -208,7 +208,7 @@ export function JobReviewCard({
 
         {/* Action buttons */}
         {!isApproved && (
-          <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[#0d1829]">
+          <div className="flex items-center gap-2 mt-3 pt-3 border-t border-muted">
             <Button
               size="sm"
               className="h-7 text-[11px] px-3 bg-emerald-900 hover:bg-emerald-800 text-emerald-300 border border-emerald-700"
@@ -236,7 +236,7 @@ export function JobReviewCard({
               className={`h-7 text-[11px] px-3 ml-auto ${
                 isSnoozed
                   ? 'text-amber-400 hover:text-amber-300'
-                  : 'text-[#64748b] hover:text-[#94a3b8]'
+                  : 'text-muted-foreground hover:text-muted-foreground'
               }`}
               onClick={() => (isSnoozed ? onUnsnooze(job.id) : onSnooze(job.id))}
               disabled={isPending}
@@ -253,7 +253,7 @@ export function JobReviewCard({
 
         {/* Generate Resume — shown on approved jobs that don't have a resume yet */}
         {job.status === 'approved' && (
-          <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[#0d1829]">
+          <div className="flex items-center gap-2 mt-3 pt-3 border-t border-muted">
             <Button
               size="sm"
               variant="outline"
@@ -270,7 +270,7 @@ export function JobReviewCard({
 
         {/* Outreach pending indicator — shown immediately after approve, clears automatically via SSE */}
         {isApproved && isPendingOutreach && (
-          <div className="mt-2 flex items-center gap-2 text-[10px] text-[#475569]">
+          <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground">
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse shrink-0" />
             Outreach starting…
           </div>
@@ -279,10 +279,10 @@ export function JobReviewCard({
         {/* F5 Outreach status — shown on approved jobs once the connector has run */}
         {outreachTarget && job.status === 'approved' && (
           <div
-            className="mt-3 pt-3 border-t border-[#0d1829] flex items-center gap-2"
+            className="mt-3 pt-3 border-t border-muted flex items-center gap-2"
             data-testid="outreach-section"
           >
-            <span className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase shrink-0">
+            <span className="text-[9px] font-semibold text-muted-foreground tracking-widest uppercase shrink-0">
               Outreach
             </span>
             <OutreachStatusBadge status={outreachTarget.status} />
@@ -306,7 +306,7 @@ export function JobReviewCard({
               />
             ) : (
               <div className="flex items-center gap-2">
-                <span className="text-[9px] font-semibold text-[#334155] tracking-widest uppercase shrink-0">
+                <span className="text-[9px] font-semibold text-muted-foreground tracking-widest uppercase shrink-0">
                   Email
                 </span>
                 <EmailCadenceStatusBadge status={emailCadence.status} />

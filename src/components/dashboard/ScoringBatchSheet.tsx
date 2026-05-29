@@ -112,11 +112,11 @@ export function ScoringBatchSheet({ open, onOpenChange, candidateId, onScored, a
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="bg-[#0d1829] border-[#1e2d4a] flex flex-col gap-0 p-0 sm:max-w-xl"
+        className="bg-muted border-border flex flex-col gap-0 p-0 sm:max-w-xl"
       >
-        <SheetHeader className="border-b border-[#1e2d4a]">
-          <SheetTitle className="text-[#f1f5f9]">Select Scoring Batch</SheetTitle>
-          <SheetDescription className="text-[#94a3b8]">
+        <SheetHeader className="border-b border-border">
+          <SheetTitle className="text-foreground">Select Scoring Batch</SheetTitle>
+          <SheetDescription className="text-muted-foreground">
             {totalJobs > 0
               ? `${totalJobs} jobs ready. Pick the positions you want to score now — the rest stay queued for a later batch.`
               : 'No jobs are ready to score yet.'}
@@ -127,7 +127,7 @@ export function ScoringBatchSheet({ open, onOpenChange, candidateId, onScored, a
           {loading ? (
             <div className="space-y-2">
               {[...Array(3)].map((_, i) => (
-                <Skeleton key={i} className="h-16 w-full rounded-xl bg-[#0d1f3c]" />
+                <Skeleton key={i} className="h-16 w-full rounded-xl bg-card" />
               ))}
             </div>
           ) : error ? (
@@ -136,23 +136,23 @@ export function ScoringBatchSheet({ open, onOpenChange, candidateId, onScored, a
             </Card>
           ) : groups.length === 0 ? (
             <Card>
-              <CardContent className="py-8 text-center text-sm text-[#94a3b8]">
-                <p className="font-medium text-[#f1f5f9]">No jobs ready to score</p>
-                <p className="mt-1 text-xs text-[#475569]">
+              <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                <p className="font-medium text-foreground">No jobs ready to score</p>
+                <p className="mt-1 text-xs text-muted-foreground">
                   Run the discovery pipeline first, then come back here.
                 </p>
               </CardContent>
             </Card>
           ) : (
             <>
-              <div className="mb-3 flex items-center justify-between text-xs text-[#94a3b8]">
+              <div className="mb-3 flex items-center justify-between text-xs text-muted-foreground">
                 <span>{groups.length} position groups</span>
                 <div className="flex gap-2">
                   <Button
                     type="button"
                     size="xs"
                     variant="ghost"
-                    className="h-7 text-[#94a3b8]"
+                    className="h-7 text-muted-foreground"
                     onClick={selectAll}
                   >
                     Select all
@@ -161,7 +161,7 @@ export function ScoringBatchSheet({ open, onOpenChange, candidateId, onScored, a
                     type="button"
                     size="xs"
                     variant="ghost"
-                    className="h-7 text-[#94a3b8]"
+                    className="h-7 text-muted-foreground"
                     onClick={clearAll}
                   >
                     Clear
@@ -183,13 +183,13 @@ export function ScoringBatchSheet({ open, onOpenChange, candidateId, onScored, a
           )}
         </div>
 
-        <div className="border-t border-[#1e2d4a] p-4">
-          <div className="mb-2 flex items-center justify-between text-xs text-[#94a3b8]">
+        <div className="border-t border-border p-4">
+          <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
             <span>
               {selectedCount} of {totalJobs} jobs selected
             </span>
             {selectedCount > 0 && (
-              <span className="text-[#475569]">
+              <span className="text-muted-foreground">
                 ~{estTokens.toLocaleString()} tokens est.
               </span>
             )}
@@ -241,12 +241,12 @@ function PositionRow({
         <CardContent className="flex items-center justify-between gap-3 py-3">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <p className="truncate text-sm font-medium text-[#f1f5f9]">{group.position}</p>
+              <p className="truncate text-sm font-medium text-foreground">{group.position}</p>
               <Badge variant={selected ? 'default' : 'secondary'} className="text-[10px]">
                 {group.count}
               </Badge>
             </div>
-            <p className="mt-0.5 truncate text-xs text-[#475569]">{subtitle}</p>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">{subtitle}</p>
           </div>
           <Button
             type="button"

@@ -90,7 +90,7 @@ export function EmailNotFoundPanel({ jobId, candidateId, cadence, company, outre
 
   return (
     <div className="mt-1 space-y-2">
-      <p className="text-[11px] text-[#64748b]">{message}</p>
+      <p className="text-[11px] text-muted-foreground">{message}</p>
 
       {/* Show discovered email when low_confidence (catch-all domain) */}
       {isLowConfidence && suggestedEmail && (
@@ -99,7 +99,7 @@ export function EmailNotFoundPanel({ jobId, candidateId, cadence, company, outre
             <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
             <span className="text-[10px] text-amber-300 font-medium">Found by AI Agent — catch-all domain</span>
           </div>
-          <p className="text-[11px] font-mono text-[#f1f5f9]">{suggestedEmail}</p>
+          <p className="text-[11px] font-mono text-foreground">{suggestedEmail}</p>
           {confidence > 0 && (
             <p className="text-[10px] text-amber-400/70">
               {confidence}% confidence · Catch-all domain — address can&apos;t be individually verified
@@ -133,7 +133,7 @@ export function EmailNotFoundPanel({ jobId, candidateId, cadence, company, outre
               href={outreachTarget.linkedinUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 h-6 px-2 text-[10px] rounded-md border border-[#1e3a5f] text-[#94a3b8] hover:bg-[#1e3a5f] transition-colors"
+              className="inline-flex items-center gap-1 h-6 px-2 text-[10px] rounded-md border border-border-strong text-muted-foreground hover:bg-border-strong transition-colors"
             >
               <ExternalLink className="w-3 h-3" />
               Use LinkedIn
@@ -143,7 +143,7 @@ export function EmailNotFoundPanel({ jobId, candidateId, cadence, company, outre
           <Button
             size="sm"
             variant="ghost"
-            className="h-6 text-[10px] text-[#475569] hover:text-[#94a3b8] gap-1"
+            className="h-6 text-[10px] text-muted-foreground hover:text-muted-foreground gap-1"
             onClick={handleSkip}
             isLoading={cancelling}
           >
@@ -154,7 +154,7 @@ export function EmailNotFoundPanel({ jobId, candidateId, cadence, company, outre
           <Button
             size="sm"
             variant="ghost"
-            className="h-6 text-[10px] text-[#334155] hover:text-[#64748b] gap-1 ml-auto"
+            className="h-6 text-[10px] text-muted-foreground hover:text-muted-foreground gap-1 ml-auto"
             onClick={handleRetry}
             disabled={retryMaxed || retrying}
             isLoading={retrying}
@@ -170,7 +170,7 @@ export function EmailNotFoundPanel({ jobId, candidateId, cadence, company, outre
             value={emailValue}
             onChange={e => setEmailValue(e.target.value)}
             placeholder="hiring@company.com"
-            className="h-7 text-[11px] bg-[#060d1f] border-[#2d4a6e] text-[#f1f5f9] flex-1"
+            className="h-7 text-[11px] bg-background border-border-strong text-foreground flex-1"
             onKeyDown={e => {
               if (e.key === 'Enter') void handleSave()
               if (e.key === 'Escape') void handleCancel()
@@ -188,7 +188,7 @@ export function EmailNotFoundPanel({ jobId, candidateId, cadence, company, outre
           <Button
             size="sm"
             variant="ghost"
-            className="h-7 text-[10px] text-[#475569] shrink-0"
+            className="h-7 text-[10px] text-muted-foreground shrink-0"
             onClick={handleCancel}
           >
             Cancel
