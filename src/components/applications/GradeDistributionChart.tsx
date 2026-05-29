@@ -8,18 +8,10 @@ import {
   type ChartConfig,
 } from '@/components/ui/chart'
 import type { GradeDistribution } from '@/types/candidate'
+import { GRADE_COLOR as GRADE_COLORS } from '@/lib/grade-colors'
 
 interface GradeDistributionChartProps {
   distribution: GradeDistribution
-}
-
-const GRADE_COLORS: Record<string, string> = {
-  A: '#22c55e',
-  B: '#3b82f6',
-  C: '#f59e0b',
-  D: '#f97316',
-  E: '#ef4444',
-  F: '#b91c1c',
 }
 
 const chartConfig: ChartConfig = {

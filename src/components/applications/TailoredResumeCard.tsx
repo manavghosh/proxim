@@ -1,6 +1,6 @@
 'use client'
 
-import { FileTextIcon } from 'lucide-react'
+import { FileTextIcon, AlertTriangle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
@@ -23,8 +23,8 @@ export function TailoredResumeCard({ version, onViewResume, onViewCoverLetter }:
       {/* Stale warning */}
       {version.isStale && (
         <div className="rounded-md bg-amber-950/30 border border-amber-800/40 px-2.5 py-1.5">
-          <p className="text-[11px] text-amber-400">
-            ⚠ CV updated since tailoring — consider re-tailoring.
+          <p className="text-[11px] text-amber-400 inline-flex items-center gap-1.5">
+            <AlertTriangle className="w-3 h-3 shrink-0" /> CV updated since tailoring — consider re-tailoring.
           </p>
         </div>
       )}

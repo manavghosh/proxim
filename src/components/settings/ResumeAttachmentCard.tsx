@@ -63,7 +63,7 @@ export function ResumeAttachmentCard({ candidateId }: Props) {
           Resume Attachment
         </p>
         {saving && <span className="text-[9px] text-muted-foreground">Saving…</span>}
-        {saved  && <span className="text-[9px] text-emerald-400">Saved ✓</span>}
+        {saved  && <span className="text-[9px] text-emerald-400 inline-flex items-center gap-1"><CheckCircle2 className="w-2.5 h-2.5" /> Saved</span>}
       </div>
 
       {loading ? (

@@ -211,7 +211,7 @@ export function EmailOutreachModeCard({ candidateId, flash }: Props) {
             className={`text-xs ${switchingToManual ? 'bg-red-700 hover:bg-red-800 text-white' : ''}`}
           >
             {saved
-              ? 'Saved ✓'
+              ? 'Saved'
               : switchingToManual
               ? 'Revoke Gmail & Switch to Manual'
               : 'Save'}

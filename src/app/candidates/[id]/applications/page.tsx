@@ -12,7 +12,9 @@ import { GradeFilterDropdown, ALL_GRADES } from '@/components/applications/Grade
 import type { Grade } from '@/components/applications/GradeFilterDropdown'
 import { ExportResumePanel } from '@/components/applications/ExportResumePanel'
 import { PdfPreviewSheet } from '@/components/applications/PdfPreviewSheet'
+import { X } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Alert } from '@/components/ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AnalyticsPanel } from '@/components/applications/AnalyticsPanel'
 import { RunHistoryTable } from '@/components/applications/RunHistoryTable'
@@ -282,16 +284,16 @@ export default function ApplicationsPage() {
           {/* ── Jobs Tab ─────────────────────────────────────────────────────── */}
           <TabsContent value="jobs" className="flex-1 overflow-x-hidden overflow-y-auto p-6 mt-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {error && (
-              <div className="mb-4 px-4 py-3 bg-destructive/15 border border-destructive/40 rounded-lg text-[12px] text-destructive flex items-center justify-between gap-3">
+              <Alert className="mb-4 px-4 py-3 bg-destructive/15 border-destructive/40 text-[12px] text-destructive flex items-center justify-between gap-3">
                 <span>{error}</span>
                 <button
                   onClick={() => setError(null)}
                   aria-label="Dismiss"
-                  className="shrink-0 text-destructive hover:text-white transition-colors"
+                  className="shrink-0 text-destructive hover:text-foreground transition-colors"
                 >
-                  ✕
+                  <X className="w-3.5 h-3.5" />
                 </button>
-              </div>
+              </Alert>
             )}
             <div className="mb-5">
               <GradeFilterDropdown selected={selectedGrades} onChange={setSelectedGrades} counts={counts} />

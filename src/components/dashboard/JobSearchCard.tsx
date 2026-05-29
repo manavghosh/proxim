@@ -6,6 +6,7 @@ import { Search, Zap, AlertTriangle, CheckCircle2, Check, Loader2, Circle, Arrow
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Alert } from '@/components/ui/alert'
 import { triggerPipeline, getPipelineStatus } from '@/lib/api'
 import type { LastSearch } from '@/lib/api'
 
@@ -362,16 +363,16 @@ export function JobSearchCard({
 
       {mode === 'error' && (
         <CardContent className="flex flex-col gap-3 pt-0">
-          <div className="border border-red-700 rounded-lg p-3 flex flex-col gap-2">
-            <p className="text-[12px] text-red-400">{errorMsg}</p>
+          <Alert className="border-destructive/40 bg-destructive/10 p-3 flex flex-col gap-2">
+            <p className="text-[12px] text-destructive">{errorMsg}</p>
             <Button
               variant="outline"
-              className="border-red-700 text-red-400 text-[12px] h-8"
+              className="border-destructive/40 text-destructive text-[12px] h-8 self-start"
               onClick={() => setMode('idle')}
             >
               Try Again
             </Button>
-          </div>
+          </Alert>
         </CardContent>
       )}
     </Card>

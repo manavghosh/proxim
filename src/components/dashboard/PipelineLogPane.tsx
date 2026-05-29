@@ -1,7 +1,10 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { ChevronDown } from 'lucide-react'
+import {
+  ChevronDown, XCircle, AlertTriangle, Search, Globe, Building2,
+  Database, RefreshCw, Flag, CheckCircle2, Zap,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface LogEntry {
@@ -13,23 +16,22 @@ interface LogEntry {
   createdAt: string
 }
 
-function stepIcon(level: string, step: string): string {
-  if (level === 'error') return '❌'
-  if (level === 'warning') return '⚠️'
-  if (step === 'review_required') return '🔍'
-  // Source-specific scraping steps — visually distinguish each portal so the
-  // user can see at a glance where jobs are coming from.
-  if (step === 'scrape_linkedin') return '🔵'
-  if (step === 'scrape_naukri') return '🟠'
-  if (step === 'scrape_iimjobs') return '🟣'
-  if (step === 'scrape_monster') return '🟡'
-  if (step === 'scrape_careers_page') return '🏢'
-  if (step === 'fetch_jds_batch') return '🔵'   // currently LinkedIn-only
-  if (step.includes('persist')) return '💾'
-  if (step.includes('dedup') || step.includes('normalise')) return '🔄'
-  if (step === 'write_run_summary' || step === 'write_fetch_summary' || step === 'write_score_summary') return '🏁'
-  if (step.includes('complete')) return '✅'
-  return '⚡'
+function StepIcon({ level, step }: { level: string; step: string }) {
+  const cls = 'w-3 h-3 shrink-0'
+  if (level === 'error') return <XCircle className={`${cls} text-destructive`} />
+  if (level === 'warning') return <AlertTriangle className={`${cls} text-warning`} />
+  if (step === 'review_required') return <Search className={`${cls} text-info`} />
+  // Source-specific scraping steps — colour distinguishes each portal at a glance.
+  if (step === 'scrape_linkedin' || step === 'fetch_jds_batch') return <Globe className={`${cls} text-[#0A66C2]`} />
+  if (step === 'scrape_naukri') return <Globe className={`${cls} text-orange-400`} />
+  if (step === 'scrape_iimjobs') return <Globe className={`${cls} text-purple-400`} />
+  if (step === 'scrape_monster') return <Globe className={`${cls} text-amber-400`} />
+  if (step === 'scrape_careers_page') return <Building2 className={`${cls} text-muted-foreground`} />
+  if (step.includes('persist')) return <Database className={`${cls} text-info`} />
+  if (step.includes('dedup') || step.includes('normalise')) return <RefreshCw className={`${cls} text-muted-foreground`} />
+  if (step === 'write_run_summary' || step === 'write_fetch_summary' || step === 'write_score_summary') return <Flag className={`${cls} text-primary`} />
+  if (step.includes('complete')) return <CheckCircle2 className={`${cls} text-success`} />
+  return <Zap className={`${cls} text-primary`} />
 }
 
 function formatTime(iso: string): string {
@@ -327,7 +329,7 @@ export function PipelineLogPane({
                   <span className="text-muted-foreground shrink-0 tabular-nums">
                     [{formatTime(entry.createdAt)}]
                   </span>
-                  <span className="shrink-0">{stepIcon(entry.level, entry.step)}</span>
+                  <span className="shrink-0 flex items-center"><StepIcon level={entry.level} step={entry.step} /></span>
                   <span className="break-all">{entry.message}</span>
                   {isReviewCta && (
                     <Button

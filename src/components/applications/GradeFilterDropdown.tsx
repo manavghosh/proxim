@@ -14,17 +14,22 @@ import {
   DropdownMenuGroup,
 } from '@/components/ui/dropdown-menu'
 
+import { GRADE_COLOR, GRADE_BG } from '@/lib/grade-colors'
+
 export const ALL_GRADES = ['A', 'B', 'C', 'D', 'E', 'F'] as const
 export type Grade = typeof ALL_GRADES[number]
 
-const GRADE_META: Record<Grade, { color: string; bg: string; label: string }> = {
-  A: { color: '#10b981', bg: 'rgba(16,185,129,0.12)', label: 'A — Excellent match' },
-  B: { color: '#06b6d4', bg: 'rgba(6,182,212,0.12)',  label: 'B — Good match'      },
-  C: { color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', label: 'C — Moderate match'  },
-  D: { color: '#f97316', bg: 'rgba(249,115,22,0.12)', label: 'D — Weak match'      },
-  E: { color: '#f43f5e', bg: 'rgba(244,63,94,0.12)',  label: 'E — Poor match'      },
-  F: { color: '#ef4444', bg: 'rgba(239,68,68,0.12)',  label: 'F — Reject (gate fail)' },
+const GRADE_LABEL: Record<Grade, string> = {
+  A: 'A — Excellent match',
+  B: 'B — Good match',
+  C: 'C — Moderate match',
+  D: 'D — Weak match',
+  E: 'E — Poor match',
+  F: 'F — Reject (gate fail)',
 }
+const GRADE_META: Record<Grade, { color: string; bg: string; label: string }> = Object.fromEntries(
+  ALL_GRADES.map((g) => [g, { color: GRADE_COLOR[g], bg: GRADE_BG[g], label: GRADE_LABEL[g] }])
+) as Record<Grade, { color: string; bg: string; label: string }>
 
 interface Props {
   selected: Grade[]

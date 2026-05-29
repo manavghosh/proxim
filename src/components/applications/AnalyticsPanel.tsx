@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Alert } from '@/components/ui/alert'
 import { MetricCard } from './MetricCard'
 import { GradeDistributionChart } from './GradeDistributionChart'
 import { getAnalytics } from '@/lib/api'
@@ -55,9 +56,9 @@ export function AnalyticsPanel({ candidateId, range, onRangeChange, refreshTrigg
       </div>
 
       {error && (
-        <div className="px-4 py-3 bg-destructive/15 border border-destructive/40 rounded-lg text-[12px] text-destructive">
+        <Alert className="px-4 py-3 bg-destructive/15 border-destructive/40 text-[12px] text-destructive">
           {error}
-        </div>
+        </Alert>
       )}
 
       {/* In-progress notice */}
