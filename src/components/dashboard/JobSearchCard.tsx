@@ -240,9 +240,9 @@ export function JobSearchCard({
 
   const borderClass =
     mode === 'running'
-      ? 'border-blue-600'
+      ? 'border-primary'
       : mode === 'complete'
-        ? 'border-emerald-500'
+        ? 'border-success'
         : mode === 'error'
           ? 'border-red-700'
           : 'border-border-strong'
@@ -254,15 +254,15 @@ export function JobSearchCard({
       {/* ── Header row ── */}
       <CardContent className="flex items-center justify-between pb-0">
         <div className="flex items-center gap-3">
-          <span className="text-[9px] font-bold tracking-widest text-blue-300 uppercase">
+          <span className="text-[9px] font-bold tracking-widest text-primary uppercase">
             Job Search
           </span>
           <div className="flex flex-col">
-            <span className="text-[13px] font-semibold text-slate-100 leading-tight">
+            <span className="text-[13px] font-semibold text-foreground leading-tight">
               {lastSearchAt ? `Last searched ${relativeStr}` : 'No searches yet'}
             </span>
             {absoluteStr && (
-              <span className="text-[10px] text-slate-500 leading-tight">{absoluteStr}</span>
+              <span className="text-[10px] text-muted-foreground leading-tight">{absoluteStr}</span>
             )}
           </div>
           {showStaleBadge && (
@@ -296,7 +296,7 @@ export function JobSearchCard({
             </Button>
             <Button
               variant="outline"
-              className="flex-1 text-[12px] h-8 border-border-strong text-slate-300 gap-1.5"
+              className="flex-1 text-[12px] h-8 border-border-strong text-foreground gap-1.5"
               onClick={onOpenBatchSheet}
             >
               <Zap className="w-3.5 h-3.5" /> Score Batch
@@ -305,7 +305,7 @@ export function JobSearchCard({
 
           {/* Cooldown note */}
           {showCooldown && (
-            <p className="text-[10px] text-slate-500 text-center">
+            <p className="text-[10px] text-muted-foreground text-center">
               Searched {Math.round(hours!)}h ago · results may be similar
             </p>
           )}
@@ -324,7 +324,7 @@ export function JobSearchCard({
               variant="ghost"
               size="sm"
               onClick={handleCancel}
-              className="text-[10px] text-slate-500 hover:text-slate-300 h-auto p-0"
+              className="text-[10px] text-muted-foreground hover:text-foreground h-auto p-0"
             >
               Cancel
             </Button>
@@ -334,13 +334,13 @@ export function JobSearchCard({
 
       {mode === 'complete' && completeResult && (
         <CardContent className="flex flex-col gap-3 pt-0">
-          <div className="border border-emerald-500 rounded-lg p-3 flex flex-col gap-2">
-            <p className="text-[12px] font-semibold text-emerald-400 inline-flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Search complete</p>
+          <div className="border border-success rounded-lg p-3 flex flex-col gap-2">
+            <p className="text-[12px] font-semibold text-success inline-flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Search complete</p>
             <div className="grid grid-cols-3 gap-2">
               <MiniStat
                 label="New jobs"
                 value={String(completeResult.newJobs)}
-                valueClass="text-emerald-400"
+                valueClass="text-success"
               />
               <MiniStat label="Total found" value={String(completeResult.discovered)} />
               <MiniStat label="Duplicates skipped" value={String(completeResult.duplicatesSkipped)} />
@@ -354,7 +354,7 @@ export function JobSearchCard({
             >
               Review {completeResult.newJobs} New Jobs in Pipeline <ArrowRight className="w-3.5 h-3.5" />
             </Button>
-            <p className="text-[10px] text-slate-500 text-center">
+            <p className="text-[10px] text-muted-foreground text-center">
               Auto-dismisses in {dismissTimer}s
             </p>
           </div>
@@ -392,8 +392,8 @@ function MiniStat({
 }) {
   return (
     <div className="bg-card rounded-lg p-2 flex flex-col gap-0.5">
-      <p className="text-[8px] text-slate-500 uppercase tracking-wide">{label}</p>
-      <p className={`text-[15px] font-bold ${valueClass ?? 'text-slate-100'}`}>{value}</p>
+      <p className="text-[8px] text-muted-foreground uppercase tracking-wide">{label}</p>
+      <p className={`text-[15px] font-bold ${valueClass ?? 'text-foreground'}`}>{value}</p>
     </div>
   )
 }
@@ -405,19 +405,19 @@ function StepBox({ step }: { step: StepState }) {
 
   const Icon = isDone ? Check : isActive ? Loader2 : Circle
   const borderColor = isDone
-    ? 'border-emerald-500'
+    ? 'border-success'
     : isActive
-      ? 'border-blue-500'
+      ? 'border-primary'
       : 'border-border-strong'
 
   return (
     <div
       className={`border rounded-lg p-2 flex flex-col gap-0.5 ${borderColor} ${isPending ? 'opacity-50' : ''}`}
     >
-      <p className="text-[11px] text-slate-300 inline-flex items-center gap-1">
+      <p className="text-[11px] text-foreground inline-flex items-center gap-1">
         <Icon className={`w-3 h-3 ${isActive ? 'animate-spin' : ''}`} /> {step.label}
       </p>
-      <p className="text-[9px] text-slate-500">
+      <p className="text-[9px] text-muted-foreground">
         {step.count ?? (isDone ? 'Done' : isActive ? 'Running…' : 'Waiting…')}
       </p>
     </div>

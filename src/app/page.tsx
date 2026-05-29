@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { UserPlus, Users, ArrowRight } from 'lucide-react'
 import { getCandidates, createCandidate, updateCandidateName } from '@/lib/api'
 import type { CandidateSummary } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -64,8 +65,8 @@ export default function RosterPage() {
           </div>
           <span className="text-[15px] font-bold text-foreground tracking-widest">PROXIM</span>
         </div>
-        <Button onClick={handleCreate} isLoading={creating}>
-          + Add Candidate
+        <Button onClick={handleCreate} isLoading={creating} className="gap-1.5">
+          <UserPlus className="w-4 h-4" /> Add Candidate
         </Button>
       </header>
 
@@ -85,9 +86,15 @@ export default function RosterPage() {
           </div>
         ) : candidates.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
-            <p className="text-muted-foreground text-sm mb-4">No candidates yet.</p>
-            <Button onClick={handleCreate} isLoading={creating}>
-              Add your first candidate
+            <div className="w-14 h-14 rounded-2xl bg-card border border-border flex items-center justify-center mb-4">
+              <Users className="w-6 h-6 text-muted-foreground" />
+            </div>
+            <h2 className="text-base font-semibold text-foreground">No candidates yet</h2>
+            <p className="text-muted-foreground text-sm mt-1 mb-5 max-w-xs">
+              Add a candidate to upload their CV, set preferences, and start the autonomous job hunt.
+            </p>
+            <Button onClick={handleCreate} isLoading={creating} className="gap-1.5">
+              <UserPlus className="w-4 h-4" /> Add your first candidate
             </Button>
           </div>
         ) : (
@@ -95,7 +102,7 @@ export default function RosterPage() {
             {candidates.map((c) => {
               const parseBadge = PARSE_BADGE[c.parseStatus] ?? PARSE_BADGE.pending
               return (
-                <Card key={c.id} className="p-5 gap-4">
+                <Card key={c.id} className="p-5 gap-4 transition-transform hover:-translate-y-0.5">
                   {/* Top row */}
                   <div className="flex items-start gap-3">
                     <CandidateAvatar
@@ -157,10 +164,11 @@ export default function RosterPage() {
                   {/* Open button */}
                   <Button
                     variant="outline"
-                    className="w-full border-border-strong text-primary hover:bg-border-strong hover:text-primary"
+                    className="w-full border-border-strong text-primary hover:bg-border-strong hover:text-primary gap-1.5 group"
                     onClick={() => router.push(`/candidates/${c.id}/dashboard`)}
                   >
-                    Open Dashboard →
+                    Open Dashboard
+                    <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
                   </Button>
                 </Card>
               )

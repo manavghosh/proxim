@@ -31,30 +31,30 @@ export function TailoredResumeCard({ version, onViewResume, onViewCoverLetter }:
 
       {/* Archetype row */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-[9px] text-slate-500 uppercase tracking-wide">Archetype</span>
+        <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Archetype</span>
         {version.archetype ? (
           <>
-            <span className="text-[12px] font-semibold text-slate-100">{version.archetype}</span>
+            <span className="text-[12px] font-semibold text-foreground">{version.archetype}</span>
             {confidence !== null && (
               isLowConfidence ? (
                 <Badge className="bg-amber-950/40 text-amber-400 border-amber-800/40 text-[9px] px-1.5 py-0">
                   Low confidence · {Math.round(confidence * 100)}%
                 </Badge>
               ) : (
-                <Badge className="bg-card text-slate-400 border-border text-[9px] px-1.5 py-0">
+                <Badge className="bg-card text-muted-foreground border-border text-[9px] px-1.5 py-0">
                   {Math.round(confidence * 100)}%
                 </Badge>
               )
             )}
           </>
         ) : (
-          <span className="text-[11px] text-slate-600">Not detected</span>
+          <span className="text-[11px] text-muted-foreground/70">Not detected</span>
         )}
       </div>
 
       {/* Keywords */}
       <div className="space-y-1">
-        <span className="text-[9px] text-slate-500 uppercase tracking-wide">Keywords injected</span>
+        <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Keywords injected</span>
         {keywords.length > 0 ? (
           <div className="flex flex-wrap gap-1">
             {keywords.map((kw) => (
@@ -67,7 +67,7 @@ export function TailoredResumeCard({ version, onViewResume, onViewCoverLetter }:
             ))}
           </div>
         ) : (
-          <p className="text-[11px] text-slate-600 italic">No keywords detected</p>
+          <p className="text-[11px] text-muted-foreground/70 italic">No keywords detected</p>
         )}
       </div>
 
@@ -97,12 +97,12 @@ export function TailoredResumeCard({ version, onViewResume, onViewCoverLetter }:
             )}
           </>
         ) : (
-          <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <Spinner className="w-3 h-3" />
             Generating PDF…
           </div>
         )}
-        <span className="text-[10px] text-slate-600 ml-auto">v{version.versionN}</span>
+        <span className="text-[10px] text-muted-foreground/70 ml-auto">v{version.versionN}</span>
       </div>
     </div>
   )
