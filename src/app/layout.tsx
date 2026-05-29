@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { Inter, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 import { NavigationLoader } from '@/components/layout/NavigationLoader'
+import { CommandMenu } from '@/components/CommandMenu'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <body className="bg-background text-foreground font-sans antialiased">
         <NavigationLoader />
+        <CommandMenu />
         {children}
       </body>
     </html>
