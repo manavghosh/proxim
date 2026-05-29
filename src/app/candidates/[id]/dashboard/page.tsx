@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import { getCV, getReadiness, getJobStats, resetFailedJobs, getReadyToScoreGroups, getLastSearch, cancelPipelineJob, getInsights } from '@/lib/api'
+import { Zap, AlertTriangle } from 'lucide-react'
 import { Topbar } from '@/components/layout/Topbar'
 import { CandidateSwitcher } from '@/components/layout/CandidateSwitcher'
 import { StatCard } from '@/components/dashboard/StatCard'
@@ -167,17 +168,17 @@ export default function DashboardPage() {
               <Button
                 size="sm"
                 variant="outline"
-                className="text-xs border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/10"
+                className="text-xs border-info/40 text-info hover:bg-info/10 gap-1.5"
                 onClick={() => { setBatchAutoSelectAll(false); setBatchSheetOpen(true) }}
               >
-                ⚡ Score Batch ({readyToScore})
+                <Zap className="w-3.5 h-3.5" /> Score Batch ({readyToScore})
               </Button>
             )}
             {scoreFailed > 0 && (
               <Button size="sm" variant="outline"
-                className="text-xs border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
+                className="text-xs border-warning/40 text-warning hover:bg-warning/10 gap-1.5"
                 onClick={handleRescore} isLoading={rescoreLoading}>
-                ⚠ Rescore Failed ({scoreFailed})
+                <AlertTriangle className="w-3.5 h-3.5" /> Rescore Failed ({scoreFailed})
               </Button>
             )}
             <ImportJobsSheet

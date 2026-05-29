@@ -5,9 +5,9 @@ interface ActivityFeedProps {
 }
 
 const DOT: Record<string, string> = {
-  green: '#10b981',
-  blue: '#3b82f6',
-  amber: '#f59e0b',
+  green: 'hsl(var(--success))',
+  blue: 'hsl(var(--primary))',
+  amber: 'hsl(var(--warning))',
 }
 
 interface ActivityItem {

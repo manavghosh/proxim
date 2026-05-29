@@ -1,3 +1,5 @@
+import { Card } from '@/components/ui/card'
+
 interface StatCardProps {
   label: string
   value: string
@@ -7,7 +9,7 @@ interface StatCardProps {
 
 export function StatCard({ label, value, sub, dotColor }: StatCardProps) {
   return (
-    <div className="bg-card border border-border rounded-xl p-4">
+    <Card className="p-4">
       <p className="text-[11px] font-medium text-primary tracking-wide mb-2">
         {label}
       </p>
@@ -21,6 +23,6 @@ export function StatCard({ label, value, sub, dotColor }: StatCardProps) {
         )}
         {sub}
       </p>
-    </div>
+    </Card>
   )
 }

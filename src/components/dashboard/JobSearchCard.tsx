@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { Search, Zap, AlertTriangle, CheckCircle2, Check, Loader2, Circle, ArrowRight } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -266,9 +267,9 @@ export function JobSearchCard({
           {showStaleBadge && (
             <Badge
               variant="outline"
-              className="border-orange-500 text-orange-400 text-[9px] px-1.5 py-0"
+              className="border-orange-500 text-orange-400 text-[9px] px-1.5 py-0 inline-flex items-center gap-1"
             >
-              ⚠ Stale · {staleDays}d
+              <AlertTriangle className="w-2.5 h-2.5" /> Stale · {staleDays}d
             </Badge>
           )}
         </div>
@@ -287,17 +288,17 @@ export function JobSearchCard({
           {/* Action buttons */}
           <div className="flex gap-2">
             <Button
-              className="flex-[2] text-[12px] h-8"
+              className="flex-[2] text-[12px] h-8 gap-1.5"
               onClick={handleSearch}
             >
-              🔍 Search for New Jobs
+              <Search className="w-3.5 h-3.5" /> Search for New Jobs
             </Button>
             <Button
               variant="outline"
-              className="flex-1 text-[12px] h-8 border-border-strong text-slate-300"
+              className="flex-1 text-[12px] h-8 border-border-strong text-slate-300 gap-1.5"
               onClick={onOpenBatchSheet}
             >
-              ⚡ Score Batch
+              <Zap className="w-3.5 h-3.5" /> Score Batch
             </Button>
           </div>
 
@@ -333,7 +334,7 @@ export function JobSearchCard({
       {mode === 'complete' && completeResult && (
         <CardContent className="flex flex-col gap-3 pt-0">
           <div className="border border-emerald-500 rounded-lg p-3 flex flex-col gap-2">
-            <p className="text-[12px] font-semibold text-emerald-400">✓ Search complete</p>
+            <p className="text-[12px] font-semibold text-emerald-400 inline-flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Search complete</p>
             <div className="grid grid-cols-3 gap-2">
               <MiniStat
                 label="New jobs"
@@ -350,7 +351,7 @@ export function JobSearchCard({
                 router.push(`/candidates/${candidateId}/pipeline`)
               }}
             >
-              Review {completeResult.newJobs} New Jobs in Pipeline →
+              Review {completeResult.newJobs} New Jobs in Pipeline <ArrowRight className="w-3.5 h-3.5" />
             </Button>
             <p className="text-[10px] text-slate-500 text-center">
               Auto-dismisses in {dismissTimer}s
@@ -401,7 +402,7 @@ function StepBox({ step }: { step: StepState }) {
   const isDone = step.status === 'done'
   const isPending = step.status === 'pending'
 
-  const icon = isDone ? '✓' : isActive ? '⟳' : '◯'
+  const Icon = isDone ? Check : isActive ? Loader2 : Circle
   const borderColor = isDone
     ? 'border-emerald-500'
     : isActive
@@ -412,8 +413,8 @@ function StepBox({ step }: { step: StepState }) {
     <div
       className={`border rounded-lg p-2 flex flex-col gap-0.5 ${borderColor} ${isPending ? 'opacity-50' : ''}`}
     >
-      <p className="text-[11px] text-slate-300">
-        {icon} {step.label}
+      <p className="text-[11px] text-slate-300 inline-flex items-center gap-1">
+        <Icon className={`w-3 h-3 ${isActive ? 'animate-spin' : ''}`} /> {step.label}
       </p>
       <p className="text-[9px] text-slate-500">
         {step.count ?? (isDone ? 'Done' : isActive ? 'Running…' : 'Waiting…')}

@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ExternalLink, FileTextIcon, MoreHorizontal, XCircle, CheckCheck, RotateCcw, Link2, MailIcon, ChevronDown } from 'lucide-react'
+import { ExternalLink, FileTextIcon, MoreHorizontal, XCircle, CheckCheck, RotateCcw, Link2, MailIcon, ChevronDown, Sparkles, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Alert } from '@/components/ui/alert'
 import {
   Collapsible,
   CollapsibleContent,
@@ -277,7 +278,7 @@ export function JobCard({
 
             {/* Interview marker */}
             {isInterviewMarked && (
-              <Badge className="text-[10px] h-5 px-1.5 bg-purple-500/20 text-purple-300 border-purple-500/30">★ Interview</Badge>
+              <Badge className="text-[10px] h-5 px-1.5 bg-purple-500/20 text-purple-300 border-purple-500/30 inline-flex items-center gap-1"><Star className="w-2.5 h-2.5 fill-current" /> Interview</Badge>
             )}
 
             {/* Score */}
@@ -313,7 +314,7 @@ export function JobCard({
 
             {/* Error card */}
             {agentBadge?.variant === 'error' && (
-              <div className="rounded-lg bg-destructive/15 border border-destructive/40 p-3 flex flex-col gap-2">
+              <Alert className="bg-destructive/15 border-destructive/40 p-3 flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-2">
                   <div>
                     <p className="text-[11px] font-semibold text-destructive">{agentBadge.agentName} failed</p>
@@ -337,7 +338,7 @@ export function JobCard({
                     </Button>
                   )}
                 </div>
-              </div>
+              </Alert>
             )}
 
             {/* Location + archetype pills */}
@@ -368,8 +369,8 @@ export function JobCard({
                   disabled={isPending || buildRunning || !job.jdRaw}
                   title={!job.jdRaw ? 'Fetch JD first before tailoring' : undefined}
                   isLoading={buildRunning}>
-                  <FileTextIcon className="w-3 h-3" />
-                  {buildRunning ? 'AI Agent writing…' : '✨ Tailor for This Role'}
+                  {!buildRunning && <Sparkles className="w-3 h-3" />}
+                  {buildRunning ? 'AI Agent writing…' : 'Tailor for This Role'}
                 </Button>
               )}
 
@@ -432,7 +433,7 @@ export function JobCard({
                   disabled={isPending}
                   title={isInterviewMarked ? 'Unmark interview callback' : 'Mark as interview callback'}
                 >
-                  {isInterviewMarked ? '★ Interview' : '☆ Interview'}
+                  <Star className={`w-3 h-3 ${isInterviewMarked ? 'fill-current' : ''}`} /> Interview
                 </Button>
               )}
 
@@ -546,12 +547,14 @@ export function JobCard({
                         </span>
                       )}
                     </div>
-                    <span className={`self-start text-[9px] font-medium px-1.5 py-0.5 rounded-full border ${
+                    <span className={`self-start inline-flex items-center gap-1 text-[9px] font-medium px-1.5 py-0.5 rounded-full border ${
                       job.outreachTarget.seniority === 'JOB_POSTER'
                         ? 'bg-emerald-950/50 text-emerald-400 border-emerald-800/40'
                         : 'bg-amber-950/50 text-amber-400 border-amber-800/40'
                     }`}>
-                      {job.outreachTarget.seniority === 'JOB_POSTER' ? '📋 From JD' : '✨ AI Match'}
+                      {job.outreachTarget.seniority === 'JOB_POSTER'
+                        ? <><FileTextIcon className="w-2.5 h-2.5" /> From JD</>
+                        : <><Sparkles className="w-2.5 h-2.5" /> AI Match</>}
                     </span>
                   </div>
                 )}
