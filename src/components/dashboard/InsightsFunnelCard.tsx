@@ -2,6 +2,7 @@
 
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip'
 import type { InsightsResponse, ArchetypeBreakdownRow } from '@/types/candidate'
 
 interface Props {
@@ -14,19 +15,19 @@ function formatRate(rate: number | null): string {
 }
 
 const FUNNEL_STAGES = [
-  { key: 'discovered', label: 'Discovered' },
-  { key: 'approved',   label: 'Approved'   },
-  { key: 'day1Sent',   label: 'Sent'        },
-  { key: 'opened',     label: 'Opened'      },
-  { key: 'replied',    label: 'Replied'     },
-  { key: 'callbacks',  label: 'Callback'    },
+  { key: 'discovered', label: 'Discovered', desc: 'Every role the agent found and scored for you — the full size of your pipeline.' },
+  { key: 'approved',   label: 'Approved',   desc: 'Roles that cleared scoring and were shortlisted to pursue (résumé tailoring + outreach).' },
+  { key: 'day1Sent',   label: 'Sent',       desc: 'Companies where your first outreach email has actually gone out (counted once per company).' },
+  { key: 'opened',     label: 'Opened',     desc: 'Sent emails the recipient opened. Some mail apps block open tracking, so the real number may be higher.' },
+  { key: 'replied',    label: 'Replied',    desc: 'Companies where the contact wrote back — actual human responses.' },
+  { key: 'callbacks',  label: 'Callback',   desc: 'Jobs that turned into an interview invite — the finish line.' },
 ] as const
 
 const RATE_CARDS = [
-  { key: 'openRate',     label: 'Open rate'      },
-  { key: 'replyRate',    label: 'Reply rate'      },
-  { key: 'abGradeRate',  label: 'A/B grade mix'   },
-  { key: 'callbackRate', label: 'Callback rate'   },
+  { key: 'openRate',     label: 'Open rate',     desc: 'Opened ÷ Sent. Share of your emails that were opened. May read low if a mail app blocks open tracking.' },
+  { key: 'replyRate',    label: 'Reply rate',    desc: 'Replied ÷ Sent. Share of emails that earned a reply — the key sign your outreach is landing.' },
+  { key: 'abGradeRate',  label: 'A/B grade mix', desc: 'A/B-graded ÷ Approved. Share of your shortlisted roles that are strong (grade A or B) matches — a pipeline-quality gauge.' },
+  { key: 'callbackRate', label: 'Callback rate', desc: 'Callbacks ÷ Approved. Share of pursued roles that became interviews — your overall success rate.' },
 ] as const
 
 function ArchetypeTable({ rows }: { rows: ArchetypeBreakdownRow[] }) {
@@ -91,46 +92,54 @@ export function InsightsFunnelCard({ insights }: Props) {
   const isEmpty = funnel.day1Sent === 0
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4 space-y-4">
-      {/* Funnel row */}
-      <div className="grid grid-cols-6 gap-2">
-        {FUNNEL_STAGES.map(({ key, label }) => (
-          <div key={key} className="flex flex-col items-center gap-1">
-            <span className="text-lg font-bold text-foreground leading-none">
-              {funnel[key]}
-            </span>
-            <span className="text-[9px] text-muted-foreground text-center leading-tight">{label}</span>
-          </div>
-        ))}
+    <TooltipProvider delayDuration={150}>
+      <div className="rounded-xl border border-border bg-card p-4 space-y-4">
+        {/* Funnel row */}
+        <div className="grid grid-cols-6 gap-2">
+          {FUNNEL_STAGES.map(({ key, label, desc }) => (
+            <Tooltip key={key}>
+              <TooltipTrigger asChild>
+                <div className="flex flex-col items-center gap-1 cursor-help rounded-md px-1 py-1 transition-colors hover:bg-accent">
+                  <span className="text-lg font-bold text-foreground leading-none">
+                    {funnel[key]}
+                  </span>
+                  <span className="text-[9px] text-muted-foreground text-center leading-tight">{label}</span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>{desc}</TooltipContent>
+            </Tooltip>
+          ))}
+        </div>
+
+        {/* Rate cards */}
+        <div className="grid grid-cols-4 gap-2">
+          {RATE_CARDS.map(({ key, label, desc }) => (
+            <Tooltip key={key}>
+              <TooltipTrigger asChild>
+                <div className="rounded-lg border border-border bg-background p-2 flex flex-col items-center gap-1 cursor-help transition-colors hover:border-border-strong">
+                  <span className={`text-sm font-semibold leading-none ${
+                    rates[key] === null ? 'text-muted-foreground' : 'text-foreground'
+                  }`}>
+                    {formatRate(rates[key])}
+                  </span>
+                  <span className="text-[9px] text-muted-foreground text-center leading-tight">{label}</span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>{desc}</TooltipContent>
+            </Tooltip>
+          ))}
+        </div>
+
+        {/* Empty state */}
+        {isEmpty && (
+          <p className="text-[11px] text-muted-foreground italic text-center pt-1">
+            Send your first email to see performance data.
+          </p>
+        )}
+
+        {/* Archetype breakdown */}
+        <ArchetypeTable rows={archetypeBreakdown} />
       </div>
-
-      {/* Rate cards */}
-      <div className="grid grid-cols-4 gap-2">
-        {RATE_CARDS.map(({ key, label }) => (
-          <div
-            key={key}
-            className="rounded-lg border border-border bg-background p-2 flex flex-col items-center gap-1"
-            title={key === 'openRate' ? 'Open tracking may be blocked by some email clients — actual open rate may be higher' : undefined}
-          >
-            <span className={`text-sm font-semibold leading-none ${
-              rates[key] === null ? 'text-muted-foreground' : 'text-foreground'
-            }`}>
-              {formatRate(rates[key])}
-            </span>
-            <span className="text-[9px] text-muted-foreground text-center leading-tight">{label}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Empty state */}
-      {isEmpty && (
-        <p className="text-[11px] text-muted-foreground italic text-center pt-1">
-          Send your first email to see performance data.
-        </p>
-      )}
-
-      {/* Archetype breakdown */}
-      <ArchetypeTable rows={archetypeBreakdown} />
-    </div>
+    </TooltipProvider>
   )
 }
