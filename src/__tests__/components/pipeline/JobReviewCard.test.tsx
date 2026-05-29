@@ -43,11 +43,14 @@ const makeProps = (overrides: Partial<HitlJob> = {}) => ({
 })
 
 describe('JobReviewCard', () => {
-  it('renders grade badge with correct colour class', () => {
+  it('renders grade badge with the grade letter and an inline grade colour', () => {
     render(<JobReviewCard {...makeProps()} />)
     const badge = screen.getByTestId('grade-badge')
     expect(badge.textContent).toBe('A')
-    expect(badge.className).toMatch(/emerald/)
+    // Colour now comes from the single-source grade scale via inline style
+    // (GradeBadge), not a Tailwind class.
+    expect(badge.style.color).toBeTruthy()
+    expect(badge.style.backgroundColor).toBeTruthy()
   })
 
   it('renders numeric score', () => {
@@ -102,10 +105,15 @@ describe('JobReviewCard', () => {
     expect(screen.getByText(/Executive Summary/)).toBeTruthy()
   })
 
-  it('shows B grade badge in blue', () => {
+  it('gives each grade its own colour (B differs from A)', () => {
+    const { unmount } = render(<JobReviewCard {...makeProps()} />)
+    const aColor = screen.getByTestId('grade-badge').style.color
+    unmount()
     render(<JobReviewCard {...makeProps({ grade: 'B' })} />)
-    const badge = screen.getByTestId('grade-badge')
-    expect(badge.className).toMatch(/blue/)
+    const bBadge = screen.getByTestId('grade-badge')
+    expect(bBadge.textContent).toBe('B')
+    expect(bBadge.style.color).toBeTruthy()
+    expect(bBadge.style.color).not.toBe(aColor)
   })
 })
 

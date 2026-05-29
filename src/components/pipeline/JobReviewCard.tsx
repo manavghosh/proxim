@@ -12,14 +12,7 @@ import type { OutreachTargetSummary, EmailCadenceSummary } from '@/types/candida
 import { OutreachStatusBadge } from './OutreachStatusBadge'
 import { EmailCadenceStatusBadge } from './EmailCadenceStatusBadge'
 import { EmailNotFoundPanel } from './EmailNotFoundPanel'
-
-const GRADE_STYLES: Record<string, string> = {
-  A: 'bg-emerald-950/60 text-emerald-400 border-emerald-700',
-  B: 'bg-blue-950/60 text-blue-400 border-blue-700',
-  C: 'bg-amber-950/60 text-amber-400 border-amber-700',
-  D: 'bg-orange-950/60 text-orange-400 border-orange-700',
-  E: 'bg-rose-950/60 text-rose-400 border-rose-700',
-}
+import { GradeBadge } from '@/components/applications/GradeBadge'
 
 const EXPIRY_WARNING_DAYS = 30   // threshold for "Likely expired" badge
 const AGE_AMBER_DAYS      = 14   // start showing amber colour for "ageing" posts
@@ -83,7 +76,6 @@ export function JobReviewCard({
 }: JobReviewCardProps) {
   const [reportOpen, setReportOpen] = useState(false)
 
-  const gradeStyle = job.grade ? GRADE_STYLES[job.grade] ?? GRADE_STYLES.D : ''
   const isNew = (() => {
     try {
       const ms = Date.now() - new Date(job.createdAt).getTime()
@@ -106,15 +98,7 @@ export function JobReviewCard({
           <div className="flex-1 min-w-0">
             {/* Grade + Score row */}
             <div className="flex items-center gap-2 mb-1.5">
-              {job.grade && (
-                <Badge
-                  variant="outline"
-                  className={`text-[11px] font-bold px-2 py-0.5 ${gradeStyle}`}
-                  data-testid="grade-badge"
-                >
-                  {job.grade}
-                </Badge>
-              )}
+              <GradeBadge grade={job.grade} variant="soft" />
               {job.numericScore !== null && (
                 <span className="text-[12px] font-semibold text-primary">
                   {job.numericScore.toFixed(1)} / 5.0

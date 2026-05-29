@@ -16,6 +16,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from '@/components/ui/dropdown-menu'
+import { GradeBadge } from '@/components/applications/GradeBadge'
+import { JobStatusBadge } from '@/components/applications/JobStatusBadge'
+import { GRADE_GLOW } from '@/lib/grade-colors'
 import { LazyScoreReportPane } from '@/components/applications/LazyScoreReportPane'
 import { BuildProgressPane } from '@/components/applications/BuildProgressPane'
 import { EmailCadenceStatusBadge } from '@/components/pipeline/EmailCadenceStatusBadge'
@@ -33,33 +36,6 @@ const EMAIL_TRANSIENT: EmailCadenceStatus[] = ['pending_discovery', 'discovering
 // Extended set for polling: keep alive through email_not_found and low_confidence
 // so the pending_approval transition (written by write_cadence_checkpoint_node) is caught.
 const EMAIL_POLL_ACTIVE: EmailCadenceStatus[] = [...EMAIL_TRANSIENT, 'email_not_found', 'low_confidence']
-
-const GRADE_STYLES: Record<string, { badge: string; glow: string }> = {
-  A: { badge: 'bg-emerald-500 text-white border-transparent', glow: 'shadow-[0_0_10px_rgba(16,185,129,0.25)]' },
-  B: { badge: 'bg-blue-500   text-white border-transparent', glow: 'shadow-[0_0_10px_rgba(59,130,246,0.2)]'  },
-  C: { badge: 'bg-amber-500  text-white border-transparent', glow: '' },
-  D: { badge: 'bg-orange-500 text-white border-transparent', glow: '' },
-  E: { badge: 'bg-rose-500   text-white border-transparent', glow: '' },
-  F: { badge: 'bg-red-600    text-white border-transparent', glow: '' },
-}
-
-const STATUS_BADGE: Record<string, string> = {
-  approved:      'bg-emerald-600 text-white border-transparent',
-  resume_ready:  'bg-blue-600    text-white border-transparent',
-  submitted:     'bg-cyan-700    text-white border-transparent',
-  resume_failed: 'bg-red-700     text-white border-transparent',
-  snoozed:       'bg-border  text-muted-foreground border-border-strong',
-  rejected:      'bg-red-900/40  text-red-400  border-red-800/40',
-}
-
-const STATUS_LABEL: Record<string, string> = {
-  approved:      'Approved',
-  resume_ready:  'Resume ready',
-  submitted:     'Submitted',
-  resume_failed: 'Resume failed',
-  snoozed:       'Snoozed',
-  rejected:      'Rejected',
-}
 
 interface Props {
   job: ScoredJob
@@ -201,9 +177,7 @@ export function JobCard({
   const isSubmitted = job.status === 'submitted'
   const isResumeReady   = job.status === 'resume_ready'
   const isResumeFailed  = job.status === 'resume_failed'
-  const gradeStyle = job.grade ? (GRADE_STYLES[job.grade] ?? GRADE_STYLES.F) : null
-  const statusBadgeClass = STATUS_BADGE[job.status]
-  const statusLabel = STATUS_LABEL[job.status]
+  const gradeGlow = job.grade ? GRADE_GLOW[job.grade] : undefined
   const agentBadge = getAgentBadge(job.pipelineJobStatus ?? null, job.status, job.errorMessage ?? null)
   const elapsedTime = job.updatedAt ? formatElapsed(job.updatedAt) : null
   const canMarkInterview = ['approved', 'resume_ready', 'submitted'].includes(job.status)
@@ -213,9 +187,8 @@ export function JobCard({
     <Collapsible
       open={isOpen}
       onOpenChange={setIsOpen}
+      style={gradeGlow ? { boxShadow: gradeGlow } : undefined}
       className={`bg-card border rounded-xl overflow-hidden transition-all duration-200 ${
-        gradeStyle?.glow ?? ''
-      } ${
         isSnoozed || isRejected
           ? 'border-border opacity-60'
           : isOpen
@@ -230,10 +203,8 @@ export function JobCard({
           aria-label={isOpen ? 'Collapse job card' : 'Expand job card'}
         >
           {/* Grade badge */}
-          {gradeStyle && job.grade ? (
-            <Badge className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-bold shrink-0 ${gradeStyle.badge}`}>
-              {job.grade}
-            </Badge>
+          {job.grade ? (
+            <GradeBadge grade={job.grade} variant="solid" />
           ) : (
             <div className="w-7 h-7 shrink-0" />
           )}
@@ -247,9 +218,7 @@ export function JobCard({
           {/* Right chips cluster */}
           <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
             {/* Status */}
-            {statusBadgeClass && statusLabel && (
-              <Badge className={`text-[10px] h-5 px-1.5 ${statusBadgeClass}`}>{statusLabel}</Badge>
-            )}
+            <JobStatusBadge status={job.status} />
 
             {/* Elapsed time */}
             {elapsedTime && (

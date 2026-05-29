@@ -21,3 +21,12 @@ export const GRADE_BG: Record<string, string> = {
   E: 'rgba(244,63,94,0.12)',
   F: 'rgba(239,68,68,0.12)',
 }
+
+/**
+ * Subtle card glow for the strongest matches only (A/B). Lower grades get no
+ * glow so the list doesn't shimmer. Returns a CSS box-shadow value or ''.
+ */
+export const GRADE_GLOW: Record<string, string> = {
+  A: '0 0 10px rgba(16,185,129,0.25)',
+  B: '0 0 10px rgba(6,182,212,0.22)',
+}
