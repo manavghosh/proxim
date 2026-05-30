@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { FileText, Upload, CheckCircle2, AlertCircle, ExternalLink } from 'lucide-react'
+import { FileText, Upload, CheckCircle2, AlertCircle, Eye } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { PdfPreviewSheet } from '@/components/applications/PdfPreviewSheet'
 import { getPreferences, updatePreferences, uploadBasePdf } from '@/lib/api'
 import { useRegisterSection } from '@/components/settings/SettingsDraftContext'
 
@@ -22,7 +23,10 @@ export function ResumeAttachmentCard({ candidateId, onSaved, sectionId = 'resume
   const [uploadedName,  setUploadedName]  = useState<string | null>(null)
   const [uploadError,   setUploadError]   = useState<string | null>(null)
   const [loading,       setLoading]       = useState(true)
+  const [previewOpen,   setPreviewOpen]   = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const previewUrl = `/api/cv/base-pdf?candidateId=${encodeURIComponent(candidateId)}`
 
   useEffect(() => {
     getPreferences(candidateId).then(({ preferences }) => {
@@ -111,20 +115,14 @@ export function ResumeAttachmentCard({ candidateId, onSaved, sectionId = 'resume
                 <div className="flex items-center gap-2 text-[10px] text-emerald-400">
                   <CheckCircle2 className="w-3 h-3 shrink-0" />
                   <Button
-                    asChild
                     variant="link"
+                    onClick={() => setPreviewOpen(true)}
                     className="h-auto min-w-0 gap-1 p-0 text-[10px] text-emerald-400 hover:text-emerald-300"
+                    title="View resume (read-only)"
+                    data-testid="view-pdf-link"
                   >
-                    <a
-                      href={`/api/cv/base-pdf?candidateId=${encodeURIComponent(candidateId)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title="Open resume in a read-only view"
-                      data-testid="view-pdf-link"
-                    >
-                      <span className="truncate">{uploadedName}</span>
-                      <ExternalLink className="w-2.5 h-2.5 shrink-0" />
-                    </a>
+                    <span className="truncate">{uploadedName}</span>
+                    <Eye className="w-2.5 h-2.5 shrink-0" />
                   </Button>
                 </div>
               ) : (
@@ -159,6 +157,14 @@ export function ResumeAttachmentCard({ candidateId, onSaved, sectionId = 'resume
           )}
         </RadioGroup>
       )}
+
+      <PdfPreviewSheet
+        url={previewUrl}
+        title={uploadedName ?? 'Original Resume'}
+        filename={uploadedName ?? undefined}
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+      />
     </div>
   )
 }

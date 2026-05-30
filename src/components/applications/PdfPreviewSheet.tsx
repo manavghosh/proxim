@@ -16,6 +16,8 @@ interface Props {
   /** Arbitrary PDF URL — used for the candidate's original uploaded resume. */
   url?: string
   title?: string
+  /** Suggested download filename; defaults to resume.pdf / cover_letter.pdf. */
+  filename?: string
   candidateName?: string
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -23,12 +25,12 @@ interface Props {
 
 // Renders a PDF inline in a right-side Sheet using an <iframe>.
 // Pass jobId+type for tailored resumes or url for an arbitrary PDF (e.g. original upload).
-export function PdfPreviewSheet({ jobId, type = 'resume', url, title: titleProp, candidateName, open, onOpenChange }: Props) {
+export function PdfPreviewSheet({ jobId, type = 'resume', url, title: titleProp, filename: filenameProp, candidateName, open, onOpenChange }: Props) {
   const baseUrl = url ?? `/api/jobs/${jobId}/resume/latest-pdf?type=${type}`
   const previewUrl = baseUrl
   const downloadUrl = `${baseUrl}&download=true`
   const title = titleProp ?? (type === 'cover-letter' ? 'Cover Letter' : 'Resume')
-  const filename = type === 'cover-letter' ? 'cover_letter.pdf' : 'resume.pdf'
+  const filename = filenameProp ?? (type === 'cover-letter' ? 'cover_letter.pdf' : 'resume.pdf')
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
