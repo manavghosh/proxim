@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { updatePreferences } from '@/lib/api'
 import { parseSeniorityText } from '@/lib/preferences-helpers'
+import { useRegisterSection } from '@/components/settings/SettingsDraftContext'
 import type { Preferences } from '@/types/candidate'
 
 const LOCATION_OPTIONS = ['Remote', 'Hybrid', 'Bengaluru-based', 'Open to relocation']
@@ -23,9 +24,22 @@ interface PreferencesFormProps {
   initialPreferences: Preferences
   onSaved: (prefs: Preferences) => void
   candidateId: string
+  sectionId?: string
 }
 
-export function PreferencesForm({ initialPreferences, onSaved, candidateId }: PreferencesFormProps) {
+function splitLines(text: string): string[] {
+  return text
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
+export function PreferencesForm({
+  initialPreferences,
+  onSaved,
+  candidateId,
+  sectionId = 'job-preferences',
+}: PreferencesFormProps) {
   // Normalise geographic_preference: old DB rows may store a plain string
   const normalisedInitial: Preferences = {
     ...initialPreferences,
@@ -50,9 +64,54 @@ export function PreferencesForm({ initialPreferences, onSaved, candidateId }: Pr
       .filter((d) => !DOMAIN_OPTIONS.includes(d))
       .join('\n')
   )
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+
+  function buildPayload(
+    p: Preferences,
+    seniority: string,
+    companies: string,
+    jobSites: string,
+    domains: string,
+  ): Preferences {
+    const mergedDomains = [
+      ...(p.preferred_domains?.filter((d) => DOMAIN_OPTIONS.includes(d)) ?? []),
+      ...splitLines(domains),
+    ]
+    return {
+      ...p,
+      seniority_levels: parseSeniorityText(seniority),
+      target_companies: splitLines(companies),
+      custom_job_sites: splitLines(jobSites),
+      preferred_domains: mergedDomains,
+    }
+  }
+
+  // Dirty baseline: the same payload built from the initial props.
+  const initialPayload = useMemo(
+    () =>
+      JSON.stringify(
+        buildPayload(
+          normalisedInitial,
+          (initialPreferences.seniority_levels ?? []).join('\n'),
+          (initialPreferences.target_companies ?? []).join('\n'),
+          (initialPreferences.custom_job_sites ?? []).join('\n'),
+          (initialPreferences.preferred_domains ?? [])
+            .filter((d) => !DOMAIN_OPTIONS.includes(d))
+            .join('\n'),
+        ),
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  )
+
+  const currentPayload = buildPayload(
+    prefs,
+    seniorityText,
+    targetCompaniesText,
+    customJobSitesText,
+    customDomainsText,
+  )
+  const dirty = JSON.stringify(currentPayload) !== initialPayload
 
   function toggleMulti(key: keyof Preferences, value: string) {
     const current = (prefs[key] as string[] | undefined) ?? []
@@ -62,52 +121,29 @@ export function PreferencesForm({ initialPreferences, onSaved, candidateId }: Pr
     setPrefs((p) => ({ ...p, [key]: next }))
   }
 
-  function validate(parsed: string[]): boolean {
+  async function save() {
+    const payload = buildPayload(
+      prefs,
+      seniorityText,
+      targetCompaniesText,
+      customJobSitesText,
+      customDomainsText,
+    )
+    // Validate required fields before persisting.
     const errors: Record<string, string> = {}
-    if (!parsed.length)
+    if (!payload.seniority_levels?.length)
       errors.seniority_levels = 'Enter at least one target role or seniority level'
-    if (!prefs.geographic_preference?.length)
+    if (!payload.geographic_preference?.length)
       errors.geographic_preference = 'Select at least one geographic preference'
     setFieldErrors(errors)
-    return Object.keys(errors).length === 0
+    if (Object.keys(errors).length > 0) {
+      throw new Error('Preferences validation failed')
+    }
+    const { preferences } = await updatePreferences(payload, candidateId)
+    onSaved(preferences as Preferences)
   }
 
-  async function handleSave() {
-    const parsed = parseSeniorityText(seniorityText)
-    if (!validate(parsed)) return
-    setError(null)
-    setSaving(true)
-    const parsedCompanies = targetCompaniesText
-      .split('\n')
-      .map((s) => s.trim())
-      .filter(Boolean)
-    const parsedCustomSites = customJobSitesText
-      .split('\n')
-      .map((s) => s.trim())
-      .filter(Boolean)
-    const parsedCustomDomains = customDomainsText
-      .split('\n')
-      .map((s) => s.trim())
-      .filter(Boolean)
-    const mergedDomains = [
-      ...(prefs.preferred_domains?.filter((d) => DOMAIN_OPTIONS.includes(d)) ?? []),
-      ...parsedCustomDomains,
-    ]
-    try {
-      const { preferences } = await updatePreferences({
-        ...prefs,
-        seniority_levels: parsed,
-        target_companies: parsedCompanies,
-        custom_job_sites: parsedCustomSites,
-        preferred_domains: mergedDomains,
-      }, candidateId)
-      onSaved(preferences as Preferences)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Save failed.')
-    } finally {
-      setSaving(false)
-    }
-  }
+  useRegisterSection(sectionId, dirty, save)
 
   return (
     <div className="space-y-6">
@@ -247,13 +283,6 @@ export function PreferencesForm({ initialPreferences, onSaved, candidateId }: Pr
           onChange={(e) => setCustomDomainsText(e.target.value)}
         />
       </fieldset>
-
-      <div className="flex items-center gap-3">
-        <Button onClick={handleSave} isLoading={saving}>
-          Save Preferences
-        </Button>
-        {error && <p className="text-sm text-destructive">{error}</p>}
-      </div>
     </div>
   )
 }

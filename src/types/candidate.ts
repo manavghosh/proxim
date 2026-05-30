@@ -51,6 +51,8 @@ export interface Preferences {
   // Email outreach mode (F6)
   email_outreach_mode?: 'agentic' | 'manual'
   email_resume_attachment?: 'tailored' | 'original'
+  /** Original filename of the uploaded base resume PDF (for display). */
+  base_resume_pdf_name?: string
 }
 
 export type OutreachStatus =

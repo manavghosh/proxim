@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { writeFile, mkdir } from 'fs/promises'
+import { writeFile, mkdir, unlink } from 'fs/promises'
+import { existsSync } from 'fs'
 import path from 'path'
 import { eq } from 'drizzle-orm'
 import { db } from '@/db'
@@ -7,6 +8,17 @@ import { candidates } from '@/db/schema'
 
 const MAX_BYTES = 10 * 1024 * 1024 // 10 MB
 const RESUME_DIR = process.env.RESUME_OUTPUT_DIR ?? path.join(process.cwd(), 'resumes')
+
+// Keep the candidate's own filename so they can recognise their original resume.
+// Only strip path separators and characters illegal on common filesystems;
+// spaces, hyphens, parentheses etc. are preserved.
+function safePdfName(name: string): string {
+  const base = (name || '').split(/[\\/]/).pop() || ''
+  let clean = base.replace(/[<>:"|?*]/g, '_').trim()
+  if (!clean) clean = 'resume.pdf'
+  if (!/\.pdf$/i.test(clean)) clean += '.pdf'
+  return clean
+}
 
 function candidateSlug(name: string): string {
   return (name || '')
@@ -28,7 +40,11 @@ export async function POST(request: Request) {
     }
 
     const [cand] = await db
-      .select({ name: candidates.name })
+      .select({
+        name: candidates.name,
+        preferences: candidates.preferences,
+        baseResumePdfPath: candidates.baseResumePdfPath,
+      })
       .from(candidates)
       .where(eq(candidates.id, candidateId))
       .limit(1)
@@ -51,17 +67,29 @@ export async function POST(request: Request) {
     const slug = candidateSlug(cand.name)
     const dir  = path.join(RESUME_DIR, slug)
     await mkdir(dir, { recursive: true })
-    const filePath = path.join(dir, 'base_resume.pdf')
+
+    // Preserve the candidate's original filename on disk so they can recognise it.
+    const filename = safePdfName(file.name)
+    const filePath = path.join(dir, filename)
 
     const bytes = await file.arrayBuffer()
     await writeFile(filePath, Buffer.from(bytes))
 
+    // Remove the previous upload if it was stored under a different name, so
+    // stale resume files don't accumulate (only one base resume per candidate).
+    const prevPath = cand.baseResumePdfPath
+    if (prevPath && prevPath !== filePath && existsSync(prevPath)) {
+      await unlink(prevPath).catch(() => {})
+    }
+
+    const mergedPrefs = { ...(cand.preferences ?? {}), base_resume_pdf_name: filename }
+
     await db
       .update(candidates)
-      .set({ baseResumePdfPath: filePath })
+      .set({ baseResumePdfPath: filePath, preferences: mergedPrefs })
       .where(eq(candidates.id, candidateId))
 
-    return NextResponse.json({ path: filePath, filename: file.name })
+    return NextResponse.json({ path: filePath, filename })
   } catch (e) {
     console.error('[cv/upload-pdf] error:', e)
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 })

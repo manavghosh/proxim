@@ -3,7 +3,9 @@
 import { useEffect, useState } from 'react'
 import { Mail, Zap, ShieldOff, CheckCircle2, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { getPreferences, updatePreferences, revokeGmailAccess, getGmailStatus } from '@/lib/api'
+import { useRegisterSection } from '@/components/settings/SettingsDraftContext'
 import type { EmailOutreachMode } from '@/types/candidate'
 
 interface GmailStatus {
@@ -17,15 +19,16 @@ interface Props {
   candidateId: string
   /** flash=connected|error injected from OAuth redirect query param */
   flash?: string | null
+  onSaved?: () => void
+  sectionId?: string
 }
 
-export function EmailOutreachModeCard({ candidateId, flash }: Props) {
+export function EmailOutreachModeCard({ candidateId, flash, onSaved, sectionId = 'outreach-mode' }: Props) {
   const [currentMode,   setCurrentMode]   = useState<EmailOutreachMode>('manual')
   const [selectedMode,  setSelectedMode]  = useState<EmailOutreachMode>('manual')
   const [gmail,         setGmail]         = useState<GmailStatus | null>(null)
-  const [saving,        setSaving]        = useState(false)
-  const [saved,         setSaved]         = useState(false)
   const [loading,       setLoading]       = useState(true)
+  const [error,         setError]         = useState<string | null>(null)
 
   useEffect(() => {
     Promise.all([
@@ -40,30 +43,29 @@ export function EmailOutreachModeCard({ candidateId, flash }: Props) {
     })
   }, [candidateId])
 
-  async function handleSave() {
-    setSaving(true)
-    setSaved(false)
-    try {
-      if (currentMode === 'agentic' && selectedMode === 'manual') {
-        // Switching Agentic → Manual: revoke and clear all Gmail tokens
-        await revokeGmailAccess(candidateId)
-        setGmail({ connected: false, expired: false, email: null, expiry: null })
-      } else {
-        await updatePreferences({ email_outreach_mode: selectedMode }, candidateId)
-      }
-      setCurrentMode(selectedMode)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2500)
-    } finally {
-      setSaving(false)
-    }
-  }
-
   const isDirty            = selectedMode !== currentMode
   const switchingToManual  = currentMode === 'agentic' && selectedMode === 'manual'
   const gmailConnected     = gmail?.connected ?? false
-  const agenticWarn        = selectedMode === 'agentic' && !gmailConnected
   const connectHref        = `/api/gmail/connect?candidateId=${encodeURIComponent(candidateId)}`
+
+  async function save() {
+    setError(null)
+    if (selectedMode === 'agentic' && !gmailConnected) {
+      setError('Connect Gmail above to enable Agentic mode.')
+      throw new Error('Gmail not connected')
+    }
+    if (switchingToManual) {
+      // Switching Agentic → Manual: revoke and clear all Gmail tokens
+      await revokeGmailAccess(candidateId)
+      setGmail({ connected: false, expired: false, email: null, expiry: null })
+    } else {
+      await updatePreferences({ email_outreach_mode: selectedMode }, candidateId)
+    }
+    setCurrentMode(selectedMode)
+    onSaved?.()
+  }
+
+  useRegisterSection(sectionId, isDirty, save)
 
   return (
     <div className="space-y-3">
@@ -91,20 +93,16 @@ export function EmailOutreachModeCard({ candidateId, flash }: Props) {
       {loading ? (
         <p className="text-xs text-muted-foreground">Loading…</p>
       ) : (
-        <div className="space-y-2">
+        <RadioGroup
+          value={selectedMode}
+          onValueChange={(v) => setSelectedMode(v as EmailOutreachMode)}
+          className="space-y-2"
+        >
           {/* Manual option */}
           <label className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-all ${
-            selectedMode === 'manual' ? 'border-blue-500 bg-blue-950/20' : 'border-border hover:border-border-strong'
+            selectedMode === 'manual' ? 'border-primary bg-primary/5' : 'border-border hover:border-border-strong'
           }`}>
-            <input
-              type="radio"
-              name="outreach-mode"
-              value="manual"
-              checked={selectedMode === 'manual'}
-              onChange={() => setSelectedMode('manual')}
-              data-testid="mode-manual"
-              className="mt-0.5 accent-blue-500"
-            />
+            <RadioGroupItem value="manual" data-testid="mode-manual" className="mt-0.5" />
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-medium text-foreground">Manual</span>
@@ -121,17 +119,9 @@ export function EmailOutreachModeCard({ candidateId, flash }: Props) {
 
           {/* Agentic option */}
           <label className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-all ${
-            selectedMode === 'agentic' ? 'border-blue-500 bg-blue-950/20' : 'border-border hover:border-border-strong'
+            selectedMode === 'agentic' ? 'border-primary bg-primary/5' : 'border-border hover:border-border-strong'
           }`}>
-            <input
-              type="radio"
-              name="outreach-mode"
-              value="agentic"
-              checked={selectedMode === 'agentic'}
-              onChange={() => setSelectedMode('agentic')}
-              data-testid="mode-agentic"
-              className="mt-0.5 accent-blue-500"
-            />
+            <RadioGroupItem value="agentic" data-testid="mode-agentic" className="mt-0.5" />
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <Zap className="w-3 h-3 text-amber-400" />
@@ -180,50 +170,30 @@ export function EmailOutreachModeCard({ candidateId, flash }: Props) {
               )}
             </div>
           </label>
+        </RadioGroup>
+      )}
 
-          {/* Revoke warning when switching Agentic → Manual */}
-          {switchingToManual && (
-            <div
-              className="flex items-start gap-2 rounded-lg border border-red-800/40 bg-red-950/20 p-3"
-              data-testid="revoke-warning"
-            >
-              <ShieldOff className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
-              <p className="text-[10px] text-red-300">
-                Switching to Manual will revoke Gmail access and permanently delete
-                your stored Gmail credentials. You will need to reconnect Gmail if
-                you switch back to Agentic.
-              </p>
-            </div>
-          )}
-
-          {selectedMode === 'agentic' && gmailConnected && !switchingToManual && (
-            <p className="text-[10px] text-muted-foreground">
-              Proxim will auto-send Day 1 emails and schedule Day 3/7 for approved cadences.
-            </p>
-          )}
-
-          <Button
-            size="sm"
-            onClick={handleSave}
-            disabled={!isDirty || (selectedMode === 'agentic' && !gmailConnected)}
-            isLoading={saving}
-            data-testid="save-mode-btn"
-            className={`text-xs ${switchingToManual ? 'bg-red-700 hover:bg-red-800 text-white' : ''}`}
-          >
-            {saved
-              ? 'Saved'
-              : switchingToManual
-              ? 'Revoke Gmail & Switch to Manual'
-              : 'Save'}
-          </Button>
-
-          {selectedMode === 'agentic' && !gmailConnected && (
-            <p className="text-[10px] text-muted-foreground">
-              Connect Gmail above to enable Agentic mode.
-            </p>
-          )}
+      {/* Revoke warning when switching Agentic → Manual */}
+      {switchingToManual && (
+        <div
+          className="flex items-start gap-2 rounded-lg border border-red-800/40 bg-red-950/20 p-3"
+          data-testid="revoke-warning"
+        >
+          <ShieldOff className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
+          <p className="text-[10px] text-red-300">
+            Saving will revoke Gmail access and permanently delete your stored Gmail
+            credentials. You will need to reconnect Gmail if you switch back to Agentic.
+          </p>
         </div>
       )}
+
+      {selectedMode === 'agentic' && gmailConnected && isDirty && (
+        <p className="text-[10px] text-muted-foreground">
+          Proxim will auto-send Day 1 emails and schedule Day 3/7 for approved cadences.
+        </p>
+      )}
+
+      {error && <p className="text-[10px] text-destructive">{error}</p>}
     </div>
   )
 }

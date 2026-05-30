@@ -59,6 +59,9 @@ type Preferences = {
   linkedin_profile_name?: string
   linkedin_paused?: boolean
   do_not_contact_companies?: string[]
+  email_outreach_mode?: 'agentic' | 'manual'
+  email_resume_attachment?: 'tailored' | 'original'
+  base_resume_pdf_name?: string
 }
 
 // ── helpers ────────────────────────────────────────────────────────────────

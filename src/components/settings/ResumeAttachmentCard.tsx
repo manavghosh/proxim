@@ -1,43 +1,48 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { FileText, Upload, CheckCircle2, AlertCircle } from 'lucide-react'
+import { FileText, Upload, CheckCircle2, AlertCircle, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { getPreferences, updatePreferences, uploadBasePdf } from '@/lib/api'
+import { useRegisterSection } from '@/components/settings/SettingsDraftContext'
+
+type AttachMode = 'tailored' | 'original'
 
 interface Props {
   candidateId: string
+  onSaved?: () => void
+  sectionId?: string
 }
 
-export function ResumeAttachmentCard({ candidateId }: Props) {
-  const [attachMode,    setAttachMode]    = useState<'tailored' | 'original'>('tailored')
+export function ResumeAttachmentCard({ candidateId, onSaved, sectionId = 'resume-attachment' }: Props) {
+  const [savedMode,     setSavedMode]     = useState<AttachMode>('tailored')
+  const [attachMode,    setAttachMode]    = useState<AttachMode>('tailored')
   const [uploading,     setUploading]     = useState(false)
   const [uploadedName,  setUploadedName]  = useState<string | null>(null)
   const [uploadError,   setUploadError]   = useState<string | null>(null)
-  const [saving,        setSaving]        = useState(false)
-  const [saved,         setSaved]         = useState(false)
   const [loading,       setLoading]       = useState(true)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     getPreferences(candidateId).then(({ preferences }) => {
-      setAttachMode(preferences.email_resume_attachment ?? 'tailored')
+      const m = preferences.email_resume_attachment ?? 'tailored'
+      setSavedMode(m)
+      setAttachMode(m)
+      setUploadedName(preferences.base_resume_pdf_name ?? null)
       setLoading(false)
     })
   }, [candidateId])
 
-  async function handleModeChange(mode: 'tailored' | 'original') {
-    setAttachMode(mode)
-    setSaving(true)
-    setSaved(false)
-    try {
-      await updatePreferences({ email_resume_attachment: mode }, candidateId)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
-    } finally {
-      setSaving(false)
-    }
+  const dirty = attachMode !== savedMode
+
+  async function save() {
+    await updatePreferences({ email_resume_attachment: attachMode }, candidateId)
+    setSavedMode(attachMode)
+    onSaved?.()
   }
+
+  useRegisterSection(sectionId, dirty, save)
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -62,28 +67,22 @@ export function ResumeAttachmentCard({ candidateId }: Props) {
         <p className="text-[9px] font-semibold text-muted-foreground tracking-widest uppercase">
           Resume Attachment
         </p>
-        {saving && <span className="text-[9px] text-muted-foreground">Saving…</span>}
-        {saved  && <span className="text-[9px] text-emerald-400 inline-flex items-center gap-1"><CheckCircle2 className="w-2.5 h-2.5" /> Saved</span>}
       </div>
 
       {loading ? (
         <p className="text-xs text-muted-foreground">Loading…</p>
       ) : (
-        <div className="space-y-2">
+        <RadioGroup
+          value={attachMode}
+          onValueChange={(v) => setAttachMode(v as AttachMode)}
+          className="space-y-2"
+        >
           <label className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-all ${
             attachMode === 'tailored'
-              ? 'border-blue-500 bg-blue-950/20'
+              ? 'border-primary bg-primary/5'
               : 'border-border hover:border-border-strong'
           }`}>
-            <input
-              type="radio"
-              name="attach-mode"
-              value="tailored"
-              checked={attachMode === 'tailored'}
-              onChange={() => handleModeChange('tailored')}
-              className="mt-0.5 accent-blue-500"
-              data-testid="attach-tailored"
-            />
+            <RadioGroupItem value="tailored" data-testid="attach-tailored" className="mt-0.5" />
             <div>
               <span className="text-xs font-medium text-foreground">Tailored AI resume</span>
               <p className="text-[10px] text-muted-foreground mt-0.5">
@@ -94,18 +93,10 @@ export function ResumeAttachmentCard({ candidateId }: Props) {
 
           <label className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-all ${
             attachMode === 'original'
-              ? 'border-blue-500 bg-blue-950/20'
+              ? 'border-primary bg-primary/5'
               : 'border-border hover:border-border-strong'
           }`}>
-            <input
-              type="radio"
-              name="attach-mode"
-              value="original"
-              checked={attachMode === 'original'}
-              onChange={() => handleModeChange('original')}
-              className="mt-0.5 accent-blue-500"
-              data-testid="attach-original"
-            />
+            <RadioGroupItem value="original" data-testid="attach-original" className="mt-0.5" />
             <div>
               <span className="text-xs font-medium text-foreground">My original resume</span>
               <p className="text-[10px] text-muted-foreground mt-0.5">
@@ -119,7 +110,22 @@ export function ResumeAttachmentCard({ candidateId }: Props) {
               {uploadedName ? (
                 <div className="flex items-center gap-2 text-[10px] text-emerald-400">
                   <CheckCircle2 className="w-3 h-3 shrink-0" />
-                  <span className="truncate">{uploadedName}</span>
+                  <Button
+                    asChild
+                    variant="link"
+                    className="h-auto min-w-0 gap-1 p-0 text-[10px] text-emerald-400 hover:text-emerald-300"
+                  >
+                    <a
+                      href={`/api/cv/base-pdf?candidateId=${encodeURIComponent(candidateId)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Open resume in a read-only view"
+                      data-testid="view-pdf-link"
+                    >
+                      <span className="truncate">{uploadedName}</span>
+                      <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                    </a>
+                  </Button>
                 </div>
               ) : (
                 <p className="text-[10px] text-muted-foreground">No PDF uploaded yet.</p>
@@ -151,7 +157,7 @@ export function ResumeAttachmentCard({ candidateId }: Props) {
               )}
             </div>
           )}
-        </div>
+        </RadioGroup>
       )}
     </div>
   )

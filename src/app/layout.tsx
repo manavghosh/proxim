@@ -4,6 +4,7 @@ import { Inter, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 import { NavigationLoader } from '@/components/layout/NavigationLoader'
 import { CommandMenu } from '@/components/CommandMenu'
+import { Toaster } from '@/components/ui/sonner'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <NavigationLoader />
         <CommandMenu />
         {children}
+        <Toaster position="bottom-right" />
       </body>
     </html>
   )

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { PreferencesForm } from '@/components/preferences/PreferencesForm'
+import { SettingsDraftProvider } from '@/components/settings/SettingsDraftContext'
 import type { Preferences } from '@/types/candidate'
 
 // Mock the api module
@@ -16,18 +17,33 @@ const basePrefs: Preferences = {
   geographic_preference: ['Remote'],
 }
 
+// The per-section "Save" button was replaced by the global save bar. Tests drive
+// the registered save via the draft provider's saveAll (exposed as a test button).
 function setup(prefs: Preferences = basePrefs) {
   const onSaved = vi.fn()
-  mockUpdatePreferences.mockResolvedValue({ preferences: prefs } as any)
-  render(<PreferencesForm initialPreferences={prefs} onSaved={onSaved} candidateId="test-id" />)
+  mockUpdatePreferences.mockResolvedValue({ preferences: prefs } as never)
+  render(
+    <SettingsDraftProvider>
+      {({ saveAll }) => (
+        <>
+          <PreferencesForm initialPreferences={prefs} onSaved={onSaved} candidateId="test-id" />
+          <button onClick={() => void saveAll()}>do-save</button>
+        </>
+      )}
+    </SettingsDraftProvider>,
+  )
   return { onSaved }
+}
+
+function save() {
+  fireEvent.click(screen.getByText('do-save'))
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
 })
 
-// ── Task 2: Job Sources section ────────────────────────────────────────────
+// ── Job Sources section ────────────────────────────────────────────────────
 
 describe('Job Sources section', () => {
   it('renders all four source toggle buttons', () => {
@@ -47,7 +63,6 @@ describe('Job Sources section', () => {
   it('source button appears selected when included in enabled_sources', () => {
     setup({ ...basePrefs, enabled_sources: ['naukri'] })
     const naukri = screen.getByRole('button', { name: 'Naukri' })
-    // default variant renders bg-primary
     expect(naukri.className).toContain('bg-primary')
   })
 
@@ -55,7 +70,7 @@ describe('Job Sources section', () => {
     setup({ ...basePrefs, enabled_sources: [] })
 
     fireEvent.click(screen.getByRole('button', { name: 'Naukri' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Save Preferences' }))
+    save()
 
     await waitFor(() => expect(mockUpdatePreferences).toHaveBeenCalledOnce())
     const callArg = mockUpdatePreferences.mock.calls[0][0] as Preferences
@@ -81,7 +96,7 @@ describe('Job Sources section', () => {
     const textarea = screen.getByPlaceholderText(/https:\/\/jobs\.acmecorp\.com\/careers/)
     fireEvent.change(textarea, { target: { value: 'https://jobs.acmecorp.com/careers' } })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save Preferences' }))
+    save()
 
     await waitFor(() => expect(mockUpdatePreferences).toHaveBeenCalledOnce())
     const callArg = mockUpdatePreferences.mock.calls[0][0] as Preferences
@@ -89,7 +104,7 @@ describe('Job Sources section', () => {
   })
 })
 
-// ── Task 3: Custom Domains textarea ───────────────────────────────────────
+// ── Custom Domains textarea ───────────────────────────────────────────────
 
 describe('Custom Domains textarea', () => {
   it('renders the Additional Job Sites label text', () => {
@@ -105,9 +120,7 @@ describe('Custom Domains textarea', () => {
   it('custom domains textarea initialises with non-DOMAIN_OPTIONS values', () => {
     setup({ ...basePrefs, preferred_domains: ['BFSI', 'FinTech', 'Climate Tech'] })
     const textarea = screen.getByPlaceholderText(/FinTech/) as HTMLTextAreaElement
-    // BFSI is in DOMAIN_OPTIONS so should NOT appear in textarea
     expect(textarea.value).not.toContain('BFSI')
-    // FinTech and Climate Tech are custom
     expect(textarea.value).toContain('FinTech')
     expect(textarea.value).toContain('Climate Tech')
   })
@@ -118,7 +131,7 @@ describe('Custom Domains textarea', () => {
     const textarea = screen.getByPlaceholderText(/FinTech/)
     fireEvent.change(textarea, { target: { value: 'Climate Tech' } })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save Preferences' }))
+    save()
 
     await waitFor(() => expect(mockUpdatePreferences).toHaveBeenCalledOnce())
     const callArg = mockUpdatePreferences.mock.calls[0][0] as Preferences
@@ -127,10 +140,11 @@ describe('Custom Domains textarea', () => {
   })
 
   it('does not duplicate DOMAIN_OPTIONS values in preferred_domains on save', async () => {
-    // BFSI is toggled on via initial prefs
     setup({ ...basePrefs, preferred_domains: ['BFSI'] })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save Preferences' }))
+    // Toggle an unrelated field to mark the form dirty without touching domains.
+    fireEvent.click(screen.getByRole('button', { name: 'Naukri' }))
+    save()
 
     await waitFor(() => expect(mockUpdatePreferences).toHaveBeenCalledOnce())
     const callArg = mockUpdatePreferences.mock.calls[0][0] as Preferences

@@ -9,8 +9,11 @@ export async function GET(request: Request) {
       ? await getCandidateById(candidateId)
       : await getOrCreateCandidate()
     if (!candidate) return NextResponse.json({ error: 'Candidate not found' }, { status: 404 })
+    // No caching: the candidate row (CV, parse status, preferences) is mutated by
+    // uploads/saves and polled for live parse status — stale cache causes the UI
+    // to lag behind real state.
     return NextResponse.json(candidate, {
-      headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' },
+      headers: { 'Cache-Control': 'no-store' },
     })
   } catch {
     return NextResponse.json({ error: 'Failed to load CV' }, { status: 500 })

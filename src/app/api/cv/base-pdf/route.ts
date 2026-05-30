@@ -41,12 +41,13 @@ export async function GET(request: Request) {
     const forceDownload = searchParams.get('download') === 'true'
     const fileBytes = await readFile(filePath)
 
+    // Serve under the candidate's original filename so they recognise it.
+    const downloadName = path.basename(filePath).replace(/"/g, '')
+
     return new NextResponse(fileBytes, {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': forceDownload
-          ? 'attachment; filename="resume.pdf"'
-          : 'inline; filename="resume.pdf"',
+        'Content-Disposition': `${forceDownload ? 'attachment' : 'inline'}; filename="${downloadName}"`,
       },
     })
   } catch (e) {
