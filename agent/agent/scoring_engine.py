@@ -372,24 +372,46 @@ async def generate_report(
     score_output: JobScoreOutput,
     run_id: str | None = None,
 ) -> ScoreReport:
-    """Generate the 6-block report. Block A only for F-grade jobs."""
+    """Generate the 6-block report. F-grade jobs get a focused improvement
+    report instead (block_a = why it failed, block_c = CV gaps + learnings)."""
     import litellm
     from agent.config import settings
 
     if score_output.grade == "F":
-        summary_prompt = (
-            f"Write a one-paragraph executive summary explaining why this job received an F grade.\n"
-            f"Job: {job.get('title')} at {job.get('company')}\n"
-            f"Gate scores: role_level_match={score_output.gate.role_level_match.score}, "
-            f"ai_stack_alignment={score_output.gate.ai_stack_alignment.score}\n"
-            f'Return JSON: {{"block_a": "<paragraph>"}}'
-        )
+        jd = truncate_jd(job.get("jd_raw", ""))
+        profile_str = json.dumps(parsed_profile, indent=2)
+        summary_prompt = f"""You are a career coach. This job was graded F (gate fail) for a senior
+candidate. Explain why, then give concrete, actionable guidance on how the
+candidate can improve their CV and skills to qualify for roles like this.
+
+CRITICAL: cite only facts present in the candidate profile below. Do NOT invent
+any experience, titles, dates, or metrics.
+
+## Candidate Profile (source of truth)
+{profile_str}
+
+## Job
+Title: {job.get('title')} at {job.get('company')}
+
+### Job Description
+{jd}
+
+## Gate scores (a gate dimension below 2.5 fails the job)
+role_level_match: {score_output.gate.role_level_match.score} — {score_output.gate.role_level_match.reasoning}
+ai_stack_alignment: {score_output.gate.ai_stack_alignment.score} — {score_output.gate.ai_stack_alignment.reasoning}
+
+## Required JSON output — every value a plain string; use \\n for line breaks:
+{{
+  "block_a": "<1 short paragraph: which gate dimension(s) failed and the core reason this scored an F>",
+  "block_c": "<Improvement plan as a plain string. First a line 'CV Gaps:' then 2-4 '- ' bullets naming specific gaps between this candidate's profile and the role's requirements (verbatim profile facts only). Then a line 'Suggested learnings:' then 2-4 '- ' bullets of concrete skills, projects, or certifications that would close those gaps and reach this role's bar.>"
+}}"""
         response = litellm.completion(
             model=f"{settings.llm_provider}/{settings.llm_model}",
             api_key=_get_api_key(settings),
             messages=[{"role": "user", "content": summary_prompt}],
             response_format={"type": "json_object"},
-            temperature=0.1,
+            temperature=0.2,
+            max_tokens=1200,
             metadata=langfuse_metadata("scoring_engine", "report",
                                        job_id=str(job.get("id") or ""), run_id=run_id),
             **_reasoning_kwargs(settings),
@@ -399,8 +421,9 @@ async def generate_report(
         raw_f = re.sub(r'\n?```\s*$', '', raw_f).strip()
         data = _loads_json(raw_f)
         return ScoreReport(
-            block_a=data["block_a"],
-            block_b="", block_c="", block_d="", block_e="", block_f="",
+            block_a=data.get("block_a", ""),
+            block_c=data.get("block_c", ""),
+            block_b="", block_d="", block_e="", block_f="",
         )
 
     prompt = _build_report_prompt(job, parsed_profile, score_output)

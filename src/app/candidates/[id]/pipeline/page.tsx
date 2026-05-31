@@ -26,9 +26,10 @@ import {
 import { Workflow } from 'lucide-react'
 import type { OutreachStatus, EmailCadenceStatus } from '@/types/candidate'
 
-// Pipeline review never includes F-grade jobs (route enforces it), so the
-// available choices are A/B/C/D only.
-const PIPELINE_GRADES: Grade[] = ALL_GRADES.filter((g) => g !== 'F')
+// The Scorecard shows every grade, including F. F jobs are read-only — shown
+// for improvement insight (CV gaps + learnings via the report), not to apply
+// to — see JobReviewCard.
+const PIPELINE_GRADES: Grade[] = [...ALL_GRADES]
 type SortOption = 'score' | 'date' | 'company'
 
 function Toast({ message, type = 'info', onDismiss }: { message: string; type?: 'info' | 'success' | 'error'; onDismiss: () => void }) {

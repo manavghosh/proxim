@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { and, eq, ne, notInArray, inArray, or } from 'drizzle-orm'
+import { and, eq, notInArray, inArray, or } from 'drizzle-orm'
 import { db } from '@/db'
 import { jobs, hitlCheckpoints, outreachTargets, emailCadences, emailDrafts } from '@/db/schema'
 import type { OutreachTargetSummary, OutreachStatus, EmailCadenceSummary, EmailCadenceStatus, EmailDraftSummary, EmailDraftStatus } from '@/types/candidate'
@@ -40,7 +40,7 @@ export async function GET(
 
     // F is always excluded from the pipeline review queue (DB WHERE enforces it).
     // E is included — it passed both gates and is reviewable, just a poor fit.
-    const VALID_GRADES = ['A', 'B', 'C', 'D', 'E'] as const
+    const VALID_GRADES = ['A', 'B', 'C', 'D', 'E', 'F'] as const
     type ValidGrade = typeof VALID_GRADES[number]
     const isValidGrade = (g: string): g is ValidGrade =>
       (VALID_GRADES as readonly string[]).includes(g)
@@ -114,10 +114,7 @@ export async function GET(
           eq(jobs.candidateId, candidateId),
           or(
             eq(jobs.status, 'score_failed'),
-            and(
-              ne(jobs.grade, 'F'),
-              notInArray(jobs.status, EXCLUDED_STATUSES)
-            )
+            notInArray(jobs.status, EXCLUDED_STATUSES)
           )
         )
       )
@@ -152,9 +149,10 @@ export async function GET(
       }
     }
 
-    // Always exclude F-grade as a safety net (DB WHERE also handles this).
-    // score_failed jobs have grade=null — keep them regardless.
-    let filtered = rows.filter(r => r.status === 'score_failed' || r.grade !== 'F')
+    // F-grade jobs are now shown (read-only, for improvement insight); the
+    // grade filter below controls their visibility. score_failed jobs
+    // (grade=null) bypass the grade filter and are always kept.
+    let filtered = rows
 
     // Apply grade filter (multi-select set built above).
     // score_failed jobs have no grade yet so they bypass the grade filter.

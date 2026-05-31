@@ -77,18 +77,37 @@ describe('GET /api/candidates/[id]/jobs', () => {
     expect(Array.isArray(body.jobs)).toBe(true)
   })
 
-  it('excludes F-grade jobs', async () => {
+  it('includes F-grade jobs by default (shown read-only for improvement insight)', async () => {
     const { db } = await import('@/db')
     const mockChain = {
       from: vi.fn().mockReturnThis(),
       leftJoin: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
-      orderBy: vi.fn().mockResolvedValue([makeJob({ grade: 'F' })]),
+      orderBy: vi.fn().mockResolvedValue([makeJob({ grade: 'F' }), makeJob({ id: 'j2', grade: 'A' })]),
     }
     vi.mocked(db.select).mockReturnValue(mockChain as never)
 
     const { GET } = await import('@/app/api/candidates/[id]/jobs/route')
-    const req = new Request('http://localhost/api/candidates/cand-1/jobs')
+    const req = new Request('http://localhost/api/candidates/cand-1/jobs') // no filter → all grades incl F
+    const res = await GET(req, { params: Promise.resolve({ id: 'cand-1' }) })
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.jobs.filter((j: { grade: string }) => j.grade === 'F').length).toBeGreaterThan(0)
+  })
+
+  it('excludes F when the grade filter omits it', async () => {
+    const { db } = await import('@/db')
+    const mockChain = {
+      from: vi.fn().mockReturnThis(),
+      leftJoin: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      orderBy: vi.fn().mockResolvedValue([makeJob({ grade: 'F' }), makeJob({ id: 'j2', grade: 'A' })]),
+    }
+    vi.mocked(db.select).mockReturnValue(mockChain as never)
+
+    const { GET } = await import('@/app/api/candidates/[id]/jobs/route')
+    const req = new Request('http://localhost/api/candidates/cand-1/jobs?grades=A,B,C,D,E')
     const res = await GET(req, { params: Promise.resolve({ id: 'cand-1' }) })
     const body = await res.json()
 

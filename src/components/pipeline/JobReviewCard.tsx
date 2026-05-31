@@ -86,6 +86,9 @@ export function JobReviewCard({
   })()
   const isSnoozed   = job.status === 'snoozed'
   const isApproved  = job.status === 'approved' || job.status === 'resume_ready' || job.status === 'submitted'
+  // F = gate fail: read-only on the Scorecard (no apply actions); the report
+  // explains the gaps + suggested learnings instead.
+  const isF         = job.grade === 'F'
   const snoozedUntil = job.hitlCheckpoint?.snoozedUntil
   const dayAge       = getDayAge(job.postedAt)
   const isExpired    = dayAge !== null && dayAge > EXPIRY_WARNING_DAYS
@@ -190,8 +193,8 @@ export function JobReviewCard({
           </a>
         </div>
 
-        {/* Action buttons */}
-        {!isApproved && (
+        {/* Action buttons — hidden for F (gate fail): read-only, report only */}
+        {!isApproved && !isF && (
           <div className="flex items-center gap-2 mt-3 pt-3 border-t border-muted">
             <Button
               size="sm"
