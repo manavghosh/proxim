@@ -58,7 +58,7 @@ export default function SettingsPage() {
     return (
       <div className="flex flex-col flex-1 overflow-hidden">
         <Topbar title="Settings" actions={<CandidateSwitcher candidateId={candidateId} />} />
-        <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-muted">
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-background">
           {loadError ? (
             <>
               <p className="text-muted-foreground text-sm">Retrying…</p>

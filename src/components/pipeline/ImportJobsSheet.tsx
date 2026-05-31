@@ -71,7 +71,7 @@ export function ImportJobsSheet({ candidateId, onImported, label = '+ Add Jobs' 
       </Button>
 
       <Sheet open={open} onOpenChange={handleClose}>
-        <SheetContent className="w-full sm:max-w-lg bg-muted border-border text-foreground">
+        <SheetContent className="w-full sm:max-w-lg bg-background border-border text-foreground">
           <SheetHeader className="mb-4">
             <SheetTitle className="text-foreground">Import Jobs</SheetTitle>
             <SheetDescription className="text-muted-foreground text-xs">

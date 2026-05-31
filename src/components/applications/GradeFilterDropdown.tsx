@@ -69,7 +69,7 @@ export function GradeFilterDropdown({ selected, onChange, counts }: Props) {
           </Button>
         </DropdownMenuTrigger>
 
-        <DropdownMenuContent className="w-52" align="start">
+        <DropdownMenuContent className="w-52" align="end">
           <DropdownMenuGroup>
             <DropdownMenuLabel>Filter by grade</DropdownMenuLabel>
             <DropdownMenuSeparator />

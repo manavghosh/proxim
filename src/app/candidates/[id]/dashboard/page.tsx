@@ -196,7 +196,7 @@ export default function DashboardPage() {
         Left column scrolls independently; right sidebar is a separate flex
         sibling so it never participates in the left column's reflow.
       */}
-      <main className="flex-1 min-h-0 bg-muted flex flex-row gap-6 p-6 overflow-hidden">
+      <main className="flex-1 min-h-0 bg-background flex flex-row gap-6 p-6 overflow-hidden">
         {/* Left — scrolls vertically; scrollbar hidden so opening sections doesn't cause visual jump */}
         <div className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto pb-6 space-y-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {error && (

@@ -25,7 +25,7 @@ export function PlaceholderPage({
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <Topbar title={title} />
-      <main className="flex-1 flex items-center justify-center bg-muted">
+      <main className="flex-1 flex items-center justify-center bg-background">
         <div className="text-center max-w-md space-y-5">
           <div className="w-16 h-16 rounded-2xl bg-card border border-border-strong flex items-center justify-center mx-auto">
             <Icon className="w-7 h-7 text-muted-foreground" />

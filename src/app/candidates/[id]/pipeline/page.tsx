@@ -37,9 +37,12 @@ function Toast({ message, type = 'info', onDismiss }: { message: string; type?: 
     return () => clearTimeout(t)
   }, [onDismiss])
 
-  const bg = type === 'success' ? 'bg-emerald-900 border-emerald-700' : type === 'error' ? 'bg-red-900 border-red-700' : 'bg-card border-primary'
+  const bg = type === 'success' ? 'bg-emerald-900 border-emerald-700' : type === 'error' ? 'bg-red-900 border-red-700' : 'bg-background border-primary'
   return (
-    <div className={`fixed bottom-4 right-4 z-50 px-4 py-3 rounded-lg border text-[12px] text-white shadow-lg ${bg}`}>
+    <div
+      data-slot="flash-toast"
+      className={`fixed bottom-4 right-4 z-50 px-4 py-3 rounded-lg border text-[12px] text-white shadow-lg ${bg}`}
+    >
       {message}
     </div>
   )
@@ -298,7 +301,7 @@ export default function PipelinePage() {
         <div>
           <h1 className="text-[15px] font-semibold text-foreground flex items-center gap-2">
             <Workflow className="w-4 h-4 text-primary" />
-            Pipeline Review
+            Scorecard Review
           </h1>
           <p className="text-[11px] text-muted-foreground mt-0.5">
             {loading ? 'Loading…' : `${jobs.length} job${jobs.length !== 1 ? 's' : ''}`}

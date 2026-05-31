@@ -35,7 +35,7 @@ export function PipelineSortControl({ value, onChange }: PipelineSortControlProp
           <ChevronDown className="w-3 h-3" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="bg-muted border-border" align="end">
+      <DropdownMenuContent align="end">
         {(Object.keys(SORT_LABELS) as SortOption[]).map(opt => (
           <DropdownMenuItem
             key={opt}

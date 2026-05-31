@@ -47,7 +47,7 @@ function SectionCard({
     <section
       id={id}
       ref={refCb}
-      className="bg-card border border-border-strong rounded-xl p-5 space-y-4 scroll-mt-6"
+      className="bg-background border border-border-strong rounded-xl p-5 space-y-4 scroll-mt-6"
     >
       <p className="text-[9px] font-semibold text-muted-foreground tracking-widest uppercase">{title}</p>
       {children}
@@ -103,7 +103,7 @@ export function SettingsLayout({
     <SettingsDraftProvider onSaved={refresh}>
       {({ version }) => (
         <>
-          <div ref={scrollRef} className="flex-1 overflow-y-auto bg-muted">
+          <div ref={scrollRef} className="flex-1 overflow-y-auto bg-background">
             <div className="mx-auto grid max-w-5xl grid-cols-[180px_1fr] gap-8 p-6">
               <SettingsNav
                 sections={SECTIONS}

@@ -24,7 +24,7 @@ const STATUS_LABEL: Record<string, string> = {
 export function ProfileCard({ candidate, candidateId }: ProfileCardProps) {
   if (!candidate?.parsedProfile) {
     return (
-      <div className="bg-card border border-border-strong rounded-xl p-5 flex flex-col items-center justify-center min-h-[240px] gap-3 text-center">
+      <div className="bg-background border border-border-strong rounded-xl p-5 flex flex-col items-center justify-center min-h-[240px] gap-3 text-center">
         <div className="w-12 h-12 rounded-xl bg-muted border border-border-strong flex items-center justify-center text-2xl text-muted-foreground">
           ?
         </div>
@@ -54,7 +54,7 @@ export function ProfileCard({ candidate, candidateId }: ProfileCardProps) {
       : []
 
   return (
-    <div className="bg-card border border-border-strong rounded-xl p-5">
+    <div className="bg-background border border-border-strong rounded-xl p-5">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-[13px] font-semibold text-foreground">Profile</h2>
         <span

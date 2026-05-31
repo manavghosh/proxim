@@ -75,7 +75,7 @@ export function RunHistoryTable({
       {inProgress.length > 0 && (
         <div className="space-y-2">
           {inProgress.map(run => (
-            <div key={run.id} className="flex items-center gap-3 px-3 py-2 bg-card border border-border rounded-lg">
+            <div key={run.id} className="flex items-center gap-3 px-3 py-2 bg-background border border-border rounded-lg">
               <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse shrink-0" />
               <span className="text-[11px] text-muted-foreground">Run started {formatDateTime(run.startedAt)}</span>
               <Badge className="text-[10px] bg-blue-500/20 text-blue-300 border-blue-500/30 ml-auto">Running</Badge>

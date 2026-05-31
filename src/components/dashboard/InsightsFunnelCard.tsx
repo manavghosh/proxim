@@ -72,7 +72,7 @@ function ArchetypeTable({ rows }: { rows: ArchetypeBreakdownRow[] }) {
 export function InsightsFunnelCard({ insights }: Props) {
   if (insights === null) {
     return (
-      <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+      <div className="rounded-xl border border-border bg-background p-4 space-y-3">
         <div className="animate-pulse h-3 w-32 rounded bg-border" />
         <div className="grid grid-cols-6 gap-2">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -93,7 +93,7 @@ export function InsightsFunnelCard({ insights }: Props) {
 
   return (
     <TooltipProvider delayDuration={150}>
-      <div className="rounded-xl border border-border bg-card p-4 space-y-4">
+      <div className="rounded-xl border border-border bg-background p-4 space-y-4">
         {/* Funnel row */}
         <div className="grid grid-cols-6 gap-2">
           {FUNNEL_STAGES.map(({ key, label, desc }) => (

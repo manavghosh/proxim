@@ -49,7 +49,7 @@ export function CandidateSidebar({
 
   const NAV_MAIN = [
     { href: `${base}/dashboard`,    label: 'Dashboard',    icon: LayoutDashboard },
-    { href: `${base}/pipeline`,     label: 'Pipeline',     icon: Workflow },
+    { href: `${base}/pipeline`,     label: 'Scorecard',    icon: Workflow },
     { href: `${base}/applications`, label: 'Applications', icon: Send },
   ]
   const NAV_ACCOUNT = [

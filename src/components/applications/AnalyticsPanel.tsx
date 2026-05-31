@@ -46,7 +46,7 @@ export function AnalyticsPanel({ candidateId, range, onRangeChange, refreshTrigg
           <SelectTrigger className="w-32 h-8 text-xs bg-card border-border text-muted-foreground">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent className="bg-card border-border">
+          <SelectContent className="bg-background border-border">
             <SelectItem value="7d" className="text-xs text-muted-foreground">Last 7 days</SelectItem>
             <SelectItem value="30d" className="text-xs text-muted-foreground">Last 30 days</SelectItem>
             <SelectItem value="90d" className="text-xs text-muted-foreground">Last 90 days</SelectItem>

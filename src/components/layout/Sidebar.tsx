@@ -7,7 +7,7 @@ import { LayoutDashboard, Workflow, Send, Settings } from 'lucide-react'
 
 const NAV_MAIN = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/pipeline',  label: 'Pipeline',  icon: Workflow, soon: true },
+  { href: '/pipeline',  label: 'Scorecard',  icon: Workflow, soon: true },
   { href: '/applications', label: 'Applications', icon: Send, soon: true },
 ]
 const NAV_ACCOUNT = [{ href: '/settings', label: 'Settings', icon: Settings }]

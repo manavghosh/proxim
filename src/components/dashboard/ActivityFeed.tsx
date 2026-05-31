@@ -19,7 +19,7 @@ interface ActivityItem {
 export function ActivityFeed({ candidate }: ActivityFeedProps) {
   if (!candidate) {
     return (
-      <div className="bg-card border border-border-strong rounded-xl p-5">
+      <div className="bg-background border border-border rounded-xl p-5">
         <p className="text-[12px] text-muted-foreground">
           No activity yet — start by uploading your CV.
         </p>
@@ -46,7 +46,7 @@ export function ActivityFeed({ candidate }: ActivityFeedProps) {
   }
 
   return (
-    <div className="bg-card border border-border-strong rounded-xl p-5">
+    <div className="bg-background border border-border rounded-xl p-5">
       {items.length === 0 ? (
         <p className="text-[12px] text-muted-foreground">
           No activity yet — start by uploading your CV.

@@ -112,7 +112,7 @@ export function ScoringBatchSheet({ open, onOpenChange, candidateId, onScored, a
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="bg-muted border-border flex flex-col gap-0 p-0 sm:max-w-xl"
+        className="bg-background border-border flex flex-col gap-0 p-0 sm:max-w-xl"
       >
         <SheetHeader className="border-b border-border">
           <SheetTitle className="text-foreground">Select Scoring Batch</SheetTitle>

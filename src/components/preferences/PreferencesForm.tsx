@@ -149,7 +149,7 @@ export function PreferencesForm({
     <div className="space-y-6">
       {/* Seniority — REQUIRED */}
       <div className="space-y-2">
-        <Label>
+        <Label className="text-blue-400">
           Target Seniority / Role Keywords{' '}
           <span className="text-destructive">*</span>
           <span className="text-muted-foreground font-normal ml-1">(one per line)</span>
@@ -167,7 +167,7 @@ export function PreferencesForm({
 
       {/* Geographic preference — REQUIRED */}
       <fieldset className="space-y-2">
-        <Label>
+        <Label className="text-blue-400">
           Geographic Preference <span className="text-destructive">*</span>
         </Label>
         <div className="flex flex-wrap gap-2">
@@ -190,7 +190,7 @@ export function PreferencesForm({
 
       {/* Company stage — optional */}
       <fieldset className="space-y-2">
-        <Label>
+        <Label className="text-blue-400">
           Company Stage <span className="text-muted-foreground font-normal">(optional)</span>
         </Label>
         <div className="flex flex-wrap gap-2">
@@ -210,7 +210,7 @@ export function PreferencesForm({
 
       {/* Target companies — optional */}
       <div className="space-y-2">
-        <Label>
+        <Label className="text-blue-400">
           Target Companies{' '}
           <span className="text-muted-foreground font-normal">(optional — one per line)</span>
         </Label>
@@ -224,7 +224,7 @@ export function PreferencesForm({
 
       {/* Job Sources — optional */}
       <fieldset className="space-y-2">
-        <Label>
+        <Label className="text-blue-400">
           Job Sources{' '}
           <span className="text-muted-foreground font-normal">(optional — all run if none selected)</span>
         </Label>
@@ -245,7 +245,7 @@ export function PreferencesForm({
 
       {/* Custom job sites — optional */}
       <div className="space-y-2">
-        <Label>
+        <Label className="text-blue-400">
           Additional Job Sites{' '}
           <span className="text-muted-foreground font-normal">(optional — one URL per line)</span>
         </Label>
@@ -259,7 +259,7 @@ export function PreferencesForm({
 
       {/* Preferred domains — optional */}
       <fieldset className="space-y-2">
-        <Label>
+        <Label className="text-blue-400">
           Preferred Domains{' '}
           <span className="text-muted-foreground font-normal">(optional)</span>
         </Label>

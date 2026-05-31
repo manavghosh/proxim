@@ -12,7 +12,7 @@ export function MetricCard({ label, value, unit = '' }: MetricCardProps) {
   const display = value === null ? '—' : `${value}${unit}`
 
   return (
-    <Card className="bg-card border-border">
+    <Card className="bg-background border-border">
       <CardContent className="p-4">
         <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-1">{label}</p>
         <p className="text-2xl font-bold text-foreground">{display}</p>

@@ -17,7 +17,7 @@ import { CandidateAvatar } from '@/components/shared/CandidateAvatar'
 
 const SECTIONS = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { key: 'pipeline', label: 'Pipeline', icon: Workflow },
+  { key: 'pipeline', label: 'Scorecard', icon: Workflow },
   { key: 'applications', label: 'Applications', icon: Send },
   { key: 'settings', label: 'Settings', icon: Settings },
 ] as const

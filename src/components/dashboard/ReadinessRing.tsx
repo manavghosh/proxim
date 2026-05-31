@@ -20,7 +20,7 @@ export function ReadinessRing({ readiness, candidateId }: ReadinessRingProps) {
   const pct = Math.round((met / total) * 100)
 
   return (
-    <div className="bg-card border border-border rounded-xl p-5">
+    <div className="bg-background border border-border rounded-xl p-5">
       <div className="flex items-center gap-6">
         <ProgressRing
           value={pct}

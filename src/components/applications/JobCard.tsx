@@ -188,7 +188,7 @@ export function JobCard({
       open={isOpen}
       onOpenChange={setIsOpen}
       style={gradeGlow ? { boxShadow: gradeGlow } : undefined}
-      className={`bg-card border rounded-xl overflow-hidden transition-all duration-200 ${
+      className={`bg-background border rounded-xl overflow-hidden transition-all duration-200 ${
         isSnoozed || isRejected
           ? 'border-border opacity-60'
           : isOpen

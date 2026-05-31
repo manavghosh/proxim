@@ -48,6 +48,7 @@ export default function ApplicationsPage() {
   const [historyTotal, setHistoryTotal] = useState(0)
   const [historyTotalPages, setHistoryTotalPages] = useState(1)
   const [historyLoading, setHistoryLoading] = useState(false)
+  const [activeTab, setActiveTab]           = useState<'jobs' | 'analytics' | 'history'>('jobs')
 
   const loadHistory = useCallback(async (page: number, range: TimeRange) => {
     setHistoryLoading(true)
@@ -259,15 +260,16 @@ export default function ApplicationsPage() {
           </div>
         }
       />
-      <main className="flex-1 min-h-0 overflow-hidden bg-muted">
+      <main className="flex-1 min-h-0 overflow-hidden bg-background">
         <Tabs
           defaultValue="jobs"
           className="flex flex-col h-full"
           onValueChange={(v) => {
+            setActiveTab(v as 'jobs' | 'analytics' | 'history')
             if (v === 'history') void loadHistory(historyPage, analyticsRange)
           }}
         >
-          <div className="px-6 pt-4 border-b border-border-strong">
+          <div className="px-6 py-3 border-b border-border-strong flex items-center justify-between gap-4">
             <TabsList className="bg-card border border-border-strong">
               <TabsTrigger value="jobs" className="data-[state=active]:bg-border-strong data-[state=active]:text-white text-muted-foreground">
                 Jobs
@@ -279,6 +281,9 @@ export default function ApplicationsPage() {
                 History
               </TabsTrigger>
             </TabsList>
+            {activeTab === 'jobs' && (
+              <GradeFilterDropdown selected={selectedGrades} onChange={setSelectedGrades} counts={counts} />
+            )}
           </div>
 
           {/* ── Jobs Tab ─────────────────────────────────────────────────────── */}
@@ -295,9 +300,6 @@ export default function ApplicationsPage() {
                 </button>
               </Alert>
             )}
-            <div className="mb-5">
-              <GradeFilterDropdown selected={selectedGrades} onChange={setSelectedGrades} counts={counts} />
-            </div>
             {loading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-[140px] rounded-xl bg-card" />)}

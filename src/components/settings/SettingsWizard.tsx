@@ -65,7 +65,7 @@ export function SettingsWizard({
         const continueDisabled = current.id === 'resume' && !resumeReady
 
         return (
-          <div className="flex-1 overflow-y-auto bg-muted">
+          <div className="flex-1 overflow-y-auto bg-background">
             <div className="mx-auto max-w-2xl px-6 py-10">
               {/* Header */}
               <div className="mb-8 flex items-center justify-between">
@@ -111,7 +111,7 @@ export function SettingsWizard({
               </div>
 
               {/* Step content */}
-              <div className="rounded-xl border border-border-strong bg-card p-6">
+              <div className="rounded-xl border border-border-strong bg-background p-6">
                 <div className="mb-5">
                   <h2 className="text-base font-semibold text-foreground">{current.label}</h2>
                   <p className="text-sm text-muted-foreground">{current.blurb}</p>
