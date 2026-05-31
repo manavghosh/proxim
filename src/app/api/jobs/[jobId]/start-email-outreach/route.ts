@@ -49,7 +49,11 @@ export async function POST(
     if (existing) {
       await db
         .update(emailCadences)
-        .set({ retryCount: isFreshStart ? 1 : existing.retryCount + 1 })
+        .set({
+          retryCount: isFreshStart ? 1 : existing.retryCount + 1,
+          status: 'pending_discovery',
+          errorMessage: null,
+        })
         .where(eq(emailCadences.id, existing.id))
     }
 

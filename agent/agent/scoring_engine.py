@@ -18,6 +18,22 @@ def _get_api_key(settings) -> str:
         return settings.gemini_api_key
     return settings.anthropic_api_key
 
+
+def _reasoning_kwargs(settings) -> dict:
+    """Disable Gemini 'thinking' tokens — they consume the max_tokens budget and
+    truncate structured JSON output. No-op for non-Gemini providers."""
+    return {"reasoning_effort": "disable"} if settings.llm_provider == "gemini" else {}
+
+
+def _loads_json(raw: str) -> dict:
+    """Parse JSON leniently, repairing truncated/malformed output as a fallback."""
+    try:
+        obj, _ = json.JSONDecoder().raw_decode(raw.strip())
+        return obj
+    except json.JSONDecodeError:
+        from json_repair import repair_json
+        return json.loads(repair_json(raw))
+
 # Weight per weighted dimension (gate dims excluded from weighted average)
 DIMENSION_WEIGHTS: dict[str, int] = {
     "compensation":          3,
@@ -278,6 +294,7 @@ async def score_job(
                 temperature=0.1,
                 max_tokens=8192,
                 metadata=langfuse_metadata("scoring_engine", "scoring", job_id=str(job.get("id") or ""), run_id=run_id),
+                **_reasoning_kwargs(settings),
             )
             raw = response.choices[0].message.content
             finish_reason = response.choices[0].finish_reason
@@ -375,11 +392,12 @@ async def generate_report(
             temperature=0.1,
             metadata=langfuse_metadata("scoring_engine", "report",
                                        job_id=str(job.get("id") or ""), run_id=run_id),
+            **_reasoning_kwargs(settings),
         )
         raw_f = response.choices[0].message.content or ""
         raw_f = re.sub(r'^```(?:json)?\s*\n?', '', raw_f.strip())
         raw_f = re.sub(r'\n?```\s*$', '', raw_f).strip()
-        data, _ = json.JSONDecoder().raw_decode(raw_f.strip())
+        data = _loads_json(raw_f)
         return ScoreReport(
             block_a=data["block_a"],
             block_b="", block_c="", block_d="", block_e="", block_f="",
@@ -394,9 +412,10 @@ async def generate_report(
         temperature=0.2,
         metadata=langfuse_metadata("scoring_engine", "report",
                                    job_id=str(job.get("id") or ""), run_id=run_id),
+        **_reasoning_kwargs(settings),
     )
     raw_r = response.choices[0].message.content or ""
     raw_r = re.sub(r'^```(?:json)?\s*\n?', '', raw_r.strip())
     raw_r = re.sub(r'\n?```\s*$', '', raw_r).strip()
-    data, _ = json.JSONDecoder().raw_decode(raw_r.strip())
+    data = _loads_json(raw_r)
     return ScoreReport.model_validate(data)

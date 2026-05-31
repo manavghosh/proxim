@@ -42,9 +42,12 @@ export async function POST(request: Request) {
         ),
       )
 
-    // Conflict check: scoped to this candidate (multi-candidate safe).
+    // Dedup guard: only block if the *exact same batch* is already queued/running
+    // (prevents double-click double-submission). A different selection must
+    // always create a new job — never silently redirect to a "score all" job
+    // or a previous batch with different job IDs.
     const existing = await db
-      .select({ id: pipelineJobs.id })
+      .select({ id: pipelineJobs.id, payload: pipelineJobs.payload })
       .from(pipelineJobs)
       .where(
         and(
@@ -56,7 +59,27 @@ export async function POST(request: Request) {
       .limit(1)
 
     if (existing.length > 0) {
-      return NextResponse.json({ jobId: existing[0].id, status: 'running' }, { status: 200 })
+      const existingIds: string[] =
+        (existing[0].payload as { job_ids?: string[] } | null)?.job_ids ?? []
+      const sameBatch =
+        existingIds.length === jobIds.length &&
+        jobIds.every((id) => existingIds.includes(id))
+      if (sameBatch) {
+        return NextResponse.json({ jobId: existing[0].id, status: 'running' }, { status: 200 })
+      }
+      // Different selection — cancel any queued (not yet started) jobs for this
+      // candidate so they don't run after the new batch and waste tokens.
+      // Running jobs are left alone: interrupting mid-scoring leaves inconsistent state.
+      await db
+        .update(pipelineJobs)
+        .set({ status: 'failed', error: 'Superseded by a new scoring batch' })
+        .where(
+          and(
+            eq(pipelineJobs.jobType, 'score_jobs'),
+            eq(pipelineJobs.candidateId, candidate.id),
+            eq(pipelineJobs.status, 'queued'),
+          ),
+        )
     }
 
     const [job] = await db

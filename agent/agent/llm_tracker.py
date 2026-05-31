@@ -15,18 +15,32 @@ import structlog
 
 from agent.config import Settings
 
+# LiteLLM only invokes callbacks that are CustomLogger instances, so
+# _LangfuseLogger must subclass it. Import at module load (needed at class-def
+# time); fall back to a stub so a missing/broken litellm never breaks importing
+# this module — configure_langfuse stays a graceful no-op in that case.
+try:
+    from litellm.integrations.custom_logger import CustomLogger
+except Exception:  # pragma: no cover - litellm is always present in the daemon
+    class CustomLogger:  # type: ignore[no-redef]
+        pass
+
 logger = structlog.get_logger()
 
 
-class _LangfuseLogger:
+class _LangfuseLogger(CustomLogger):
     """Posts LiteLLM generations to Langfuse REST API.
 
+    MUST subclass litellm CustomLogger — LiteLLM only invokes
+    log_success_event / async_log_success_event on CustomLogger instances;
+    a plain class is registered but never called (no cost/trace recorded).
     Registered via litellm.callbacks so it handles both sync and async
     completions. Failures are swallowed — cost tracking must never break
     the pipeline.
     """
 
     def __init__(self, endpoint: str, public_key: str, secret_key: str) -> None:
+        super().__init__()
         self.endpoint = endpoint
         self._auth = (public_key, secret_key)
 
@@ -172,23 +186,18 @@ def configure_langfuse(settings: Settings) -> None:
 
 
 def configure_langsmith_litellm(settings: Settings) -> None:
-    """Register LangSmith as a LiteLLM success callback so LLM calls appear
-    inside LangSmith traces alongside graph-level LangGraph spans.
+    """Intentional no-op.
 
-    No-op when LANGSMITH_TRACING is false or LANGSMITH_API_KEY is empty.
-    Never raises.
+    LiteLLM's built-in "langsmith" success_callback posts to
+    api.smith.langchain.com after every LLM call.  When the endpoint is
+    unreachable (firewall, VPN, transient outage) LiteLLM logs a
+    LiteLLM:ERROR on every call and blocks ~14 s per attempt.
+
+    LangGraph already instruments graph-level spans for LangSmith via env
+    vars set in _configure_langsmith().  LangFuse handles per-call cost and
+    token tracking via _LangfuseLogger.  The LiteLLM→LangSmith callback is
+    therefore redundant and removed to keep the daemon logs clean.
     """
-    if not settings.langsmith_tracing or not settings.langsmith_api_key:
-        return
-
-    try:
-        import litellm
-
-        if "langsmith" not in litellm.success_callback:
-            litellm.success_callback.append("langsmith")
-        logger.info("langsmith_litellm_configured")
-    except Exception as exc:
-        logger.warning("langsmith_litellm_configure_failed", error=str(exc))
 
 
 def langfuse_metadata(

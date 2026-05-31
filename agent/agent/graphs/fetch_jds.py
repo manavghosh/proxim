@@ -81,7 +81,7 @@ async def fetch_jds_batch(state: FetchJdsState) -> dict:
                    f"Fetching JDs from LinkedIn for {total} jobs…",
                    {"total": total, "source": "linkedin"})
 
-        async def on_fetched(job_id: str, jd_text: str) -> None:
+        async def on_fetched(job_id: str, jd_text: str, **_) -> None:
             """Save each JD to the DB immediately after it is fetched."""
             nonlocal fetched, failed
             if jd_text:

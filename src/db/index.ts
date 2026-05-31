@@ -36,6 +36,11 @@ if (isNeon) {
   const client = new Database(url)
   client.pragma('journal_mode = WAL')
   client.pragma('foreign_keys = ON')
+  // Wait up to 5 s when the Python daemon holds a write lock — skip in Vitest
+  // where concurrent workers share the file and would deadlock waiting on each other.
+  if (!process.env.VITEST) {
+    client.pragma('busy_timeout = 5000')
+  }
   _db = drizzle(client, { schema: s, casing: 'snake_case' })
 }
 

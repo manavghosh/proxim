@@ -82,7 +82,7 @@ async def load_jobs(state: ScoringState) -> dict:
 async def score_and_report_batch(state: ScoringState) -> dict:
     """Score each job with LiteLLM and save to DB immediately after each job."""
     from agent.scoring_engine import score_job, generate_report
-    from agent.db import update_job_score, mark_job_score_failed
+    from agent.db import update_job_score, mark_job_score_failed, get_pipeline_job_status
     from agent.telemetry import get_tracer
     from agent.config import settings as _settings
 
@@ -113,6 +113,23 @@ async def score_and_report_batch(state: ScoringState) -> dict:
                    f"Scoring {total} jobs…", {"total": total})
 
         for job in state.jobs_to_score:
+            current_status = await get_pipeline_job_status(pool, state.pipeline_job_id)
+            if current_status == 'failed':
+                cancelled_count = total - scored - failed - skipped
+                await _log(
+                    pool, state.pipeline_job_id, "info", "score_and_report_batch",
+                    f"Scoring cancelled — {scored} scored, {skipped} F-grade filtered, "
+                    f"{failed} failed, {cancelled_count} not scored",
+                    {"scored": scored, "skipped": skipped, "failed": failed,
+                     "cancelled_count": cancelled_count, "cancelled": True},
+                )
+                logger.info("scoring_cancelled", scored=scored, skipped=skipped,
+                            failed=failed, cancelled_count=cancelled_count)
+                return {
+                    "scored_count": scored, "failed_count": failed,
+                    "skipped_count": skipped, "was_cancelled": True,
+                    "cancelled_count": cancelled_count,
+                }
             try:
                 with tracer.start_as_current_span("score_job") as span:
                     span.set_attribute("job_id", str(job.get("id", "")))
@@ -217,11 +234,41 @@ async def score_and_report_batch(state: ScoringState) -> dict:
 
 async def write_score_summary(state: ScoringState) -> dict:
     """Mark the score_jobs pipeline job as completed and log the summary."""
+    from agent.db import update_pipeline_run, update_pipeline_job_status, get_pipeline_job_status
+
     pool = await _make_pool()
     try:
-        from agent.db import update_pipeline_run, update_pipeline_job_status
-
         now = datetime.now(timezone.utc).isoformat()
+
+        # Re-read status to catch cancellations that arrived after the last
+        # loop iteration's status check (i.e. cancel clicked in the window
+        # between the check passing and write_score_summary starting).
+        current_status = await get_pipeline_job_status(pool, state.pipeline_job_id)
+        was_cancelled = state.was_cancelled or current_status == 'failed'
+
+        if was_cancelled:
+            # Job row is already 'failed' — set by the cancel API. Do not overwrite.
+            # Mark the run as failed and surface a clear summary to the log pane.
+            try:
+                await update_pipeline_run(pool, state.pipeline_run_id,
+                                          status="failed", completedAt=now)
+            except Exception as e:
+                logger.error("write_score_summary_run_update_failed", error=str(e))
+
+            pending_msg = f", {state.failed_count} failed" if state.failed_count else ""
+            await _log(
+                pool, state.pipeline_job_id, "info", "write_score_summary",
+                f"Scoring stopped — {state.scored_count} scored, "
+                f"{state.skipped_count} F-grade filtered{pending_msg}, "
+                f"{state.cancelled_count} not scored (cancelled)",
+                {"scored": state.scored_count, "skipped": state.skipped_count,
+                 "failed": state.failed_count, "cancelled_count": state.cancelled_count},
+            )
+            logger.info("scoring_pipeline_cancelled",
+                        scored=state.scored_count, skipped=state.skipped_count,
+                        failed=state.failed_count, cancelled_count=state.cancelled_count)
+            return {}
+
         try:
             await update_pipeline_run(
                 pool, state.pipeline_run_id,

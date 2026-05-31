@@ -27,7 +27,9 @@ async def find_email(
         )
 
     if resp.status_code == 429:
-        raise HunterRateLimitError("Hunter.io rate limit exceeded")
+        logger.warning("hunter_io.rate_limit", endpoint="email-finder", domain=domain,
+                       hint="monthly credit quota likely exhausted — skipping Hunter pass")
+        return None
 
     if resp.status_code != 200:
         logger.warning("hunter_io.find_email_failed", status=resp.status_code, domain=domain)
@@ -51,7 +53,9 @@ async def domain_search(domain: str, api_key: str) -> list[dict]:
         )
 
     if resp.status_code == 429:
-        raise HunterRateLimitError("Hunter.io rate limit exceeded")
+        logger.warning("hunter_io.rate_limit", endpoint="domain-search", domain=domain,
+                       hint="monthly credit quota likely exhausted — skipping Hunter pass")
+        return []
 
     if resp.status_code != 200:
         logger.warning("hunter_io.domain_search_failed", status=resp.status_code, domain=domain)
@@ -80,7 +84,9 @@ async def verify_email(email: str, api_key: str) -> str:
                 params={"email": email, "api_key": api_key},
             )
         if resp.status_code == 429:
-            raise HunterRateLimitError("Hunter.io rate limit exceeded")
+            logger.warning("hunter_io.rate_limit", endpoint="email-verifier", email=email,
+                           hint="monthly credit quota likely exhausted — skipping verification")
+            return "rate_limited"
         if resp.status_code != 200:
             logger.warning("hunter_io.verify_failed", email=email, status=resp.status_code)
             return "unknown"
@@ -91,8 +97,6 @@ async def verify_email(email: str, api_key: str) -> str:
         status = {"valid": "deliverable", "invalid": "undeliverable"}.get(raw, raw)
         logger.info("hunter_io.verify_email", email=email, status=status, raw=raw)
         return status
-    except HunterRateLimitError:
-        raise
     except Exception as exc:
         logger.warning("hunter_io.verify_error", email=email, error=str(exc)[:100])
         return "unknown"

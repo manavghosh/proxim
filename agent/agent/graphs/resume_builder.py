@@ -195,10 +195,6 @@ async def personalise_resume(state: ResumeBuilderState) -> dict:
         registry = ArchetypeRegistry()
         arch_config = registry.get_archetype(state.archetype, state.archetype_confidence)
 
-        prompt_kwargs = {}
-        if state.review_feedback:
-            prompt_kwargs["review_feedback"] = state.review_feedback
-
         try:
             with get_tracer().start_as_current_span("personalise_resume") as span:
                 span.set_attribute("agent_name", "resume_builder")
@@ -211,11 +207,8 @@ async def personalise_resume(state: ResumeBuilderState) -> dict:
                     job_id=state.job_id, run_id=state.pipeline_run_id,
                 )
             await _log(pool, state.pipeline_job_id, "personalise_resume",
-                       f"Resume personalised (attempt {state.self_review_attempt + 1})")
-            return {
-                "personalised_resume": result.model_dump_json(),
-                "self_review_attempt": state.self_review_attempt + 1,
-            }
+                       "Resume personalised")
+            return {"personalised_resume": result.model_dump_json()}
         except Exception as e:
             logger.warning("personalise_resume_failed", error=str(e))
             await _log(pool, state.pipeline_job_id, "personalise_resume",
@@ -223,48 +216,6 @@ async def personalise_resume(state: ResumeBuilderState) -> dict:
             return {"error": str(e)}
     finally:
         await _close_pool(pool)
-
-
-async def self_review(state: ResumeBuilderState) -> dict:
-    """Coherence check on the personalised resume."""
-    if state.error:
-        return {"review_passed": True}  # force forward on error state
-    pool = await _make_pool()
-    try:
-        from agent.config import settings
-        from agent.models import PersonalisedResume
-        from agent.resume_engine import self_review as _review
-        from agent.telemetry import get_tracer
-
-        if not state.personalised_resume:
-            return {"review_passed": False, "review_feedback": "No resume content generated"}
-
-        pr = PersonalisedResume.model_validate_json(state.personalised_resume)
-        with get_tracer().start_as_current_span("self_review") as span:
-            span.set_attribute("agent_name", "resume_builder")
-            span.set_attribute("job_id", state.job_id or "")
-            span.set_attribute("pipeline_run_id", state.pipeline_run_id or "")
-            ok, feedback = _review(
-                {"id": state.job_id, "title": state.job_title, "company": state.job_company},
-                pr, state.parsed_profile, settings,
-                job_id=state.job_id, run_id=state.pipeline_run_id,
-            )
-        await _log(pool, state.pipeline_job_id, "self_review",
-                   f"Coherence check: {'passed' if ok else 'failed'} — {feedback}")
-        return {"review_passed": ok, "review_feedback": feedback}
-    except Exception as e:
-        logger.warning("self_review_failed", error=str(e))
-        return {"review_passed": True, "review_feedback": "Review skipped due to error"}
-    finally:
-        await _close_pool(pool)
-
-
-def route_after_review(state: ResumeBuilderState) -> str:
-    if state.review_passed:
-        return "inject_keywords"
-    if state.self_review_attempt < 2:
-        return "personalise_resume"
-    return "inject_keywords"  # force forward after max retries per FR-014
 
 
 async def inject_keywords(state: ResumeBuilderState) -> dict:
@@ -288,18 +239,104 @@ async def inject_keywords(state: ResumeBuilderState) -> dict:
         await _close_pool(pool)
 
 
+async def render_resume_pdf(state: ResumeBuilderState) -> dict:
+    """Render the resume PDF via WeasyPrint."""
+    if state.error or not state.personalised_resume:
+        return {}
+    pool = await _make_pool()
+    try:
+        from agent.config import settings
+        from agent.models import PersonalisedResume
+        from agent.archetype_registry import ArchetypeRegistry
+        from agent.pdf_renderer import render_resume
+        from agent.db import get_candidate_name
+
+        registry = ArchetypeRegistry()
+        arch_config = registry.get_archetype(state.archetype, state.archetype_confidence)
+
+        pr = PersonalisedResume.model_validate_json(state.personalised_resume)
+        pr_dict = pr.model_dump()
+        pr_dict["profile"] = state.parsed_profile
+
+        candidate_name = await get_candidate_name(pool, state.candidate_id)
+        candidate_slug = _candidate_slug(candidate_name)
+
+        output_base = os.path.join(settings.resume_output_dir, candidate_slug, state.job_id)
+        existing = [
+            d for d in (os.listdir(output_base) if os.path.exists(output_base) else [])
+            if d.startswith("v")
+        ]
+        version_n = len(existing) + 1
+        version_dir = os.path.join(output_base, f"v{version_n}")
+        os.makedirs(version_dir, exist_ok=True)
+
+        resume_path = os.path.join(version_dir, "resume.pdf")
+
+        job = {"id": state.job_id, "title": state.job_title, "company": state.job_company}
+        render_resume(pr_dict, arch_config, job, resume_path)
+
+        await _log(pool, state.pipeline_job_id, "render_resume_pdf",
+                   f"Resume PDF rendered: v{version_n}")
+        return {"resume_pdf_path": resume_path}
+    except Exception as e:
+        logger.error("render_resume_pdf_failed", error=str(e))
+        return {"error": str(e)}
+    finally:
+        await _close_pool(pool)
+
+
+async def store_version(state: ResumeBuilderState) -> dict:
+    """Persist the resume version record and mark the job resume_ready.
+
+    Cover letter is stored separately after generate_cover_letter runs —
+    at this point cover_letter_pdf_path may be empty (new run) or set
+    (reused from a previous version).
+    """
+    pool = await _make_pool()
+    try:
+        from agent.db_sqlite import insert_resume_version
+
+        vid = await insert_resume_version(
+            pool,
+            job_id=state.job_id,
+            candidate_id=state.candidate_id,
+            archetype=state.archetype,
+            base_cv_hash=state.base_cv_hash,
+            archetype_confidence=state.archetype_confidence,
+            keywords=state.keywords,
+            resume_pdf_path=state.resume_pdf_path,
+            cover_letter_pdf_path=state.cover_letter_pdf_path,
+            generation_status="completed",
+        )
+
+        # Mark job resume_ready so the UI can render TailoredResumeCard immediately.
+        # Cover letter generation continues in subsequent nodes.
+        if hasattr(pool, 'execute'):
+            await pool.execute("UPDATE jobs SET status = 'resume_ready' WHERE id = ?", (state.job_id,))
+            await pool.execute("UPDATE pipeline_jobs SET status = 'completed' WHERE id = ?",
+                               (state.pipeline_job_id,))
+            await pool.commit()
+
+        await _log(pool, state.pipeline_job_id, "store_version",
+                   f"Version stored: {vid}")
+        return {"version_id": vid}
+    except Exception as e:
+        logger.error("store_version_failed", error=str(e))
+        return {"error": str(e)}
+    finally:
+        await _close_pool(pool)
+
+
 async def generate_cover_letter(state: ResumeBuilderState) -> dict:
-    """Generate a cover letter tailored to the archetype."""
+    """Generate a cover letter tailored to the archetype.
+
+    Runs after store_version so the resume is already visible to the user.
+    Errors are swallowed — a missing cover letter is non-fatal.
+    """
     if state.error:
         return {}
     # Reuse cover letter from a previous successful run — skip generation.
     if state.cover_letter_pdf_path:
-        pool = await _make_pool()
-        try:
-            await _log(pool, state.pipeline_job_id, "generate_cover_letter",
-                       "Cover letter reused from previous version")
-        finally:
-            await _close_pool(pool)
         return {}
     pool = await _make_pool()
     try:
@@ -334,110 +371,59 @@ async def generate_cover_letter(state: ResumeBuilderState) -> dict:
         await _close_pool(pool)
 
 
-async def render_pdf(state: ResumeBuilderState) -> dict:
-    """Render resume + cover letter PDFs via WeasyPrint."""
-    if state.error:
+async def render_cover_letter_pdf(state: ResumeBuilderState) -> dict:
+    """Render the cover letter PDF — runs after store_version.
+
+    Errors are swallowed; a missing cover letter doesn't break the resume card.
+    """
+    # Already have a cover letter path (reused from previous version)
+    if state.cover_letter_pdf_path:
+        return {}
+    if not state.resume_pdf_path:
         return {}
     pool = await _make_pool()
     try:
-        from agent.config import settings
-        from agent.models import PersonalisedResume, CoverLetterContent
-        from agent.archetype_registry import ArchetypeRegistry
-        from agent.pdf_renderer import render_resume, render_cover_letter
+        from agent.pdf_renderer import render_cover_letter
 
-        if not state.personalised_resume:
-            return {"error": "No resume content to render"}
+        version_dir = os.path.dirname(state.resume_pdf_path)
+        cl_path = os.path.join(version_dir, "cover_letter.pdf")
 
-        registry = ArchetypeRegistry()
-        arch_config = registry.get_archetype(state.archetype, state.archetype_confidence)
-
-        pr = PersonalisedResume.model_validate_json(state.personalised_resume)
-        pr_dict = pr.model_dump()
-        pr_dict["profile"] = state.parsed_profile
-
-        # Resolve the candidate's name so we can group all of their resumes
-        # under one folder. Operators reviewing the output directory can then
-        # navigate by candidate first instead of scanning a flat list of
-        # job-id folders to find the right person.
-        from agent.db import get_candidate_name
-        candidate_name = await get_candidate_name(pool, state.candidate_id)
-        candidate_slug = _candidate_slug(candidate_name)
-
-        # Determine version number
-        output_base = os.path.join(settings.resume_output_dir, candidate_slug, state.job_id)
-        existing = [
-            d for d in (os.listdir(output_base) if os.path.exists(output_base) else [])
-            if d.startswith("v")
-        ]
-        version_n = len(existing) + 1
-        version_dir = os.path.join(output_base, f"v{version_n}")
-        os.makedirs(version_dir, exist_ok=True)
-
-        resume_path = os.path.join(version_dir, "resume.pdf")
+        cl_dict = {}
+        if state.cover_letter:
+            try:
+                cl_dict = json.loads(state.cover_letter)
+            except Exception:
+                pass
 
         job = {"id": state.job_id, "title": state.job_title, "company": state.job_company}
-        render_resume(pr_dict, arch_config, job, resume_path)
+        render_cover_letter(cl_dict, job, cl_path, profile=state.parsed_profile)
 
-        # Reuse existing cover letter PDF if no new one was generated this run.
-        if state.cover_letter_pdf_path and not state.cover_letter:
-            cl_path = state.cover_letter_pdf_path
-        else:
-            cl_path = os.path.join(version_dir, "cover_letter.pdf")
-            cl_dict = {}
-            if state.cover_letter:
-                try:
-                    cl_dict = json.loads(state.cover_letter)
-                except Exception:
-                    pass
-            render_cover_letter(cl_dict, job, cl_path, profile=state.parsed_profile)
-
-        await _log(pool, state.pipeline_job_id, "render_pdf",
-                   f"PDFs rendered: v{version_n}")
-        return {
-            "resume_pdf_path": resume_path,
-            "cover_letter_pdf_path": cl_path,
-        }
+        await _log(pool, state.pipeline_job_id, "render_cover_letter_pdf",
+                   "Cover letter PDF rendered")
+        return {"cover_letter_pdf_path": cl_path}
     except Exception as e:
-        logger.error("render_pdf_failed", error=str(e))
-        return {"error": str(e)}
+        logger.warning("render_cover_letter_pdf_failed", error=str(e))
+        return {}
     finally:
         await _close_pool(pool)
 
 
-async def store_version(state: ResumeBuilderState) -> dict:
-    """Persist the resume version record to the DB."""
+async def update_version_cl(state: ResumeBuilderState) -> dict:
+    """Update the stored version record with the final cover letter PDF path."""
+    if not state.version_id or not state.cover_letter_pdf_path:
+        return {}
     pool = await _make_pool()
     try:
-        from agent.db_sqlite import insert_resume_version, update_resume_version_status
-
-        keywords_list = state.keywords
-
-        vid = await insert_resume_version(
-            pool,
-            job_id=state.job_id,
-            candidate_id=state.candidate_id,
-            archetype=state.archetype,
-            base_cv_hash=state.base_cv_hash,
-            archetype_confidence=state.archetype_confidence,
-            keywords=keywords_list,
-            resume_pdf_path=state.resume_pdf_path,
-            cover_letter_pdf_path=state.cover_letter_pdf_path,
-            generation_status="completed",
+        from agent.db_sqlite import update_resume_version_cover_letter
+        await update_resume_version_cover_letter(
+            pool, state.version_id, state.cover_letter_pdf_path
         )
-
-        # Update job status
-        if hasattr(pool, 'execute'):
-            await pool.execute("UPDATE jobs SET status = 'resume_ready' WHERE id = ?", (state.job_id,))
-            await pool.execute("UPDATE pipeline_jobs SET status = 'completed' WHERE id = ?",
-                               (state.pipeline_job_id,))
-            await pool.commit()
-
-        await _log(pool, state.pipeline_job_id, "store_version",
-                   f"Version stored: {vid}")
-        return {"version_id": vid}
+        await _log(pool, state.pipeline_job_id, "update_version_cl",
+                   "Cover letter path saved to version record")
+        return {}
     except Exception as e:
-        logger.error("store_version_failed", error=str(e))
-        return {"error": str(e)}
+        logger.warning("update_version_cl_failed", error=str(e))
+        return {}
     finally:
         await _close_pool(pool)
 
@@ -474,29 +460,33 @@ def _has_error(state: ResumeBuilderState) -> str:
 def _build_graph():
     g = StateGraph(ResumeBuilderState)
 
-    g.add_node("validate_inputs", validate_inputs)
-    g.add_node("extract_keywords", extract_keywords)
-    g.add_node("personalise_resume", personalise_resume)
-    g.add_node("self_review", self_review)
-    g.add_node("inject_keywords", inject_keywords)
+    g.add_node("validate_inputs",       validate_inputs)
+    g.add_node("extract_keywords",      extract_keywords)
+    g.add_node("personalise_resume",    personalise_resume)
+    g.add_node("inject_keywords",       inject_keywords)
+    g.add_node("render_resume_pdf",     render_resume_pdf)
+    g.add_node("store_version",         store_version)
     g.add_node("generate_cover_letter", generate_cover_letter)
-    g.add_node("render_pdf", render_pdf)
-    g.add_node("store_version", store_version)
-    g.add_node("handle_failure", handle_failure)
+    g.add_node("render_cover_letter_pdf", render_cover_letter_pdf)
+    g.add_node("update_version_cl",     update_version_cl)
+    g.add_node("handle_failure",        handle_failure)
 
     g.set_entry_point("validate_inputs")
+
     g.add_conditional_edges("validate_inputs", _has_error,
                             {"handle_failure": "handle_failure", "continue": "extract_keywords"})
     g.add_edge("extract_keywords", "personalise_resume")
     g.add_conditional_edges("personalise_resume", _has_error,
-                            {"handle_failure": "handle_failure", "continue": "self_review"})
-    g.add_conditional_edges("self_review", route_after_review)
-    g.add_edge("inject_keywords", "generate_cover_letter")
-    g.add_edge("generate_cover_letter", "render_pdf")
-    g.add_conditional_edges("render_pdf", _has_error,
+                            {"handle_failure": "handle_failure", "continue": "inject_keywords"})
+    g.add_edge("inject_keywords", "render_resume_pdf")
+    g.add_conditional_edges("render_resume_pdf", _has_error,
                             {"handle_failure": "handle_failure", "continue": "store_version"})
-    g.add_edge("store_version", END)
-    g.add_edge("handle_failure", END)
+    # Resume is now visible in the UI — cover letter generation is a background step.
+    g.add_edge("store_version",         "generate_cover_letter")
+    g.add_edge("generate_cover_letter", "render_cover_letter_pdf")
+    g.add_edge("render_cover_letter_pdf", "update_version_cl")
+    g.add_edge("update_version_cl",     END)
+    g.add_edge("handle_failure",        END)
 
     return g.compile()
 

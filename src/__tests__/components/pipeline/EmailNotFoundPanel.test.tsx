@@ -95,7 +95,7 @@ describe('EmailNotFoundPanel', () => {
     expect(baseProps.onUpdate).toHaveBeenCalled()
   })
 
-  it('calls startEmailOutreach and onUpdate when Retry is clicked', async () => {
+  it('calls startEmailOutreach with jobId+candidateId and then onUpdate when Retry is clicked', async () => {
     const { startEmailOutreach } = await import('@/lib/api')
     render(<EmailNotFoundPanel {...baseProps} />)
     fireEvent.click(screen.getByText('Retry (0/2)'))
@@ -105,7 +105,9 @@ describe('EmailNotFoundPanel', () => {
 
   it('shows Max retries reached when retry returns 429', async () => {
     const { startEmailOutreach } = await import('@/lib/api')
-    ;(startEmailOutreach as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('429: Max retries reached'))
+    ;(startEmailOutreach as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error('429: Max retries reached')
+    )
     render(<EmailNotFoundPanel {...baseProps} />)
     fireEvent.click(screen.getByText('Retry (0/2)'))
     await waitFor(() => expect(screen.getByText('Max retries reached')).toBeInTheDocument())

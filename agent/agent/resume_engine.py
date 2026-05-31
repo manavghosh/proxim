@@ -18,6 +18,21 @@ def _get_api_key(settings) -> str:
     return settings.anthropic_api_key
 
 
+def _reasoning_kwargs(settings) -> dict:
+    """Disable Gemini 'thinking' tokens — they consume the max_tokens budget and
+    truncate structured JSON output. No-op for non-Gemini providers."""
+    return {"reasoning_effort": "disable"} if settings.llm_provider == "gemini" else {}
+
+
+def _loads_json(raw: str) -> dict:
+    """Parse JSON, repairing truncated/malformed output as a fallback."""
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        from json_repair import repair_json
+        return json.loads(repair_json(raw))
+
+
 def _fix_json_newlines(s: str) -> str:
     """Escape raw newlines/CRs inside JSON string values.
 
@@ -54,6 +69,8 @@ def _call_llm(
     settings,
     job_id: str | None = None,
     run_id: str | None = None,
+    max_tokens: int = 2000,
+    timeout: int = 90,
 ) -> str:
     import litellm
     response = litellm.completion(
@@ -62,8 +79,10 @@ def _call_llm(
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
         temperature=0.2,
-        max_tokens=8192,
+        max_tokens=max_tokens,
+        timeout=timeout,
         metadata=langfuse_metadata("resume_engine", "resume", job_id=job_id, run_id=run_id),
+        **_reasoning_kwargs(settings),
     )
     choice = response.choices[0]
     finish_reason = getattr(choice, 'finish_reason', 'unknown')
@@ -127,8 +146,10 @@ JD: {str(job.get('jd_raw', ''))[:2000]}
     for attempt in range(3):
         raw = ""
         try:
-            raw = _call_llm(prompt, settings, job_id=job_id or job.get("id"), run_id=run_id)
-            parsed = json.loads(raw)
+            # Large budget: senior profiles with 10+ roles can exceed 4000 tokens of JSON output
+            raw = _call_llm(prompt, settings, job_id=job_id or job.get("id"), run_id=run_id,
+                            max_tokens=5000, timeout=150)
+            parsed = _loads_json(raw)
             return PersonalisedResume.model_validate(parsed)
         except (json.JSONDecodeError, ValueError) as exc:
             last_exc = exc
@@ -204,7 +225,8 @@ Respond with JSON:
   "company_research_used": false
 }}"""
 
-    raw = _call_llm(prompt, settings, job_id=job_id or job.get("id"), run_id=run_id)
+    raw = _call_llm(prompt, settings, job_id=job_id or job.get("id"), run_id=run_id,
+                    max_tokens=1500, timeout=90)
     parsed = json.loads(raw)
     return CoverLetterContent.model_validate(parsed)
 
@@ -228,8 +250,9 @@ Return exactly 15–20 keywords as strings in the array."""
 
     for attempt in range(2):
         try:
-            raw = _call_llm(prompt, settings, job_id=job_id, run_id=run_id)
-            parsed = json.loads(raw)
+            raw = _call_llm(prompt, settings, job_id=job_id, run_id=run_id,
+                            max_tokens=600, timeout=45)
+            parsed = _loads_json(raw)
             kws = parsed.get("keywords", [])
             return KeywordSet(keywords=kws)
         except Exception as e:

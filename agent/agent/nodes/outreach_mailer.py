@@ -412,6 +412,13 @@ async def discover_email_node(state: OutreachMailerState, config) -> OutreachMai
                 return email, min(base_confidence, 65), source
             return email, min(base_confidence, 40), source
 
+        if status == "rate_limited":
+            # Hunter.io quota exhausted — can't verify, but don't discard.
+            # Route to risky fallback so the user gets a candidate to review.
+            logger.warning("outreach_mailer.verification_skipped_rate_limit",
+                           email=email, source=source)
+            return email, min(base_confidence, 55) if domain_match else min(base_confidence, 35), source
+
         return None, 0, ""   # undeliverable / unknown
 
     # Track the best below-threshold candidate in case no pass yields a confident email.

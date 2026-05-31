@@ -34,7 +34,12 @@ async def create_pool(database_url: str) -> aiosqlite.Connection:
         if path.startswith(prefix):
             path = path[len(prefix):]
             break
-    conn = await aiosqlite.connect(path)
+    # isolation_level=None → true autocommit: every statement is its own transaction.
+    # Without this, Python's sqlite3 issues an implicit BEGIN before each DML, which
+    # takes a WAL snapshot. Reads on the same connection then see that frozen snapshot
+    # and miss concurrent writes from other processes (e.g. the Next.js cancel API).
+    # pool.commit() calls remain safe — they are no-ops in autocommit mode.
+    conn = await aiosqlite.connect(path, isolation_level=None)
     await conn.execute('PRAGMA journal_mode=WAL')
     await conn.execute('PRAGMA foreign_keys=ON')
     return conn
@@ -73,6 +78,17 @@ async def claim_pipeline_job(pool: aiosqlite.Connection) -> Optional[dict]:
             'candidate_id': row[3],
             'payload': json.loads(row[4]) if row[4] else {},
         }
+
+
+async def get_pipeline_job_status(
+    pool: aiosqlite.Connection,
+    job_id: str,
+) -> str | None:
+    async with pool.execute(
+        'SELECT status FROM pipeline_jobs WHERE id = ?', (job_id,)
+    ) as cur:
+        row = await cur.fetchone()
+    return row[0] if row else None
 
 
 async def update_pipeline_job_status(
@@ -327,12 +343,14 @@ async def queue_pipeline_job(
     pool: aiosqlite.Connection,
     candidate_id: str,
     job_type: str,
+    payload: dict | None = None,
 ) -> str:
     job_id = _new_id()
+    payload_str = json.dumps(payload) if payload else '{}'
     await pool.execute(
         "INSERT INTO pipeline_jobs (id, status, job_type, candidate_id, payload, created_at) "
-        "VALUES (?, 'queued', ?, ?, '{}', ?)",
-        (job_id, job_type, candidate_id, _now()),
+        "VALUES (?, 'queued', ?, ?, ?, ?)",
+        (job_id, job_type, candidate_id, payload_str, _now()),
     )
     await pool.commit()
     return job_id
@@ -540,6 +558,18 @@ async def update_resume_version_status(
         "UPDATE resume_versions SET generation_status = ?, "
         "resume_pdf_path = ?, cover_letter_pdf_path = ? WHERE id = ?",
         (status, resume_pdf_path, cover_letter_pdf_path, version_id),
+    )
+    await pool.commit()
+
+
+async def update_resume_version_cover_letter(
+    pool: aiosqlite.Connection,
+    version_id: str,
+    cover_letter_pdf_path: str,
+) -> None:
+    await pool.execute(
+        "UPDATE resume_versions SET cover_letter_pdf_path = ? WHERE id = ?",
+        (cover_letter_pdf_path, version_id),
     )
     await pool.commit()
 

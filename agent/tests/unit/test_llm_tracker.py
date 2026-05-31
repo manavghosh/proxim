@@ -30,6 +30,29 @@ def test_configure_langfuse_is_noop_when_keys_empty():
     )
 
 
+def test_configure_langfuse_registers_a_custom_logger_instance():
+    """Regression: the Langfuse callback MUST be a litellm CustomLogger subclass.
+
+    LiteLLM only invokes log_success_event/async_log_success_event on CustomLogger
+    instances. A plain class is added to litellm.callbacks but never called, so no
+    cost/token/trace is ever sent to Langfuse for any LLM call.
+    """
+    import litellm
+    from litellm.integrations.custom_logger import CustomLogger
+
+    settings = _FakeSettings()
+    settings.langfuse_public_key = "pk-lf-test"
+    settings.langfuse_secret_key = "sk-lf-test"
+    settings.langfuse_base_url = "https://us.cloud.langfuse.com"
+
+    from agent.llm_tracker import configure_langfuse
+    configure_langfuse(settings)
+
+    assert any(isinstance(cb, CustomLogger) for cb in litellm.callbacks), (
+        "Langfuse callback must subclass litellm CustomLogger or LiteLLM never invokes it"
+    )
+
+
 def test_configure_langfuse_does_not_raise_on_import_error():
     """configure_langfuse catches exceptions gracefully — bad credentials must not crash daemon."""
     settings = _FakeSettings()

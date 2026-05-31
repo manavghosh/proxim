@@ -116,6 +116,8 @@ class ScoringState(BaseModel):
     scored_count:    int = 0
     failed_count:    int = 0
     skipped_count:   int = 0
+    was_cancelled:   bool = False   # set when a mid-run cancel is detected
+    cancelled_count: int = 0        # jobs in the batch that were not scored due to cancellation
 
 
 # ── Resume Builder (F10) ──────────────────────────────────────────────────────
@@ -178,12 +180,7 @@ class ResumeBuilderState(BaseModel):
     # Intermediate outputs
     keywords:           list[str] = []
     personalised_resume: str = ""   # JSON-serialised PersonalisedResume
-    review_feedback:    str = ""
     cover_letter:       str = ""    # JSON-serialised CoverLetterContent
-
-    # Retry tracking
-    self_review_attempt: int  = 0
-    review_passed:       bool = False
 
     # Final outputs
     resume_pdf_path:       str = ""

@@ -22,7 +22,10 @@ async def _sleep_until_stopped(seconds: float) -> None:
 
 async def _dispatch_job(pool, job: dict) -> None:
     """Dispatch a pipeline job to the appropriate LangGraph graph."""
-    from agent.db import insert_pipeline_run, get_candidate_preferences
+    from agent.db import (
+        insert_pipeline_run, get_candidate_preferences,
+        update_pipeline_run, update_run_aggregates,
+    )
 
     run_id = await insert_pipeline_run(pool, job['id'], job['candidate_id'])
 
@@ -37,7 +40,17 @@ async def _dispatch_job(pool, job: dict) -> None:
             pipeline_job_id=str(job['id']),
             pipeline_run_id=run_id,
         )
-        await fetch_jds_graph.ainvoke(state)
+        try:
+            from datetime import datetime, timezone as _tz
+            await fetch_jds_graph.ainvoke(state)
+            await update_run_aggregates(pool, run_id)
+            await update_pipeline_run(pool, run_id, status='completed',
+                                      completedAt=datetime.now(_tz.utc))
+            logger.info("pipeline_run_complete", run_id=run_id, job_type='fetch_jds')
+        except Exception as exc:
+            logger.error("pipeline_run_failed", run_id=run_id, job_type='fetch_jds', error=str(exc))
+            await update_pipeline_run(pool, run_id, status='failed', error=str(exc))
+            raise
 
     elif job['job_type'] == 'resume_builder':
         from agent.graphs.resume_builder import resume_builder_graph
@@ -53,7 +66,17 @@ async def _dispatch_job(pool, job: dict) -> None:
             pipeline_run_id=run_id,
             job_id=job_id,
         )
-        await resume_builder_graph.ainvoke(state)
+        try:
+            from datetime import datetime, timezone as _tz
+            await resume_builder_graph.ainvoke(state)
+            await update_run_aggregates(pool, run_id)
+            await update_pipeline_run(pool, run_id, status='completed',
+                                      completedAt=datetime.now(_tz.utc))
+            logger.info("pipeline_run_complete", run_id=run_id, job_type='resume_builder')
+        except Exception as exc:
+            logger.error("pipeline_run_failed", run_id=run_id, job_type='resume_builder', error=str(exc))
+            await update_pipeline_run(pool, run_id, status='failed', error=str(exc))
+            raise
 
     elif job['job_type'] == 'score_jobs':
         from agent.graphs.scoring import scoring_graph
@@ -74,7 +97,17 @@ async def _dispatch_job(pool, job: dict) -> None:
             pipeline_run_id=run_id,
             job_ids=list(job_ids),
         )
-        await scoring_graph.ainvoke(state)
+        try:
+            from datetime import datetime, timezone as _tz
+            await scoring_graph.ainvoke(state)
+            await update_run_aggregates(pool, run_id)
+            await update_pipeline_run(pool, run_id, status='completed',
+                                      completedAt=datetime.now(_tz.utc))
+            logger.info("pipeline_run_complete", run_id=run_id, job_type='score_jobs')
+        except Exception as exc:
+            logger.error("pipeline_run_failed", run_id=run_id, job_type='score_jobs', error=str(exc))
+            await update_pipeline_run(pool, run_id, status='failed', error=str(exc))
+            raise
 
     elif job['job_type'] == 'linkedin_note_regen':
         import agent.db as _db_regen
@@ -318,7 +351,7 @@ async def _dispatch_job(pool, job: dict) -> None:
                        f"Fetch complete — {fetched} LinkedIn job(s) processed. Queuing scoring.",
                        {"fetched": fetched})
 
-            await queue_pipeline_job(pool, cand_id, 'score_jobs')
+            await queue_pipeline_job(pool, cand_id, 'score_jobs', payload={'job_ids': job_ids})
             await _log("import_jobs",
                        f"Score jobs queued — jobs will appear in the Pipeline review queue once scored.",
                        {"queued": True})
@@ -521,8 +554,17 @@ async def _dispatch_job(pool, job: dict) -> None:
         )
 
         logger.info("graph_invoking", graph="discovery", job_id=job['id'])
-        await discovery_graph.ainvoke(state)
-        logger.info("graph_complete", graph="discovery", job_id=job['id'])
+        try:
+            from datetime import datetime, timezone as _tz
+            await discovery_graph.ainvoke(state)
+            await update_run_aggregates(pool, run_id)
+            await update_pipeline_run(pool, run_id, status='completed',
+                                      completedAt=datetime.now(_tz.utc))
+            logger.info("pipeline_run_complete", run_id=run_id, job_type=job['job_type'])
+        except Exception as exc:
+            logger.error("pipeline_run_failed", run_id=run_id, job_type=job['job_type'], error=str(exc))
+            await update_pipeline_run(pool, run_id, status='failed', error=str(exc))
+            raise
 
 
 async def _linkedin_acceptance_poll_once(pool) -> None:

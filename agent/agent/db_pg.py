@@ -37,6 +37,17 @@ async def claim_pipeline_job(pool: asyncpg.Pool) -> Optional[dict]:
         return result
 
 
+async def get_pipeline_job_status(
+    pool: asyncpg.Pool,
+    job_id: str,
+) -> str | None:
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            'SELECT status FROM pipeline_jobs WHERE id = $1', job_id
+        )
+    return row['status'] if row else None
+
+
 async def update_pipeline_job_status(
     pool: asyncpg.Pool,
     job_id: str,
@@ -272,12 +283,13 @@ async def queue_pipeline_job(
     pool: asyncpg.Pool,
     candidate_id: str,
     job_type: str,
+    payload: dict | None = None,
 ) -> str:
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
             "INSERT INTO pipeline_jobs (job_type, candidate_id, payload) "
             "VALUES ($1, $2, $3) RETURNING id",
-            job_type, candidate_id, {},
+            job_type, candidate_id, payload or {},
         )
     return str(row["id"])
 
