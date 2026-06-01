@@ -111,6 +111,40 @@ async def test_discover_email_node_sets_low_confidence_when_best_result_is_risky
     assert result["status"] == "low_confidence"
 
 
+def test_is_placeholder_company_detects_hidden_employers():
+    from agent.nodes.outreach_mailer import _is_placeholder_company
+    assert _is_placeholder_company("Confidential")
+    assert _is_placeholder_company("Confidential Company")
+    assert _is_placeholder_company("Stealth Startup")
+    assert _is_placeholder_company("Undisclosed")
+    assert _is_placeholder_company("a global confidential employer")  # 'confidential' word
+    assert not _is_placeholder_company("Acme Corp")
+    assert not _is_placeholder_company("Google")
+    assert not _is_placeholder_company("Confidentiality Networks")     # not the word 'confidential'
+
+
+@pytest.mark.asyncio
+async def test_discover_email_node_holds_placeholder_company_for_review():
+    """A 'Confidential' employer can only yield a guessed domain → held as
+    low_confidence for manual review instead of auto-proceeding to generation."""
+    state = {**BASE_STATE, "company": "Confidential", "hiring_manager_name": "Venkat B"}
+
+    with patch("agent.nodes.outreach_mailer._find_company_domain",
+               new=AsyncMock(return_value="confidentialofficial.com")), \
+         patch("agent.nodes.outreach_mailer.hunter_io.find_email",
+               new=AsyncMock(return_value={"email": "venkat.b@confidentialofficial.com", "score": 85})), \
+         patch("agent.nodes.outreach_mailer.hunter_io.verify_email",
+               new=AsyncMock(return_value="deliverable")), \
+         patch("agent.nodes.outreach_mailer.update_email_cadence", new=AsyncMock()):
+
+        from agent.nodes.outreach_mailer import discover_email_node
+        result = await discover_email_node(state, CONFIG)
+
+    # Even with a "deliverable" verification, a placeholder employer is held.
+    assert result["status"] == "low_confidence"
+    assert result["discovered_email"] == "venkat.b@confidentialofficial.com"
+
+
 @pytest.mark.asyncio
 async def test_discover_email_node_domain_matched_accept_all_beats_non_domain_deliverable():
     """Key regression: accept_all on company domain wins over deliverable on unrelated domain.

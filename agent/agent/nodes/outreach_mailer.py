@@ -280,6 +280,28 @@ def _company_to_domain(company: str) -> str:
     return f"{''.join(meaningful[:2])}.com"
 
 
+# Placeholder "employer" names used when the real company is hidden. These can
+# never resolve to a real email domain, so any address discovered for them is a
+# guess and must be confirmed by the user before sending.
+_PLACEHOLDER_COMPANIES = frozenset([
+    "confidential", "confidential company", "company confidential",
+    "undisclosed", "not disclosed", "undisclosed company",
+    "stealth", "stealth startup", "stealth mode",
+    "various", "multiple", "multiple companies",
+    "private", "private company", "unknown", "none", "n a", "na",
+])
+
+# A name-derived (synthetic) domain with confidence below this is held for review
+# rather than auto-proceeding to draft generation.
+_SYNTHETIC_DOMAIN_MIN_CONFIDENCE = 80
+
+
+def _is_placeholder_company(company: str) -> bool:
+    """True if *company* is a hidden-employer placeholder, not a real name."""
+    c = " ".join(re.sub(r"[^a-z0-9 ]", " ", (company or "").lower()).split())
+    return c in _PLACEHOLDER_COMPANIES or "confidential" in c.split()
+
+
 def _is_plausible_email(email: str) -> bool:
     """Reject emails that look like LinkedIn URL slugs or are otherwise malformed."""
     if not email or '@' not in email:
@@ -324,6 +346,10 @@ async def discover_email_node(state: OutreachMailerState, config) -> OutreachMai
         span.set_attribute("pipeline_run_id", state.get("run_id") or "")
         real_domain = await _find_company_domain(company, exa_api_key)
     domain      = real_domain or _company_to_domain(company)
+    # Guard signals: a placeholder employer has no real domain, and a name-derived
+    # domain (Exa found no official site) is an unverified guess.
+    placeholder      = _is_placeholder_company(company)
+    synthetic_domain = real_domain is None
 
     # Resolve contact name from LinkedIn connector if not already in state
     hiring_manager_name = state.get("hiring_manager_name") or ""
@@ -456,6 +482,33 @@ async def discover_email_node(state: OutreachMailerState, config) -> OutreachMai
         risky_email, risky_conf, risky_src = e, c, s
         return None, 0, ""
 
+    async def _accept(e: str, c: int, s: str) -> dict:
+        """Finalise a discovered email — but hold guessed-domain addresses for
+        manual review instead of auto-proceeding to draft generation.
+
+        A placeholder employer ("Confidential", "Stealth", …) can't have a real
+        domain, and a name-derived (synthetic) domain below the confidence floor
+        is a guess. Either way, surface it as low_confidence so the user confirms
+        or corrects the address before anything is sent.
+        """
+        if placeholder or (synthetic_domain and c < _SYNTHETIC_DOMAIN_MIN_CONFIDENCE):
+            logger.info("outreach_mailer.email_held_for_review",
+                        cadence_id=cadence_id, email=e, confidence=c,
+                        placeholder=placeholder, synthetic_domain=synthetic_domain)
+            await update_email_cadence(pool, cadence_id, status="low_confidence",
+                                       hiring_manager_email=e, email_confidence=c,
+                                       email_source=s)
+            return {
+                **state,
+                "status": "low_confidence",
+                "hiring_manager_name": hiring_manager_name or state.get("hiring_manager_name"),
+                "discovered_email": e,
+                "email_confidence": c,
+                "email_source": s,
+            }
+        await _finalise(pool, cadence_id, state, e, c, s, hiring_manager_name)
+        return _success_state(state, e, c, s, hiring_manager_name)
+
     # ── Pass 1: Hunter.io Email Finder ────────────────────────────────────────
     if first_name:
         result = await hunter_io.find_email(domain, first_name, last_name, hunter_key)
@@ -463,8 +516,7 @@ async def discover_email_node(state: OutreachMailerState, config) -> OutreachMai
             e, c, s = await _try(result["email"], "finder", result.get("score", 70))
             if e:
                 logger.info("outreach_mailer.email_found", pass_=1, email=e, confidence=c)
-                await _finalise(pool, cadence_id, state, e, c, s, hiring_manager_name)
-                return _success_state(state, e, c, s, hiring_manager_name)
+                return await _accept(e, c, s)
 
     # ── Pass 2: Exa web search ────────────────────────────────────────────────
     if clean_name:
@@ -473,8 +525,7 @@ async def discover_email_node(state: OutreachMailerState, config) -> OutreachMai
             e, c, s = await _try(web_email, "web_search", 80)
             if e:
                 logger.info("outreach_mailer.email_found", pass_=2, email=e, confidence=c)
-                await _finalise(pool, cadence_id, state, e, c, s, hiring_manager_name)
-                return _success_state(state, e, c, s, hiring_manager_name)
+                return await _accept(e, c, s)
 
     # ── Pass 3: Pattern guessing + verification ───────────────────────────────
     if first_name:
@@ -486,8 +537,7 @@ async def discover_email_node(state: OutreachMailerState, config) -> OutreachMai
             e, c, s = await _try(candidate, "pattern_guess", 75)
             if e:
                 logger.info("outreach_mailer.email_found", pass_=3, email=e, confidence=c)
-                await _finalise(pool, cadence_id, state, e, c, s, hiring_manager_name)
-                return _success_state(state, e, c, s, hiring_manager_name)
+                return await _accept(e, c, s)
 
     # ── Pass 4: Hunter.io Domain Search fallback ──────────────────────────────
     domain_results = await hunter_io.domain_search(domain, hunter_key)
