@@ -154,7 +154,7 @@ with sync_playwright() as p:
         results["ui_step1"] = check("Step 1 visible (Scraping)", page.get_by_text("Scraping job pages").is_visible())
         results["ui_step2"] = check("Step 2 visible (Scoring)",  page.get_by_text("Scoring against").is_visible())
         results["ui_step3"] = check("Step 3 visible (Pipeline)", page.get_by_text("Pipeline for your review").is_visible())
-        results["ui_go_btn"] = check("Go to Pipeline button shown", page.get_by_role("link", name="Go to Pipeline").is_visible())
+        results["ui_go_btn"] = check("Go to Scorecard button shown", page.get_by_role("link", name="Go to Scorecard").is_visible())
     else:
         print("  (URL may already exist from a previous test run)")
 

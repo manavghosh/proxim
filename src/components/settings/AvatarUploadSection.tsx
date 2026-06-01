@@ -80,7 +80,7 @@ export function AvatarUploadSection({ candidateId, candidateName, avatarData, on
             </Button>
           )}
         </div>
-        <p className="text-[10px] text-muted-foreground">JPG, PNG or GIF · will be cropped to square</p>
+        <p className="text-[10px] text-muted-foreground">JPG, PNG or GIF</p>
         <input
           ref={inputRef}
           type="file"

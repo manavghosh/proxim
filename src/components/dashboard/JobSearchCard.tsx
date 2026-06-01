@@ -352,7 +352,7 @@ export function JobSearchCard({
                 router.push(`/candidates/${candidateId}/pipeline`)
               }}
             >
-              Review {completeResult.newJobs} New Jobs in Pipeline <ArrowRight className="w-3.5 h-3.5" />
+              Review {completeResult.newJobs} New Jobs in Scorecard <ArrowRight className="w-3.5 h-3.5" />
             </Button>
             <p className="text-[10px] text-muted-foreground text-center">
               Auto-dismisses in {dismissTimer}s

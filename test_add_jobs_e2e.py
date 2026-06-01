@@ -114,8 +114,8 @@ with sync_playwright() as p:
             page.get_by_text("Scoring against").is_visible())
         results["step3"] = check("Step 3 visible (Jobs appear in Pipeline)",
             page.get_by_text("Pipeline for your review").is_visible())
-        results["go_pipeline"] = check("Go to Pipeline button visible",
-            page.get_by_role("link", name="Go to Pipeline").is_visible())
+        results["go_pipeline"] = check("Go to Scorecard button visible",
+            page.get_by_role("link", name="Go to Scorecard").is_visible())
     elif is_dedup:
         print("  Deduplication path (URLs already existed):")
         results["step1"] = results["step2"] = results["step3"] = True
