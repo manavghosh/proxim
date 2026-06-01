@@ -349,6 +349,7 @@ export const emailCadences = pgTable('email_cadences', {
   bounceDetectedAt:   timestamp({ withTimezone: true }),
   errorMessage:       text(),
   retryCount:         integer().notNull().default(0),
+  sendRetryCount:     integer().notNull().default(0),
   createdAt:          timestamp({ withTimezone: true }).defaultNow().notNull(),
   updatedAt:          timestamp({ withTimezone: true }).defaultNow().notNull().$onUpdateFn(() => new Date()),
 }, (table) => [

@@ -578,6 +578,7 @@ async def update_email_cadence(
         "reply_detected_at": "reply_detected_at",
         "bounce_detected_at": "bounce_detected_at",
         "error_message": "error_message",
+        "send_retry_count": "send_retry_count",
     }
     sets, values = [], []
     for i, (k, v) in enumerate(kwargs.items(), start=1):
@@ -657,7 +658,8 @@ async def get_scheduled_drafts(pool: asyncpg.Pool) -> list[dict]:
         rows = await conn.fetch(
             "SELECT ed.id, ed.cadence_id, ed.candidate_id, ed.day_number, "
             "ed.subject, ed.body_html, ed.body_text, ed.scheduled_send_at, "
-            "ec.gmail_thread_id, ec.day1_message_id, ec.hiring_manager_email, ec.status AS cadence_status "
+            "ec.gmail_thread_id, ec.day1_message_id, ec.hiring_manager_email, ec.status AS cadence_status, "
+            "ec.send_retry_count "
             "FROM email_drafts ed "
             "JOIN email_cadences ec ON ec.id = ed.cadence_id "
             "WHERE ed.status IN ('scheduled', 'approved') "

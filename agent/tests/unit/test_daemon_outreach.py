@@ -26,6 +26,7 @@ def _make_draft(
     day1_message_id=None,
     hiring_manager_email="sarah@acme.com",
     cadence_status="approved",
+    send_retry_count=0,
 ):
     return {
         "id": draft_id,
@@ -40,6 +41,7 @@ def _make_draft(
         "day1_message_id": day1_message_id,
         "hiring_manager_email": hiring_manager_email,
         "cadence_status": cadence_status,
+        "send_retry_count": send_retry_count,
     }
 
 
@@ -216,6 +218,96 @@ async def test_send_loop_threads_day3_day7_using_day1_message_id_and_thread_id()
 
     assert captured_kwargs.get("thread_id") == "th-001"
     assert captured_kwargs.get("in_reply_to") == "msg-001"
+
+
+# ── Transient send-failure tolerance (network errors) ─────────────────────────
+
+@pytest.mark.asyncio
+async def test_send_loop_records_retry_without_failing_below_threshold():
+    """A transient send error (e.g. network/DNS) should bump send_retry_count and
+    record the reason, but NOT mark the cadence failed while attempts remain."""
+    pool = MagicMock()
+    draft = _make_draft(day_number=1, send_retry_count=0)
+
+    with patch("agent.db.get_scheduled_drafts", new=AsyncMock(return_value=[draft])), \
+         patch("agent.db.get_daily_email_send_count", new=AsyncMock(return_value=0)), \
+         patch("agent.db.get_resume_version_for_send", new=AsyncMock(return_value=_make_resume_version())), \
+         patch("agent.db.get_candidate_preferences",
+               new=AsyncMock(return_value={"gmail_access_token": "tok", "gmail_refresh_token": "ref", "email_outreach_mode": "agentic"})), \
+         patch("agent.gmail_client.send_email",
+               side_effect=ConnectionError("Unable to find the server at gmail.googleapis.com")), \
+         patch("agent.db.update_email_draft", new=AsyncMock()) as mock_update_draft, \
+         patch("agent.db.update_email_cadence", new=AsyncMock()) as mock_update_cadence:
+
+        from agent.daemon import _outreach_send_once
+        await _outreach_send_once(pool)  # must NOT raise
+
+    kwargs = mock_update_cadence.call_args[1]
+    assert kwargs.get("send_retry_count") == 1
+    assert kwargs.get("error_message")          # reason stored for logs/debug
+    assert kwargs.get("status") != "failed"     # not failed yet
+    # draft stays scheduled (auto-retry next pass) — never cancelled here
+    cancel_calls = [c for c in mock_update_draft.call_args_list if c[1].get("status") == "cancelled"]
+    assert cancel_calls == []
+
+
+@pytest.mark.asyncio
+async def test_send_loop_marks_failed_after_third_send_attempt():
+    """On the 3rd consecutive send failure the cadence is marked failed and the
+    draft cancelled so it stops auto-retrying."""
+    pool = MagicMock()
+    draft = _make_draft(day_number=1, send_retry_count=2)  # this attempt is the 3rd
+
+    with patch("agent.db.get_scheduled_drafts", new=AsyncMock(return_value=[draft])), \
+         patch("agent.db.get_daily_email_send_count", new=AsyncMock(return_value=0)), \
+         patch("agent.db.get_resume_version_for_send", new=AsyncMock(return_value=_make_resume_version())), \
+         patch("agent.db.get_candidate_preferences",
+               new=AsyncMock(return_value={"gmail_access_token": "tok", "gmail_refresh_token": "ref", "email_outreach_mode": "agentic"})), \
+         patch("agent.gmail_client.send_email",
+               side_effect=ConnectionError("Unable to find the server at gmail.googleapis.com")), \
+         patch("agent.db.update_email_draft", new=AsyncMock()) as mock_update_draft, \
+         patch("agent.db.update_email_cadence", new=AsyncMock()) as mock_update_cadence:
+
+        from agent.daemon import _outreach_send_once
+        await _outreach_send_once(pool)
+
+    kwargs = mock_update_cadence.call_args[1]
+    assert kwargs.get("status") == "failed"
+    assert kwargs.get("send_retry_count") == 3
+    cancel_calls = [c for c in mock_update_draft.call_args_list if c[1].get("status") == "cancelled"]
+    assert cancel_calls, "failed send should cancel the draft to stop auto-retry"
+
+
+@pytest.mark.asyncio
+async def test_send_loop_does_not_abort_remaining_drafts_on_send_error():
+    """One draft failing must not skip the other scheduled drafts in the pass."""
+    pool = MagicMock()
+    bad  = _make_draft(draft_id="d-bad", cadence_id="cad-bad", day_number=1)
+    good = _make_draft(draft_id="d-good", cadence_id="cad-good", day_number=1)
+
+    # first send (bad draft) raises, second send (good draft) succeeds
+    send_results = [
+        ConnectionError("Unable to find the server at gmail.googleapis.com"),
+        {"id": "gm-good", "threadId": "th-good"},
+    ]
+
+    with patch("agent.db.get_scheduled_drafts", new=AsyncMock(return_value=[bad, good])), \
+         patch("agent.db.get_daily_email_send_count", new=AsyncMock(return_value=0)), \
+         patch("agent.db.get_resume_version_for_send", new=AsyncMock(return_value=_make_resume_version())), \
+         patch("agent.db.get_candidate_preferences",
+               new=AsyncMock(return_value={"gmail_access_token": "tok", "gmail_refresh_token": "ref", "email_outreach_mode": "agentic"})), \
+         patch("agent.gmail_client.send_email", side_effect=send_results), \
+         patch("agent.db.get_cadence_drafts", new=AsyncMock(return_value=[])), \
+         patch("agent.db.update_email_draft", new=AsyncMock()) as mock_update_draft, \
+         patch("agent.db.update_email_cadence", new=AsyncMock()):
+
+        from agent.daemon import _outreach_send_once
+        await _outreach_send_once(pool)
+
+    # the good draft was still sent despite the bad one failing first
+    sent_calls = [c for c in mock_update_draft.call_args_list
+                  if c[0][1] == "d-good" and c[1].get("status") == "sent"]
+    assert sent_calls, "second draft should still send after the first one errors"
 
 
 # ── Reply/Bounce Detection Tests (T063) ───────────────────────────────────────

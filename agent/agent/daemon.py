@@ -724,6 +724,10 @@ async def _snooze_resurface_loop(pool) -> None:
         await _sleep_until_stopped(60)
 
 
+# Consecutive send failures tolerated before a cadence is marked failed.
+_MAX_SEND_ATTEMPTS = 3
+
+
 async def _outreach_send_once(pool) -> None:
     """Single pass of the cadence send loop."""
     import agent.db as _db
@@ -818,7 +822,9 @@ async def _outreach_send_once(pool) -> None:
                 await _db.update_email_cadence(pool, cadence_id,
                                                 gmail_thread_id=result["threadId"],
                                                 day1_message_id=result["id"],
-                                                status="active")
+                                                status="active",
+                                                send_retry_count=0,
+                                                error_message=None)
                 # Schedule Day 3 and Day 7
                 day3_at = (datetime.now(timezone.utc) + timedelta(hours=72)).isoformat()
                 day7_at = (datetime.now(timezone.utc) + timedelta(hours=168)).isoformat()
@@ -830,10 +836,34 @@ async def _outreach_send_once(pool) -> None:
                     elif od["day_number"] == 7:
                         await _db.update_email_draft(pool, od["id"], status="scheduled",
                                                       scheduled_send_at=day7_at)
+            else:
+                # Successful follow-up send — clear any earlier transient-failure state
+                await _db.update_email_cadence(pool, cadence_id,
+                                                send_retry_count=0, error_message=None)
 
         except GmailAuthExpiredError:
             await _db.update_email_cadence(pool, cadence_id, status="auth_expired")
             logger.warning("outreach.auth_expired", cadence_id=cadence_id)
+        except Exception as exc:
+            # Transient send failure (network/DNS/5xx). Tolerate up to
+            # _MAX_SEND_ATTEMPTS across passes before surfacing as failed; the
+            # draft stays scheduled so the loop auto-retries next cycle.
+            attempts = int(draft.get("send_retry_count") or 0) + 1
+            if attempts >= _MAX_SEND_ATTEMPTS:
+                await _db.update_email_cadence(pool, cadence_id, status="failed",
+                                                send_retry_count=attempts,
+                                                error_message=str(exc)[:500])
+                await _db.update_email_draft(pool, draft_id, status="cancelled")
+                logger.error("outreach.send_failed", cadence_id=cadence_id,
+                             draft_id=draft_id, attempts=attempts, error=str(exc))
+            else:
+                await _db.update_email_cadence(pool, cadence_id,
+                                                send_retry_count=attempts,
+                                                error_message=str(exc)[:500])
+                logger.warning("outreach.send_retry", cadence_id=cadence_id,
+                               draft_id=draft_id, attempt=attempts,
+                               max_attempts=_MAX_SEND_ATTEMPTS, error=str(exc))
+            continue
 
 
 async def _outreach_send_loop(pool) -> None:

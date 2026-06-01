@@ -840,6 +840,7 @@ async def update_email_cadence(
         "reply_detected_at": "reply_detected_at",
         "bounce_detected_at": "bounce_detected_at",
         "error_message": "error_message",
+        "send_retry_count": "send_retry_count",
     }
     sets, values = [], []
     for k, v in kwargs.items():
@@ -931,7 +932,7 @@ async def get_scheduled_drafts(pool: aiosqlite.Connection) -> list[dict]:
         "SELECT ed.id, ed.cadence_id, ed.candidate_id, ed.day_number, "
         "ed.subject, ed.body_html, ed.body_text, ed.scheduled_send_at, "
         "ec.gmail_thread_id, ec.day1_message_id, ec.hiring_manager_email, ec.status AS cadence_status, "
-        "ec.job_id "
+        "ec.job_id, ec.send_retry_count "
         "FROM email_drafts ed "
         "JOIN email_cadences ec ON ec.id = ed.cadence_id "
         "WHERE ed.status IN ('scheduled', 'approved') "
@@ -947,7 +948,7 @@ async def get_scheduled_drafts(pool: aiosqlite.Connection) -> list[dict]:
         "id", "cadence_id", "candidate_id", "day_number",
         "subject", "body_html", "body_text", "scheduled_send_at",
         "gmail_thread_id", "day1_message_id", "hiring_manager_email", "cadence_status",
-        "job_id",
+        "job_id", "send_retry_count",
     ]
     return [dict(zip(cols, row)) for row in rows]
 

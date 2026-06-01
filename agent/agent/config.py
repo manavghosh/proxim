@@ -1,3 +1,5 @@
+import os
+
 from pydantic_settings import BaseSettings
 
 
@@ -27,8 +29,16 @@ class Settings(BaseSettings):
     langfuse_base_url: str = ""    # reads LANGFUSE_BASE_URL (alias used by some setups)
     otel_exporter_otlp_endpoint: str = "http://localhost:4317"
     otel_service_name: str = "proxim-agent"
+    # Use LiteLLM's bundled pricing table instead of fetching it from GitHub on
+    # cold start (avoids the "Failed to fetch remote model cost map" timeout warning).
+    litellm_local_model_cost_map: bool = True
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 
 settings = Settings()  # pyright: ignore[reportCallIssue]
+
+# Bridge the setting into the OS environment LiteLLM reads. Done here (config is
+# imported before litellm anywhere) so litellm uses the local cost map on import.
+if settings.litellm_local_model_cost_map:
+    os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
