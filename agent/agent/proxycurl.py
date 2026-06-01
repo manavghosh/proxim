@@ -9,6 +9,7 @@ Add to agent/.env:  EXA_API_KEY=your_key_here
 """
 from __future__ import annotations
 
+import asyncio
 from typing import Optional
 
 import structlog
@@ -20,9 +21,44 @@ class ProxycurlRateLimitError(Exception):
     """Raised when the upstream API returns a rate-limit response."""
 
 
+# Transient upstream failures worth retrying. Exa runs live web crawls per
+# request, so under load a single call can exceed Cloudflare's gateway timeout
+# (524) or hit a transient 5xx — almost always succeeds on a quick retry.
+_TRANSIENT_STATUS = ("500", "502", "503", "504", "524")
+
+
 def _exa_client(api_key: str):
     from exa_py import Exa  # pip install exa_py
     return Exa(api_key=api_key)
+
+
+async def _exa_call(fn, *, attempts: int = 3, base_delay: float = 2.0):
+    """Run a synchronous Exa SDK call with retry/backoff on transient 5xx errors.
+
+    Rate limits (429) and non-transient errors are raised immediately so each
+    caller keeps its existing handling. Transient gateway timeouts / 5xx are
+    retried with linear backoff; the final failure is re-raised unchanged.
+    """
+    last_exc: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            return fn()
+        except Exception as exc:
+            msg = str(exc)
+            # Never retry rate limits — let the caller raise ProxycurlRateLimitError.
+            if "429" in msg or "rate" in msg.lower():
+                raise
+            # Only retry transient upstream gateway timeouts / 5xx.
+            if not any(code in msg for code in _TRANSIENT_STATUS):
+                raise
+            last_exc = exc
+            if attempt < attempts:
+                delay = base_delay * attempt
+                logger.warning("exa.transient_retry", attempt=attempt,
+                               max_attempts=attempts, delay=delay, error=msg[:120])
+                await asyncio.sleep(delay)
+    # Exhausted retries on a transient error — re-raise so the caller logs it.
+    raise last_exc  # type: ignore[misc]
 
 
 async def search_employees(
@@ -43,11 +79,11 @@ async def search_employees(
     query = f"{role} at {company_name}"
     try:
         exa     = _exa_client(api_key)
-        results = exa.search(
+        results = await _exa_call(lambda: exa.search(
             query,
             category="people",
             num_results=1,
-        )
+        ))
 
         if not results.results:
             logger.info("exa.no_match", company=company_name, role=role, query=query)
@@ -109,7 +145,7 @@ async def find_company_domain(company: str, api_key: str) -> Optional[str]:
     query = f"{company} official website"
     try:
         exa     = _exa_client(api_key)
-        results = exa.search(query, num_results=5)
+        results = await _exa_call(lambda: exa.search(query, num_results=5))
         for hit in results.results:
             url = hit.url or ""
             if not url:
@@ -166,7 +202,7 @@ async def search_person_profile(
     try:
         exa = _exa_client(api_key)
         # Global search — no category restriction
-        results = exa.search(query, num_results=5)
+        results = await _exa_call(lambda: exa.search(query, num_results=5))
         for hit in results.results:
             url = hit.url or ""
             if "linkedin.com/in/" in url:
@@ -197,10 +233,10 @@ async def enrich_profile(
 
     try:
         exa     = _exa_client(api_key)
-        results = exa.get_contents(
+        results = await _exa_call(lambda: exa.get_contents(
             [linkedin_url],
             text=True,
-        )
+        ))
 
         if not results.results:
             logger.warning("exa.enrich_no_content", url=linkedin_url)
@@ -408,7 +444,7 @@ async def extract_hiring_team_from_jd(
         return None
     try:
         exa     = _exa_client(api_key)
-        results = exa.get_contents([job_url], text=True)
+        results = await _exa_call(lambda: exa.get_contents([job_url], text=True))
         if not results.results:
             logger.info("exa.jd_no_content", url=job_url)
             return None
@@ -446,7 +482,7 @@ async def search_person_email(name: str, company: str, api_key: str) -> str | No
     query = f'"{name}" {company} email'
     try:
         exa     = _exa_client(api_key)
-        results = exa.search(query, num_results=5)
+        results = await _exa_call(lambda: exa.search(query, num_results=5))
         for result in (results.results or []):
             text = " ".join(filter(None, [
                 result.title or "",
@@ -477,7 +513,7 @@ async def research_person(name: str, company: str, api_key: str) -> str:
     query = f"{name} {company} professional insights career"
     try:
         exa     = _exa_client(api_key)
-        results = exa.search(query, num_results=3)
+        results = await _exa_call(lambda: exa.search(query, num_results=3))
         items   = [r.title for r in results.results if r.title][:3]
         snippet = "\n".join(f"• {t}" for t in items)
         logger.info("exa.person_research", name=name, found=len(items))
@@ -504,7 +540,7 @@ async def research_company(company: str, api_key: str, job_context: str = "") ->
     query = f"{company} {context_hint} news 2025"
     try:
         exa     = _exa_client(api_key)
-        results = exa.search(query, num_results=3)
+        results = await _exa_call(lambda: exa.search(query, num_results=3))
         items   = [r.title for r in results.results if r.title][:3]
         snippet = "\n".join(f"• {t}" for t in items)
         logger.info("exa.company_research", company=company, found=len(items))
