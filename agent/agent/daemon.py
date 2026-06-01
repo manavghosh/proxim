@@ -528,10 +528,19 @@ async def _dispatch_job(pool, job: dict) -> None:
                        {"cadence_id": cadence_id})
             await update_pipeline_job_status(pool, pj_id, 'completed')
         except Exception as exc:
-            logger.error("outreach_mailer.error", cadence_id=cadence_id, error=str(exc))
-            await _log("outreach_mailer", f"Error: {exc}", {"error": str(exc)})
-            await update_email_cadence(pool, cadence_id, status="failed", error_message=str(exc))
-            await update_pipeline_job_status(pool, pj_id, 'failed', error=str(exc))
+            # Always surface the exception TYPE (and a trimmed traceback) — some
+            # exceptions carry an empty str(), which otherwise logs "error=" with
+            # nothing actionable.
+            import traceback as _tb
+            detail = f"[{type(exc).__name__}] {str(exc)}".strip()
+            if detail.endswith("]"):
+                detail = f"[{type(exc).__name__}] (no message)"
+            logger.error("outreach_mailer.error", cadence_id=cadence_id,
+                         error=detail, error_type=type(exc).__name__,
+                         traceback=_tb.format_exc()[-800:])
+            await _log("outreach_mailer", f"Error: {detail}", {"error": detail})
+            await update_email_cadence(pool, cadence_id, status="failed", error_message=detail)
+            await update_pipeline_job_status(pool, pj_id, 'failed', error=detail)
 
     else:
         from agent.graphs.discovery import discovery_graph
