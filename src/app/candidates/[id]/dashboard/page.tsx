@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { useParams } from 'next/navigation'
-import { getCV, getReadiness, getJobStats, resetFailedJobs, getReadyToScoreGroups, getLastSearch, cancelPipelineJob, getInsights } from '@/lib/api'
+import { useParams, useRouter } from 'next/navigation'
+import { toast } from 'sonner'
+import { getCV, getReadiness, getJobStats, resetFailedJobs, getReadyToScoreGroups, getLastSearch, cancelPipelineJob, getInsights, getPipelineStatus } from '@/lib/api'
 import { Zap, AlertTriangle } from 'lucide-react'
 import { Topbar } from '@/components/layout/Topbar'
 import { CandidateSwitcher } from '@/components/layout/CandidateSwitcher'
@@ -38,6 +39,7 @@ function pipelineMeta(readiness: PipelineReadiness | null) {
 
 export default function DashboardPage() {
   const { id: candidateId } = useParams<{ id: string }>()
+  const router = useRouter()
 
   const [candidate, setCandidate]         = useState<CandidateState | null>(null)
   const [readiness, setReadiness]         = useState<PipelineReadiness | null>(null)
@@ -51,6 +53,9 @@ export default function DashboardPage() {
   const [batchSheetOpen, setBatchSheetOpen] = useState(false)
   const [batchAutoSelectAll, setBatchAutoSelectAll] = useState(false)
   const [importJobId, setImportJobId]       = useState<string | null>(null)
+  // Tracks a manual "Add Jobs" import specifically (importJobId is shared with
+  // the scoring-batch flow) so we can toast only when an import finishes scoring.
+  const [manualImport, setManualImport]     = useState<{ id: string; count: number } | null>(null)
   const [isCancelling, setIsCancelling]         = useState(false)
   const [awaitingCancelledStop, setAwaitingCancelledStop] = useState(false)
   const [lastSearch, setLastSearch]       = useState<import('@/lib/api').LastSearch | null>(null)
@@ -154,6 +159,47 @@ export default function DashboardPage() {
     void refreshStats()
   }
 
+  // Toast when a manual "Add Jobs" import finishes scoring, with a jump to the
+  // Scorecard. Independent of the shared log-pane flow so it only fires for imports.
+  useEffect(() => {
+    if (!manualImport) return
+    let cancelled = false
+    // import_jobs chains to a follow-up score_jobs run — only toast once the
+    // terminal scoring job (not the import job) finishes.
+    let currentId = manualImport.id
+    const tick = async () => {
+      try {
+        const st = await getPipelineStatus(currentId)
+        if (cancelled) return
+        if (st.status === 'completed') {
+          if (st.followUpJobId) {
+            currentId = st.followUpJobId            // advance to the scoring job
+          } else if (currentId !== manualImport.id) {
+            const n = manualImport.count
+            toast.success(`${n} added job${n !== 1 ? 's' : ''} scored`, {
+              description: 'Review them on the Scorecard.',
+              action: {
+                label: 'Open Scorecard',
+                onClick: () => router.push(`/candidates/${candidateId}/pipeline`),
+              },
+            })
+            setManualImport(null)
+            void refreshReadyToScore()
+            void refreshStats()
+          }
+          // else: import done but scoring not queued yet — keep polling
+        } else if (st.status === 'failed') {
+          toast.error('Importing jobs failed', { description: 'Some added jobs could not be scored.' })
+          setManualImport(null)
+        }
+      } catch { /* transient — keep polling */ }
+    }
+    const interval = setInterval(tick, 3000)
+    void tick()
+    return () => { cancelled = true; clearInterval(interval) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [manualImport, candidateId, router])
+
   const cvMeta = parseStatusMeta(candidate)
   const pMeta  = pipelineMeta(readiness)
 
@@ -184,7 +230,9 @@ export default function DashboardPage() {
             <ImportJobsSheet
               candidateId={candidateId}
               label="+ Add Jobs"
-              onImported={(pjId) => { if (pjId) setImportJobId(pjId) }}
+              onImported={(pjId, count) => {
+                if (pjId) { setImportJobId(pjId); setManualImport({ id: pjId, count }) }
+              }}
             />
           </div>
         }

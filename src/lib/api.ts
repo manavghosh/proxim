@@ -320,6 +320,10 @@ export interface HitlJob {
   postedAt: string | null
   createdAt: string
   status: string
+  /** 'imported' = added via "Add Jobs"; 'discovered' = found by "Search Jobs". */
+  origin: 'imported' | 'discovered'
+  /** The import/discovery run's pipelineJob id — identifies the batch this job came in. */
+  batchId: string | null
   grade: string | null
   numericScore: number | null
   score10d: Record<string, unknown> | null

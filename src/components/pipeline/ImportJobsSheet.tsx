@@ -11,7 +11,7 @@ import { importJobs } from '@/lib/api'
 
 interface Props {
   candidateId: string
-  onImported?: (pipelineJobId: string) => void
+  onImported?: (pipelineJobId: string, importedCount: number) => void
   label?: string
 }
 
@@ -36,10 +36,14 @@ export function ImportJobsSheet({ candidateId, onImported, label = '+ Add Jobs' 
       setResult(res)
       setStatus('success')
       if (res.imported > 0) {
-        onImported?.(res.pipelineJobId ?? '')
-        // Persist so Pipeline page can show progress when user navigates there
+        onImported?.(res.pipelineJobId ?? '', res.imported)
+        // Persist so the Scorecard can show batch progress + filter to just
+        // these jobs when the user navigates there.
         if (res.pipelineJobId && typeof window !== 'undefined') {
-          sessionStorage.setItem(`proxim-import-${candidateId}`, res.pipelineJobId)
+          sessionStorage.setItem(
+            `proxim-import-${candidateId}`,
+            JSON.stringify({ id: res.pipelineJobId, count: res.imported }),
+          )
         }
       }
     } catch (e: unknown) {
@@ -179,7 +183,7 @@ export function ImportJobsSheet({ candidateId, onImported, label = '+ Add Jobs' 
                     onClick={handleClose}
                   >
                     <Link href={`/candidates/${candidateId}/pipeline`}>
-                      Go to Pipeline
+                      Go to Scorecard
                       <ArrowRight className="w-3 h-3" />
                     </Link>
                   </Button>

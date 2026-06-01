@@ -9,6 +9,8 @@ import { CandidateSwitcher } from '@/components/layout/CandidateSwitcher'
 import { GradeFilterDropdown, ALL_GRADES } from '@/components/applications/GradeFilterDropdown'
 import type { Grade } from '@/components/applications/GradeFilterDropdown'
 import { PipelineSortControl } from '@/components/pipeline/PipelineSortControl'
+import { SourceFilterControl } from '@/components/pipeline/SourceFilterControl'
+import type { SourceFilter } from '@/components/pipeline/SourceFilterControl'
 import { PipelineLogPane } from '@/components/dashboard/PipelineLogPane'
 import { ScoreFailedSection } from '@/components/pipeline/ScoreFailedSection'
 import {
@@ -21,9 +23,10 @@ import {
   updatePreferences,
   getPreferences,
   triggerResumeGeneration,
+  getPipelineStatus,
   type HitlJob,
 } from '@/lib/api'
-import { Workflow } from 'lucide-react'
+import { Workflow, CheckCircle2 } from 'lucide-react'
 import type { OutreachStatus, EmailCadenceStatus } from '@/types/candidate'
 
 // The Scorecard shows every grade, including F. F jobs are read-only — shown
@@ -67,6 +70,12 @@ export default function PipelinePage() {
   const [resumeBuilderJobIds, setResumeBuilderJobIds] = useState<string[]>([])
   const [retryJobIds, setRetryJobIds] = useState<string[]>([])
   const [pendingOutreachIds, setPendingOutreachIds] = useState<Set<string>>(new Set())
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all')
+  // Batch view: set when the user arrives right after an "Add Jobs" import.
+  // Filters the list to just that import + shows a live progress banner.
+  const [batchFilterId, setBatchFilterId] = useState<string | null>(null)
+  const [batchCount, setBatchCount] = useState(0)
+  const [batchComplete, setBatchComplete] = useState(false)
   const logPaneRef = useRef<HTMLDivElement>(null)
 
   const showToast = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
@@ -109,10 +118,19 @@ export default function PipelinePage() {
   useEffect(() => {
     if (typeof window === 'undefined') return
     const key = `proxim-import-${candidateId}`
-    const pendingId = sessionStorage.getItem(key)
-    if (pendingId) {
+    const raw = sessionStorage.getItem(key)
+    if (raw) {
       sessionStorage.removeItem(key)
-      setRetryJobIds([pendingId])
+      // New format: JSON {id, count}. Legacy: bare pipelineJobId string.
+      let id = raw
+      let count = 0
+      try {
+        const parsed = JSON.parse(raw) as { id?: string; count?: number }
+        if (parsed && typeof parsed === 'object') { id = parsed.id ?? raw; count = parsed.count ?? 0 }
+      } catch { /* legacy bare string */ }
+      setRetryJobIds([id])
+      setBatchFilterId(id)
+      setBatchCount(count)
       setTimeout(() => {
         if (logPaneRef.current) {
           logPaneRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -121,6 +139,38 @@ export default function PipelinePage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candidateId])
+
+  // While a batch view is active, poll the import run's status so the banner can
+  // flip from "scoring…" to "complete" and the freshly-scored cards load in.
+  useEffect(() => {
+    if (!batchFilterId || batchComplete) return
+    let cancelled = false
+    // import_jobs chains to a follow-up score_jobs run — "scoring complete" is
+    // the terminal job in that chain, not the import job itself.
+    let currentId = batchFilterId
+    const tick = async () => {
+      try {
+        const st = await getPipelineStatus(currentId)
+        if (cancelled) return
+        if (st.status === 'completed') {
+          if (st.followUpJobId) {
+            currentId = st.followUpJobId            // advance to the scoring job
+            loadJobs(selectedGrades, sort)           // cards may already be landing
+          } else if (currentId !== batchFilterId) {
+            setBatchComplete(true)                   // terminal scoring job finished
+            loadJobs(selectedGrades, sort)
+          }
+          // else: import done but scoring not queued yet — keep polling
+        } else if (st.status === 'failed') {
+          setBatchComplete(true)
+          loadJobs(selectedGrades, sort)
+        }
+      } catch { /* transient — keep polling */ }
+    }
+    const interval = setInterval(tick, 3000)
+    void tick()
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [batchFilterId, batchComplete, selectedGrades, sort, loadJobs])
 
   // SSE stream
   const reconnectStream = useCallback(() => {
@@ -285,15 +335,35 @@ export default function PipelinePage() {
     }
   }
 
-  // Per-grade counts feed the dropdown's count column and the inline badges,
-  // matching the Applications page exactly.
+  const allScored = jobs.filter(j => j.status !== 'score_failed')
+  const allFailed = jobs.filter(j => j.status === 'score_failed')
+
+  // Source counts feed the Source dropdown.
+  const sourceCounts: Partial<Record<SourceFilter, number>> = {
+    all: allScored.length,
+    imported: allScored.filter(j => j.origin === 'imported').length,
+    discovered: allScored.filter(j => j.origin === 'discovered').length,
+  }
+
+  // A job is visible when it matches the source filter AND (in batch mode) the
+  // active import batch.
+  const matchesView = (j: HitlJob) =>
+    (sourceFilter === 'all' || j.origin === sourceFilter) &&
+    (!batchFilterId || j.batchId === batchFilterId)
+
+  // Per-grade counts feed the dropdown's count column + the inline badges. They
+  // respect the active Source/batch view so the "N shown" total stays consistent.
   const counts = PIPELINE_GRADES.reduce((acc, g) => {
-    acc[g] = jobs.filter((j) => j.grade === g).length
+    acc[g] = jobs.filter((j) => j.grade === g && matchesView(j)).length
     return acc
   }, {} as Partial<Record<Grade, number>>)
 
-  const scoredJobs = jobs.filter(j => j.status !== 'score_failed')
-  const failedJobs = jobs.filter(j => j.status === 'score_failed')
+  const scoredJobs = allScored.filter(matchesView)
+  const failedJobs = allFailed.filter(matchesView)
+  const displayedTotal = scoredJobs.length + failedJobs.length
+
+  // How many of the just-added batch have finished scoring (scored or failed).
+  const batchScoredCount = batchFilterId ? jobs.filter(j => j.batchId === batchFilterId).length : 0
 
   return (
     <div className="flex flex-col h-full">
@@ -305,12 +375,13 @@ export default function PipelinePage() {
             Scorecard Review
           </h1>
           <p className="text-[11px] text-muted-foreground mt-0.5">
-            {loading ? 'Loading…' : `${jobs.length} job${jobs.length !== 1 ? 's' : ''}`}
+            {loading ? 'Loading…' : `${displayedTotal} job${displayedTotal !== 1 ? 's' : ''}`}
             {streamConnected && <span className="ml-2 text-emerald-500">● live</span>}
           </p>
         </div>
         <div className="flex items-center gap-3">
           <CandidateSwitcher candidateId={candidateId} />
+          <SourceFilterControl value={sourceFilter} onChange={setSourceFilter} counts={sourceCounts} />
           <GradeFilterDropdown
             selected={selectedGrades}
             onChange={handleGradesChange}
@@ -322,6 +393,34 @@ export default function PipelinePage() {
 
       {/* Job list */}
       <div className="flex-1 overflow-y-auto p-6">
+        {/* Batch banner — shown when arriving right after an "Add Jobs" import */}
+        {batchFilterId && (
+          <div className="max-w-3xl mb-4 rounded-xl border border-blue-800/40 bg-blue-950/20 px-4 py-3 flex items-center gap-3">
+            {batchComplete ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            ) : (
+              <div className="w-4 h-4 rounded-full border-2 border-blue-400 border-t-transparent animate-spin shrink-0" />
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-[12px] font-medium text-foreground">
+                {batchComplete
+                  ? `${batchCount || batchScoredCount} job${(batchCount || batchScoredCount) !== 1 ? 's' : ''} you added · scoring complete`
+                  : `Scoring the ${batchCount || ''} job${batchCount !== 1 ? 's' : ''} you just added…`}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {batchScoredCount} scored so far{batchComplete ? '' : ' · this view updates automatically'}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-[11px] border-border shrink-0"
+              onClick={() => { setBatchFilterId(null); setBatchComplete(false) }}
+            >
+              Show all jobs
+            </Button>
+          </div>
+        )}
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map(i => (

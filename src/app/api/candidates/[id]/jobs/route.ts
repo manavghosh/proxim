@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { and, eq, notInArray, inArray, or } from 'drizzle-orm'
 import { db } from '@/db'
-import { jobs, hitlCheckpoints, outreachTargets, emailCadences, emailDrafts } from '@/db/schema'
+import { jobs, hitlCheckpoints, outreachTargets, emailCadences, emailDrafts, pipelineRuns, pipelineJobs } from '@/db/schema'
 import type { OutreachTargetSummary, OutreachStatus, EmailCadenceSummary, EmailCadenceStatus, EmailDraftSummary, EmailDraftStatus } from '@/types/candidate'
 
 type JobStatus = 'awaiting' | 'approved' | 'rejected' | 'snoozed' | 'discovered' | 'scored' | 'score_failed' | 'resume_failed' | 'resume_ready' | 'submitted'
@@ -104,11 +104,16 @@ export async function GET(
         cadenceReplyAt:         emailCadences.replyDetectedAt,
         cadenceBounceAt:        emailCadences.bounceDetectedAt,
         cadenceRetryCount:      emailCadences.retryCount,
+        // Origin: which run created this job. import_jobs ⇒ "Added by you".
+        runJobType:             pipelineJobs.jobType,
+        batchId:                pipelineRuns.pipelineJobId,
       })
       .from(jobs)
       .leftJoin(hitlCheckpoints, eq(hitlCheckpoints.jobId, jobs.id))
       .leftJoin(outreachTargets, eq(outreachTargets.jobId, jobs.id))
       .leftJoin(emailCadences, eq(emailCadences.jobId, jobs.id))
+      .leftJoin(pipelineRuns, eq(pipelineRuns.id, jobs.pipelineRunId))
+      .leftJoin(pipelineJobs, eq(pipelineJobs.id, pipelineRuns.pipelineJobId))
       .where(
         and(
           eq(jobs.candidateId, candidateId),
@@ -191,6 +196,8 @@ export async function GET(
       archetype: r.archetype,
       archetypeConfidence: r.archetypeConfidence,
       createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
+      origin: (r.runJobType === 'import_jobs' ? 'imported' : 'discovered') as 'imported' | 'discovered',
+      batchId: r.batchId ?? null,
       errorMessage:        r.jobErrorMessage ?? null,
       hitlCheckpoint: r.hitlCheckpointId
         ? {

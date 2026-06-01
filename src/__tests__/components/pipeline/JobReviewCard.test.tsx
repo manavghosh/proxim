@@ -13,6 +13,8 @@ const baseJob: HitlJob = {
   postedAt: '2026-05-01T00:00:00Z',
   createdAt: '2026-05-01T00:00:00Z',
   status: 'awaiting',
+  origin: 'discovered',
+  batchId: null,
   grade: 'A',
   numericScore: 4.6,
   score10d: null,
@@ -134,5 +136,17 @@ describe('JobReviewCard — New badge', () => {
     }
     render(<JobReviewCard {...makeProps(oldJob)} />)
     expect(screen.queryByText('New')).not.toBeInTheDocument()
+  })
+})
+
+describe('JobReviewCard — Manual search badge', () => {
+  it('shows "Manual search" when the job was imported', () => {
+    render(<JobReviewCard {...makeProps({ origin: 'imported' })} />)
+    expect(screen.getByText('Manual search')).toBeInTheDocument()
+  })
+
+  it('does not show "Manual search" for AI-based (discovered) jobs', () => {
+    render(<JobReviewCard {...makeProps({ origin: 'discovered' })} />)
+    expect(screen.queryByText('Manual search')).not.toBeInTheDocument()
   })
 })

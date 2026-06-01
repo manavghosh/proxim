@@ -14,6 +14,7 @@ function makeJob(overrides: Partial<HitlJob> = {}): HitlJob {
     id: 'j1', title: 'Head of AI', company: 'Acme Corp',
     location: null, source: 'linkedin', sourceUrl: 'https://linkedin.com/jobs/view/123',
     postedAt: null, createdAt: new Date().toISOString(), status: 'score_failed', grade: null, numericScore: null,
+    origin: 'discovered', batchId: null,
     score10d: null, reportMd: null, archetype: null, archetypeConfidence: null,
     hitlCheckpoint: null, outreachTarget: null, emailCadence: null,
     errorMessage: 'No job description found — try re-importing with a direct job URL',

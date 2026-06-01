@@ -34,6 +34,8 @@ vi.mock('@/db/schema', () => ({
     isApproved: 'isApproved', status: 'status', scheduledSendAt: 'scheduledSendAt',
     sentAt: 'sentAt', openDetectedAt: 'openDetectedAt', clickDetectedAt: 'clickDetectedAt',
   },
+  pipelineRuns: { id: 'id', pipelineJobId: 'pipelineJobId' },
+  pipelineJobs: { id: 'id', jobType: 'jobType' },
 }))
 
 const makeJob = (overrides = {}) => ({
@@ -42,6 +44,7 @@ const makeJob = (overrides = {}) => ({
   postedAt: '2026-05-01T00:00:00Z', status: 'scored', grade: 'A',
   score10d: null, reportMd: null, archetype: null, archetypeConfidence: null,
   createdAt: '2026-05-01T00:00:00Z',
+  runJobType: 'discovery', batchId: 'pj-discovery',
   hitlCheckpointId: null, hitlStatus: null, hitlSnoozedUntil: null, hitlCreatedAt: null,
   outreachId: null, outreachStatus: null, outreachName: null, outreachLinkedinUrl: null,
   outreachTitle: null, outreachSeniority: null, outreachNoteA: null, outreachNoteB: null,
@@ -113,6 +116,31 @@ describe('GET /api/candidates/[id]/jobs', () => {
 
     expect(res.status).toBe(200)
     expect(body.jobs.filter((j: { grade: string }) => j.grade === 'F')).toHaveLength(0)
+  })
+
+  it('derives origin from the run type (import_jobs ⇒ imported)', async () => {
+    const { db } = await import('@/db')
+    const mockChain = {
+      from: vi.fn().mockReturnThis(),
+      leftJoin: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      orderBy: vi.fn().mockResolvedValue([
+        makeJob({ id: 'imp', runJobType: 'import_jobs', batchId: 'pj-import-1' }),
+        makeJob({ id: 'disc', runJobType: 'discovery', batchId: 'pj-disc-1' }),
+      ]),
+    }
+    vi.mocked(db.select).mockReturnValue(mockChain as never)
+
+    const { GET } = await import('@/app/api/candidates/[id]/jobs/route')
+    const req = new Request('http://localhost/api/candidates/cand-1/jobs')
+    const res = await GET(req, { params: Promise.resolve({ id: 'cand-1' }) })
+    const body = await res.json()
+
+    const imp = body.jobs.find((j: { id: string }) => j.id === 'imp')
+    const disc = body.jobs.find((j: { id: string }) => j.id === 'disc')
+    expect(imp.origin).toBe('imported')
+    expect(imp.batchId).toBe('pj-import-1')
+    expect(disc.origin).toBe('discovered')
   })
 
   it('applies grade filter A only', async () => {

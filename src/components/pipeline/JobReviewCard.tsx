@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { CheckCircle, XCircle, Bell, BellOff, MapPin, Building2, ExternalLink, Calendar, AlertTriangle, FileTextIcon } from 'lucide-react'
+import { CheckCircle, XCircle, Bell, BellOff, MapPin, Building2, ExternalLink, Calendar, AlertTriangle, FileTextIcon, PlusCircle } from 'lucide-react'
 import { StrengthRiskChips } from './StrengthRiskChips'
 import { ScoreReportPane } from './ScoreReportPane'
 import type { HitlJob } from '@/lib/api'
@@ -121,6 +121,16 @@ export function JobReviewCard({
                   className="text-[10px] border-emerald-700 text-emerald-400 bg-emerald-950/40"
                 >
                   Approved
+                </Badge>
+              )}
+              {job.origin === 'imported' && (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] border-blue-700/50 text-blue-300 bg-blue-950/30 gap-1 px-1.5"
+                  title="You added this job manually via “Add Jobs” (not found by AI based search)"
+                >
+                  <PlusCircle className="w-2.5 h-2.5" />
+                  Manual search
                 </Badge>
               )}
             </div>
