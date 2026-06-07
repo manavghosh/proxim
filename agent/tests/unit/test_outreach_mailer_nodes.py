@@ -230,6 +230,39 @@ async def test_generate_emails_node_produces_three_drafts_within_word_limits():
     assert result["day7_body"] is not None
 
 
+def test_email_draft_accepts_day1_body_with_mandated_closing():
+    """Day-1 body with the required closing paragraph routinely runs ~160 words.
+
+    Regression for `outreach_mailer.generation_error: Day 1 draft exceeds 150
+    words (153)` — the hard 150 cap rejected drafts that the prompt's own
+    mandated content cannot fit under, wasting an LLM call on every overshoot.
+    """
+    from agent.nodes.outreach_mailer import EmailDraftOutput
+
+    body = " ".join(["word"] * 160)  # 160 words — realistic with mandated closing
+    draft = EmailDraftOutput(
+        subject="Re: Role @ Acme",
+        day1_body=body,
+        day3_body="A short day three body well under the limit.",
+        day7_body="A short day seven body under limit.",
+    )
+    assert draft.day1_body == body
+
+
+def test_email_draft_rejects_egregiously_long_day1_body():
+    """The day-1 cap is relaxed, not removed — walls of text are still rejected."""
+    import pytest as _pytest
+    from agent.nodes.outreach_mailer import EmailDraftOutput
+
+    with _pytest.raises(Exception):
+        EmailDraftOutput(
+            subject="Re: Role @ Acme",
+            day1_body=" ".join(["word"] * 200),
+            day3_body="short",
+            day7_body="short",
+        )
+
+
 @pytest.mark.asyncio
 async def test_generate_emails_node_rejects_day3_draft_with_forbidden_phrase_following_up():
     from agent.nodes.outreach_mailer import _validate_day3_body

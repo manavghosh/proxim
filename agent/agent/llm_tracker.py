@@ -130,7 +130,11 @@ class _LangfuseLogger(CustomLogger):
                     auth=self._auth,
                 )
         except Exception as exc:
-            logger.debug("langfuse_log_failed", error=str(exc))
+            # repr(), not str(): httpx timeout/transport exceptions have an empty
+            # str(), which made this log line ('langfuse_log_failed error=')
+            # impossible to diagnose.
+            logger.debug("langfuse_log_failed", error=repr(exc),
+                         error_type=type(exc).__name__)
 
     async def async_log_success_event(self, kwargs, response_obj, start_time, end_time):
         import httpx
@@ -142,7 +146,8 @@ class _LangfuseLogger(CustomLogger):
                     auth=self._auth,
                 )
         except Exception as exc:
-            logger.debug("langfuse_log_failed", error=str(exc))
+            logger.debug("langfuse_log_failed", error=repr(exc),
+                         error_type=type(exc).__name__)
 
 
 # ── helpers ────────────────────────────────────────────────────────────────────

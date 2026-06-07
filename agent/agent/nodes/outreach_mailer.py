@@ -85,8 +85,13 @@ class EmailDraftOutput(BaseModel):
     @field_validator("day1_body")
     @classmethod
     def validate_day1(cls, v: str) -> str:
-        if _word_count(v) > 150:
-            raise ValueError(f"Day 1 draft exceeds 150 words ({_word_count(v)})")
+        # The prompt mandates a ~40-word fixed closing paragraph plus intro,
+        # an excitement paragraph and a sign-off, which realistically lands
+        # around 150–170 words. A hard 150 cap rejected valid drafts and burned
+        # a retry on every overshoot; 175 tolerates the mandated content while
+        # still rejecting walls of text.
+        if _word_count(v) > 175:
+            raise ValueError(f"Day 1 draft exceeds 175 words ({_word_count(v)})")
         return v
 
     @field_validator("day3_body")
@@ -165,7 +170,7 @@ async def litellm_generate(state: OutreachMailerState, settings,
         "3. The sign-off must be on its own line after a blank line.\n"
         "4. Never write walls of text — each email must have at least 2 paragraphs.\n\n"
         "Write 3 emails:\n\n"
-        f"day1_body — max 150 words:\n"
+        f"day1_body — aim for 160 words, hard limit 175:\n"
         f"  {greeting_instruction}\n"
         f"  Paragraph 1: Introduce yourself as {candidate_name} and why you're reaching out.\n"
         f"  Paragraph 2: One specific reason you're excited about {state['company']}.\n"

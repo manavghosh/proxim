@@ -32,6 +32,19 @@ def _llm_api_key() -> str:
         return _settings.gemini_api_key
     return _settings.anthropic_api_key
 
+
+def _strip_markdown(text: str) -> str:
+    """Strip ```json ... ``` fencing that some models (notably gemini) add despite
+    response_format={"type": "json_object"}. Without this, json.loads chokes on the
+    leading backtick with 'Expecting value: line 1 column 1 (char 0)'."""
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[-1]
+        if text.endswith("```"):
+            text = text[: text.rfind("```")]
+    return text.strip()
+
+
 logger = structlog.get_logger(__name__)
 
 # ── State ────────────────────────────────────────────────────────────────────
@@ -187,7 +200,7 @@ async def determine_target_roles(job_title: str, company: str,
             max_tokens=200,
             metadata=langfuse_metadata("linkedin_connector", "role_determination", job_id=job_id, run_id=run_id),
         )
-        raw   = (resp.choices[0].message.content or "").strip() or "{}"
+        raw   = _strip_markdown(resp.choices[0].message.content or "") or "{}"
         data  = json.loads(raw)
         roles = [str(r) for r in data.get("roles", []) if r][:5]
         if roles:
@@ -562,7 +575,7 @@ async def generate_notes_node(state: LinkedInConnectorState, config: RunnableCon
                 response_format={"type": "json_object"},
                 metadata=langfuse_metadata("linkedin_connector", "linkedin", job_id=state.get("job_id"), run_id=config["configurable"].get("run_id")),
             )
-            raw = response.choices[0].message.content or "{}"
+            raw = _strip_markdown(response.choices[0].message.content or "") or "{}"
             try:
                 parsed   = json.loads(raw)
                 variants = NoteVariants(**parsed)

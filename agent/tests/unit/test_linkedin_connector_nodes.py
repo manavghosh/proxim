@@ -284,6 +284,30 @@ async def test_generate_notes_node_marks_failed_after_3_retries(mock_llm, mock_u
     assert result["status"] == "failed"
 
 
+@pytest.mark.asyncio
+@patch("agent.nodes.linkedin_connector.update_outreach_target")
+@patch("agent.nodes.linkedin_connector.litellm.completion")
+async def test_generate_notes_node_strips_markdown_fences(mock_llm, mock_update):
+    """gemini wraps note JSON in ```json fences — must still parse, not fail 3x."""
+    note_a = "Hi Alice,\n\nI am Test Candidate, an agentic systems architect. Acme's recent AI infra work caught my eye.\n\nKind regards,\nTest Candidate"
+    note_b = "Hi Alice,\n\nI am Test Candidate, an agentic systems architect. Your trajectory at Acme is impressive.\n\nWarm regards,\nTest Candidate"
+
+    mock_response = MagicMock()
+    mock_response.choices[0].message.content = (
+        "```json\n" + json.dumps({"note_a": note_a, "note_b": note_b}) + "\n```"
+    )
+    mock_llm.return_value = mock_response
+    mock_update.return_value = None
+
+    state = _base_state(status="generating", enrichment=SAMPLE_ENRICHMENT,
+                        contact=SAMPLE_CONTACT)
+    result = await generate_notes_node(state, _config())
+
+    assert result["status"] == "notes_ready"
+    assert result["note_a"] == note_a
+    assert result["note_b"] == note_b
+
+
 # ── determine_target_roles ────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
@@ -311,6 +335,27 @@ async def test_determine_target_roles_falls_back_on_llm_failure():
     # Fallback must be generic — no AI-specific hardcoding
     assert len(roles) >= 3
     assert any("Hiring Manager" in r or "Talent Acquisition" in r or "Recruiter" in r for r in roles)
+
+
+@pytest.mark.asyncio
+async def test_determine_target_roles_strips_markdown_fences():
+    """gemini (the default provider) wraps json_object responses in ```json fences.
+
+    Regression for `linkedin.role_determination_failed: Expecting value: line 1
+    column 1 (char 0)` — json.loads on the leading backtick raised, silently
+    dropping to the generic fallback role list.
+    """
+    from agent.nodes.linkedin_connector import determine_target_roles
+
+    mock_resp = MagicMock()
+    mock_resp.choices[0].message.content = (
+        '```json\n{"roles": ["VP Sales", "Head of Sales", "Sales Director"]}\n```'
+    )
+
+    with patch("agent.nodes.linkedin_connector.litellm.acompletion", new=AsyncMock(return_value=mock_resp)):
+        roles = await determine_target_roles("VP of Sales", "Acme Corp")
+
+    assert roles == ["VP Sales", "Head of Sales", "Sales Director"]
 
 
 @pytest.mark.asyncio

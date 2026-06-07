@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime
+from types import SimpleNamespace
 from unittest.mock import patch
 
 
@@ -84,6 +86,39 @@ def test_configure_langfuse_sets_langfuse_otel_host_not_langfuse_host():
         assert "LANGFUSE_HOST" not in os.environ, (
             "LANGFUSE_HOST is the old SDK var and must not be set by configure_langfuse"
         )
+
+
+def test_langfuse_log_failure_records_diagnosable_error():
+    """A swallowed Langfuse post failure must log a non-empty, diagnosable error.
+
+    Regression for `langfuse_log_failed error=` (empty). httpx timeout/transport
+    exceptions have an empty str(); logging str(exc) made the failure impossible
+    to diagnose. The handler must log repr/type instead.
+    """
+    import agent.llm_tracker as mod
+    from agent.llm_tracker import _LangfuseLogger
+
+    class _EmptyMsgError(Exception):
+        def __str__(self) -> str:  # mimics httpx.ConnectTimeout("")
+            return ""
+
+    captured: dict = {}
+
+    def _capture(event, **kw):
+        captured["event"] = event
+        captured["kw"] = kw
+
+    cb = _LangfuseLogger("http://example.invalid/ingest", "pk", "sk")
+    resp = SimpleNamespace(usage=None, choices=[])
+
+    with patch("httpx.Client") as MockClient:
+        MockClient.return_value.__enter__.return_value.post.side_effect = _EmptyMsgError()
+        with patch.object(mod.logger, "debug", _capture):
+            cb.log_success_event({"messages": []}, resp, datetime.now(), datetime.now())
+
+    assert captured.get("event") == "langfuse_log_failed"
+    assert captured["kw"].get("error"), "error must not be empty — log repr, not str"
+    assert "_EmptyMsgError" in captured["kw"].get("error_type", "")
 
 
 def test_langfuse_metadata_omits_trace_id_when_run_id_none():
