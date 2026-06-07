@@ -1,6 +1,7 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
+import { MarkdownReport } from '@/components/ui/markdown-report'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 
 interface ScoreReportPaneProps {
@@ -30,9 +31,7 @@ export function ScoreReportPane({ reportMd, isOpen, onToggle }: ScoreReportPaneP
 
       {isOpen && (
         <div className="mt-2 p-3 rounded-md bg-background border border-border max-h-80 overflow-y-auto">
-          <pre className="text-[11px] text-muted-foreground whitespace-pre-wrap font-mono leading-relaxed">
-            {reportMd}
-          </pre>
+          <MarkdownReport content={reportMd} />
         </div>
       )}
     </div>

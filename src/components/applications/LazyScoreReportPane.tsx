@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { MarkdownReport } from '@/components/ui/markdown-report'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { getJobReport } from '@/lib/api'
 
@@ -48,11 +49,7 @@ export function LazyScoreReportPane({ jobId }: Props) {
         <div className="mt-2 p-3 rounded-md bg-background border border-border max-h-80 overflow-y-auto">
           {loading && <p className="text-[11px] text-muted-foreground">Loading report…</p>}
           {error && <p className="text-[11px] text-red-400">{error}</p>}
-          {reportMd && !loading && !error && (
-            <pre className="text-[11px] text-muted-foreground whitespace-pre-wrap font-mono leading-relaxed">
-              {reportMd}
-            </pre>
-          )}
+          {reportMd && !loading && !error && <MarkdownReport content={reportMd} />}
         </div>
       )}
     </div>
