@@ -321,22 +321,38 @@ async def _dispatch_job(pool, job: dict) -> None:
                 async def on_fetched(job_id: str, jd_text: str, title: str = "", company: str = "") -> None:
                     nonlocal fetched
                     fetched += 1
-                    if jd_text or title:
-                        await update_job_meta(
+                    from agent.graphs.scoring import MIN_SCORABLE_JD_WORDS, _jd_word_count
+                    from agent.db import mark_job_score_failed
+                    words = _jd_word_count(jd_text)
+                    # G1: a pasted search/login/expired URL fetches a wall page with
+                    # little or no JD body (often with a junk title like
+                    # "3,927,000+ Jobs"). Don't leave it as an invisible 'discovered'
+                    # row that never scores — mark it unreadable so it surfaces in the
+                    # "could not be scored" list with a clear next step.
+                    if words < MIN_SCORABLE_JD_WORDS:
+                        await mark_job_score_failed(
                             pool, job_id,
-                            title=title or "Imported Job",
-                            company=company or "Unknown",
-                            jd_raw=jd_text,
+                            error_message=("Couldn't read this posting — the link returned a "
+                                           "search, login, or expired page, not a job. Re-add "
+                                           "the direct job URL (…/jobs/view/…)."),
                         )
-                        words = len(jd_text.split()) if jd_text else 0
                         await _log("import_jobs",
-                                   f"Job {fetched}/{total} fetched: {(title or 'Unknown')[:50]} — {words} words",
-                                   {"fetched": fetched, "total": total, "words": words})
-                        logger.info("import_jobs.fetched", job_id=job_id, title=(title or "")[:60])
-                    else:
-                        await _log("import_jobs",
-                                   f"Job {fetched}/{total} — no content found (URL may be expired or private)",
-                                   {"fetched": fetched, "total": total})
+                                   f"Job {fetched}/{total} — couldn't read posting "
+                                   f"({words} words); marked unreadable",
+                                   {"fetched": fetched, "total": total, "words": words,
+                                    "unreadable": True})
+                        logger.info("import_jobs.unreadable", job_id=job_id, words=words)
+                        return
+                    await update_job_meta(
+                        pool, job_id,
+                        title=title or "Imported Job",
+                        company=company or "Unknown",
+                        jd_raw=jd_text,
+                    )
+                    await _log("import_jobs",
+                               f"Job {fetched}/{total} fetched: {(title or 'Unknown')[:50]} — {words} words",
+                               {"fetched": fetched, "total": total, "words": words})
+                    logger.info("import_jobs.fetched", job_id=job_id, title=(title or "")[:60])
 
                 await scraper.fetch_jds(linkedin_jobs, on_fetched=on_fetched)
 

@@ -94,6 +94,10 @@ export function JobSearchCard({
   const dismissRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const discoveryRunRef = useRef<{ jobsDiscovered: number; jobsDeduplicated: number } | null>(null)
   const stepCountsRef = useRef<string[]>(['', '', ''])
+  // True when this card resumed an in-flight run from the sessionStorage marker
+  // (user returned to the dashboard mid-search). Discovery counts aren't
+  // available on a mid-chain resume, so we skip the count summary on completion.
+  const rehydratedRef = useRef(false)
 
   // Cleanup on unmount
   useEffect(() => {
@@ -158,6 +162,14 @@ export function JobSearchCard({
 
           if (status.status === 'completed') {
             if (typeof window !== 'undefined') sessionStorage.removeItem(`proxim-search-${candidateId}`)
+            // Resumed run: discovery counts are unknown mid-chain, so skip the
+            // (misleading) "0 new jobs" summary card and just refresh stats.
+            if (rehydratedRef.current) {
+              rehydratedRef.current = false
+              onSearchComplete()
+              setMode('idle')
+              return
+            }
             if (rescoreOnly) {
               setCompleteResult({ discovered: 0, newJobs: 0, duplicatesSkipped: 0 })
             } else {
@@ -196,6 +208,26 @@ export function JobSearchCard({
     },
     [onSearchComplete],
   )
+
+  // G4: if the user navigated away mid-search and came back, resume the live
+  // step view from the sessionStorage marker instead of showing an idle card.
+  useEffect(() => {
+    if (typeof window === 'undefined' || mode !== 'idle') return
+    const raw = sessionStorage.getItem(`proxim-search-${candidateId}`)
+    if (!raw) return
+    let id = raw
+    try {
+      const parsed = JSON.parse(raw) as { id?: string }
+      if (parsed && typeof parsed === 'object') id = parsed.id ?? raw
+    } catch { /* legacy bare string */ }
+    if (!id) return
+    rehydratedRef.current = true
+    setSteps(STEP_LABELS.map((label, i) => ({ label, status: i === 0 ? 'active' : 'pending', count: null })))
+    setMode('running')
+    poll(id, false)
+  // Mount-only resume: re-running on every dep change would restart the poll.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [candidateId])
 
   // ─── Handlers ─────────────────────────────────────────────────────────────
 

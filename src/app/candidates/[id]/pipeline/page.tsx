@@ -154,7 +154,9 @@ export default function PipelinePage() {
     const key = `proxim-search-${candidateId}`
     const raw = sessionStorage.getItem(key)
     if (!raw) return
-    sessionStorage.removeItem(key)
+    // Peek, don't remove (G4): the marker must survive so the dashboard card can
+    // also resume the run if the user navigates back. The poll below removes it
+    // once the run reaches a terminal state.
     let id = raw
     try {
       const parsed = JSON.parse(raw) as { id?: string }
@@ -176,27 +178,37 @@ export default function PipelinePage() {
     if (!searchJobId || !searchActive) return
     let cancelled = false
     let currentId = searchJobId
+    let stuckTicks = 0
+    const finish = () => {
+      if (typeof window !== 'undefined') sessionStorage.removeItem(`proxim-search-${candidateId}`)
+      setSearchActive(false)
+      loadJobs(selectedGrades, sort)
+    }
     const tick = async () => {
       try {
         const st = await getPipelineStatus(currentId)
         if (cancelled) return
         if (st.followUpJobId) {
           currentId = st.followUpJobId            // advance through the chain
+          stuckTicks = 0
           loadJobs(selectedGrades, sort)           // cards may already be landing
         } else if (st.status === 'completed' && st.jobType === 'score_jobs') {
-          setSearchActive(false)                   // terminal scoring job finished
-          loadJobs(selectedGrades, sort)
+          finish()                                 // terminal scoring job finished
         } else if (st.status === 'failed') {
-          setSearchActive(false)
-          loadJobs(selectedGrades, sort)
+          finish()
+        } else if (st.status === 'completed') {
+          // Completed non-terminal job whose follow-up isn't queued yet. Give it
+          // a few ticks, then stop so the banner can't hang forever (G2).
+          if (++stuckTicks >= 5) finish()
+        } else {
+          stuckTicks = 0                           // still running
         }
-        // else: completed but follow-up not queued yet, or still running — wait
       } catch { /* transient — keep polling */ }
     }
     const interval = setInterval(tick, 3000)
     void tick()
     return () => { cancelled = true; clearInterval(interval) }
-  }, [searchJobId, searchActive, selectedGrades, sort, loadJobs])
+  }, [searchJobId, searchActive, selectedGrades, sort, loadJobs, candidateId])
 
   // While a batch view is active, poll the import run's status so the banner can
   // flip from "scoring…" to "complete" and the freshly-scored cards load in.
@@ -206,6 +218,7 @@ export default function PipelinePage() {
     // import_jobs chains to a follow-up score_jobs run — "scoring complete" is
     // the terminal job in that chain, not the import job itself.
     let currentId = batchFilterId
+    let stuckTicks = 0
     const tick = async () => {
       try {
         const st = await getPipelineStatus(currentId)
@@ -213,15 +226,21 @@ export default function PipelinePage() {
         if (st.status === 'completed') {
           if (st.followUpJobId) {
             currentId = st.followUpJobId            // advance to the scoring job
+            stuckTicks = 0
             loadJobs(selectedGrades, sort)           // cards may already be landing
           } else if (currentId !== batchFilterId) {
             setBatchComplete(true)                   // terminal scoring job finished
             loadJobs(selectedGrades, sort)
+          } else if (++stuckTicks >= 5) {
+            // Import completed but scoring never got queued — stop waiting (G2).
+            setBatchComplete(true)
+            loadJobs(selectedGrades, sort)
           }
-          // else: import done but scoring not queued yet — keep polling
         } else if (st.status === 'failed') {
           setBatchComplete(true)
           loadJobs(selectedGrades, sort)
+        } else {
+          stuckTicks = 0
         }
       } catch { /* transient — keep polling */ }
     }
@@ -396,6 +415,10 @@ export default function PipelinePage() {
   const allScored = jobs.filter(j => j.status !== 'score_failed')
   const allFailed = jobs.filter(j => j.status === 'score_failed')
 
+  // Whether a run is actively in flight — drives the "Scoring…" empty state so
+  // it can't get stuck on once a run finishes with no results (G3).
+  const isProcessing = searchActive || (!!batchFilterId && !batchComplete)
+
   // Source counts feed the Source dropdown.
   const sourceCounts: Partial<Record<SourceFilter, number>> = {
     all: allScored.length,
@@ -498,7 +521,7 @@ export default function PipelinePage() {
           </div>
         ) : scoredJobs.length === 0 && failedJobs.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center py-20">
-            {retryJobIds.length > 0 ? (
+            {isProcessing ? (
               <>
                 <div className="w-8 h-8 rounded-full border-2 border-blue-500 border-t-transparent animate-spin mb-4" />
                 <p className="text-[13px] text-muted-foreground mb-1 font-medium">

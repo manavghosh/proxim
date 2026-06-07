@@ -7,6 +7,17 @@ from agent.models import ScoringState
 
 logger = structlog.get_logger()
 
+# A real job description always runs to hundreds of words. A search/login/wall
+# page that slipped through discovery or import arrives as a "job" with a
+# near-empty body — below this many words we treat it as unreadable rather than
+# spending an LLM call to score junk.
+MIN_SCORABLE_JD_WORDS = 40
+
+
+def _jd_word_count(jd_raw: str | None) -> int:
+    """Word count of a JD body — used to detect unreadable wall/login pages."""
+    return len((jd_raw or "").split())
+
 
 async def _make_pool():
     from agent.config import settings
@@ -130,6 +141,30 @@ async def score_and_report_batch(state: ScoringState) -> dict:
                     "skipped_count": skipped, "was_cancelled": True,
                     "cancelled_count": cancelled_count,
                 }
+
+            # G1 guard: a search/login/wall page can slip through as a "job" with
+            # a near-empty JD (wrong title, ~0 words). Don't burn an LLM call
+            # scoring junk — mark it score_failed with a clear reason so it shows
+            # in the "could not be scored" list instead of polluting the Scorecard.
+            jd_words = _jd_word_count(job.get("jd_raw"))
+            if jd_words < MIN_SCORABLE_JD_WORDS:
+                failed += 1
+                try:
+                    await mark_job_score_failed(
+                        pool, job["id"],
+                        error_message=("Couldn't read this posting — the link likely "
+                                       "returned a search or login page, not a job. "
+                                       "Re-add the direct job URL (…/jobs/view/…)."),
+                    )
+                except Exception:
+                    pass
+                await _log(pool, state.pipeline_job_id, "warning", "score_and_report_batch",
+                           f"Skipped {scored + failed + skipped}/{total}: "
+                           f"{job.get('title')} @ {job.get('company')} — only {jd_words} "
+                           f"words, looks unreadable (marked score_failed)",
+                           {"job_id": job.get("id"), "words": jd_words, "unreadable": True})
+                continue
+
             try:
                 with tracer.start_as_current_span("score_job") as span:
                     span.set_attribute("job_id", str(job.get("id", "")))
