@@ -1,0 +1,31 @@
+# Keep the web build context (repo root) small and secret-free.
+node_modules
+.next
+out
+.git
+.gitignore
+npm-debug.log*
+yarn-error.log*
+
+# Local databases (the VPS uses its own /data/proxim.db on a volume)
+*.db
+*.db-shm
+*.db-wal
+
+# Secrets — never bake into the image
+.env
+.env.*
+!docs/vps/.env.example
+agent/.env
+
+# Python agent local artifacts (the agent image builds from agent/ separately)
+agent/output
+agent/.venv
+**/__pycache__
+*.pyc
+
+# Test / tooling output
+coverage
+.playwright-mcp
+.vscode
+.idea

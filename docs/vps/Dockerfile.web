@@ -1,0 +1,45 @@
+# syntax=docker/dockerfile:1
+# Production image for the Next.js UI (`next start`).
+# Build context is the repo root (see docker-compose.yml `context: ../..`).
+
+# ---- Build stage ----
+FROM node:20-bookworm-slim AS builder
+WORKDIR /app
+
+# Toolchain for the better-sqlite3 native module (used when DATABASE_URL is a
+# SQLite path). Prebuilt binaries are used when available; these are the fallback.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      python3 make g++ ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+COPY . .
+
+# next.config.ts swaps the DB layer to SQLite at BUILD time based on DATABASE_URL.
+# Pass the SAME value used at runtime so the correct driver gets bundled:
+#   /data/proxim.db        -> better-sqlite3 (default)
+#   postgresql://...        -> Neon HTTP driver
+ARG DATABASE_URL=/data/proxim.db
+ENV DATABASE_URL=${DATABASE_URL}
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN npm run build
+
+# ---- Runtime stage ----
+FROM node:20-bookworm-slim AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+
+# better-sqlite3 is declared in serverExternalPackages, so it is NOT bundled —
+# it is required from node_modules at runtime. Hence we copy node_modules.
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/.next        ./.next
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/next.config.ts ./next.config.ts
+
+EXPOSE 3000
+# `next start` binds 0.0.0.0:3000 by default — reachable by Caddy on the compose network.
+CMD ["npm", "run", "start"]

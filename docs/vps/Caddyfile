@@ -1,0 +1,20 @@
+# Caddy reverse proxy for Proxim.
+# Caddy automatically obtains and renews a Let's Encrypt TLS certificate for
+# $DOMAIN (requires the domain's DNS A record to point at this VPS, and ports
+# 80 + 443 reachable from the internet).
+#
+# DOMAIN and ACME_EMAIL are injected from the environment (see docker-compose.yml).
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Proxy all traffic to the Next.js container on the internal compose network.
+	reverse_proxy web:3000
+
+	# Tracking pixels/links in outreach emails resolve to https://$DOMAIN
+	# (set TRACKING_HOST=https://$DOMAIN in .env so the agent generates them).
+}

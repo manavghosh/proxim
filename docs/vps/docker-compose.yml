@@ -1,0 +1,72 @@
+# Single-VPS stack for Proxim — Caddy (TLS) + Next.js UI + Python agent.
+#
+# Everything runs on ONE machine, so the two runtimes share one disk via the
+# `proxim_data` volume mounted at the SAME absolute path (/data) in both the
+# `web` and `agent` containers. This matters because the DB stores ABSOLUTE PDF
+# paths written by each runtime (base resumes by web, tailored resumes/cover
+# letters by the agent) — they only resolve if /data is identical on both sides.
+#
+# Usage (from this docs/vps/ directory):
+#   cp .env.example .env   # then edit .env
+#   docker compose up -d --build
+#
+# See README.md for first-run DB bootstrap, DNS, and OAuth setup.
+
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data       # Caddy's own ACME/cert store (separate container, separate volume)
+      - caddy_config:/config
+    depends_on:
+      - web
+
+  web:
+    build:
+      context: ../..                     # repo root
+      dockerfile: docs/vps/Dockerfile.web
+      args:
+        # next.config.ts picks the DB driver at BUILD time from DATABASE_URL.
+        # Must match the runtime value below (SQLite path → better-sqlite3).
+        DATABASE_URL: ${DATABASE_URL:-/data/proxim.db}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:-/data/proxim.db}
+      RESUME_OUTPUT_DIR: /data/base-resumes   # base-resume uploads (read by the agent)
+    volumes:
+      - proxim_data:/data
+    expose:
+      - "3000"
+
+  agent:
+    build:
+      context: ../../agent
+      dockerfile: Dockerfile               # existing agent/Dockerfile (Playwright base image)
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-/data/proxim.db}
+      RESUME_OUTPUT_DIR: /data/output/resumes  # tailored resumes/cover letters (read by web)
+    volumes:
+      - proxim_data:/data
+    depends_on:
+      - web
+    # Chromium needs headroom — 512 MB OOMs. Give the box ≥2 GB total.
+    # mem_limit: 2g   # uncomment if you want a hard cap
+
+volumes:
+  proxim_data:     # shared by web + agent: SQLite DB, base resumes, generated PDFs
+  caddy_data:
+  caddy_config:
