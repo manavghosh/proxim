@@ -76,6 +76,11 @@ export default function PipelinePage() {
   const [batchFilterId, setBatchFilterId] = useState<string | null>(null)
   const [batchCount, setBatchCount] = useState(0)
   const [batchComplete, setBatchComplete] = useState(false)
+  // Search view: set when the user arrives mid-flight from an AI "Search for New
+  // Jobs" run. Shows a live progress banner + log without batch-filtering (a
+  // search isn't a tight batch — results land across the existing list).
+  const [searchActive, setSearchActive] = useState(false)
+  const [searchJobId, setSearchJobId] = useState<string | null>(null)
   const logPaneRef = useRef<HTMLDivElement>(null)
 
   const showToast = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
@@ -139,6 +144,59 @@ export default function PipelinePage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candidateId])
+
+  // Pick up an in-flight AI "Search for New Jobs" run (marker set by the
+  // dashboard's JobSearchCard). Unlike an import, we don't batch-filter — a
+  // search drops matches across the whole list — but we do show a live banner
+  // and the chain log so the user isn't met with a misleading empty state.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const key = `proxim-search-${candidateId}`
+    const raw = sessionStorage.getItem(key)
+    if (!raw) return
+    sessionStorage.removeItem(key)
+    let id = raw
+    try {
+      const parsed = JSON.parse(raw) as { id?: string }
+      if (parsed && typeof parsed === 'object') id = parsed.id ?? raw
+    } catch { /* legacy bare string */ }
+    setSearchActive(true)
+    setSearchJobId(id)
+    setRetryJobIds(prev => (prev.includes(id) ? prev : [...prev, id]))
+    setTimeout(() => {
+      logPaneRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 300)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [candidateId])
+
+  // Poll the search chain (discovery → fetch_jds → score_jobs). The terminal job
+  // is the score_jobs run; until it completes, keep the banner up and reload as
+  // freshly-scored cards land.
+  useEffect(() => {
+    if (!searchJobId || !searchActive) return
+    let cancelled = false
+    let currentId = searchJobId
+    const tick = async () => {
+      try {
+        const st = await getPipelineStatus(currentId)
+        if (cancelled) return
+        if (st.followUpJobId) {
+          currentId = st.followUpJobId            // advance through the chain
+          loadJobs(selectedGrades, sort)           // cards may already be landing
+        } else if (st.status === 'completed' && st.jobType === 'score_jobs') {
+          setSearchActive(false)                   // terminal scoring job finished
+          loadJobs(selectedGrades, sort)
+        } else if (st.status === 'failed') {
+          setSearchActive(false)
+          loadJobs(selectedGrades, sort)
+        }
+        // else: completed but follow-up not queued yet, or still running — wait
+      } catch { /* transient — keep polling */ }
+    }
+    const interval = setInterval(tick, 3000)
+    void tick()
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [searchJobId, searchActive, selectedGrades, sort, loadJobs])
 
   // While a batch view is active, poll the import run's status so the banner can
   // flip from "scoring…" to "complete" and the freshly-scored cards load in.
@@ -421,6 +479,17 @@ export default function PipelinePage() {
             </Button>
           </div>
         )}
+        {/* Search banner — shown when arriving mid-flight from an AI "Search for
+            New Jobs" run (not an import). No filter — matches land across the list. */}
+        {searchActive && !batchFilterId && (
+          <div className="max-w-3xl mb-4 rounded-xl border border-blue-800/40 bg-blue-950/20 px-4 py-3 flex items-center gap-3">
+            <div className="w-4 h-4 rounded-full border-2 border-blue-400 border-t-transparent animate-spin shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[12px] font-medium text-foreground">Searching &amp; scoring new jobs…</p>
+              <p className="text-[11px] text-muted-foreground">New matches appear here automatically as they&apos;re scored.</p>
+            </div>
+          </div>
+        )}
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map(i => (
@@ -443,7 +512,7 @@ export default function PipelinePage() {
               <>
                 <Workflow className="w-10 h-10 text-border mb-4" />
                 <p className="text-[13px] text-muted-foreground mb-4">
-                  No matching jobs — try a wider filter or run the pipeline
+                  No matching jobs — try a wider filter or run a new search
                 </p>
                 <Button
                   size="sm"

@@ -157,6 +157,7 @@ export function JobSearchCard({
           }
 
           if (status.status === 'completed') {
+            if (typeof window !== 'undefined') sessionStorage.removeItem(`proxim-search-${candidateId}`)
             if (rescoreOnly) {
               setCompleteResult({ discovered: 0, newJobs: 0, duplicatesSkipped: 0 })
             } else {
@@ -178,6 +179,7 @@ export function JobSearchCard({
           }
 
           if (status.status === 'failed') {
+            if (typeof window !== 'undefined') sessionStorage.removeItem(`proxim-search-${candidateId}`)
             setErrorMsg('Pipeline run failed. Please try again.')
             setMode('error')
             return
@@ -186,6 +188,7 @@ export function JobSearchCard({
           // Still running — poll again
           poll(jobId, rescoreOnly)
         } catch (err) {
+          if (typeof window !== 'undefined') sessionStorage.removeItem(`proxim-search-${candidateId}`)
           setErrorMsg(err instanceof Error ? err.message : 'Unknown error')
           setMode('error')
         }
@@ -203,6 +206,11 @@ export function JobSearchCard({
     stepCountsRef.current = ['', '', '']
     try {
       const { jobId } = await triggerPipeline('discovery_only', candidateId)
+      // Persist a marker so the Scorecard can show live "searching & scoring"
+      // progress if the user navigates there before this run finishes.
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem(`proxim-search-${candidateId}`, JSON.stringify({ id: jobId }))
+      }
       setSteps(
         STEP_LABELS.map((label, i) => ({
           label,
@@ -213,6 +221,7 @@ export function JobSearchCard({
       setMode('running')
       poll(jobId, false)
     } catch (err) {
+      if (typeof window !== 'undefined') sessionStorage.removeItem(`proxim-search-${candidateId}`)
       setErrorMsg(err instanceof Error ? err.message : 'Unknown error')
       setMode('error')
     }
@@ -221,6 +230,7 @@ export function JobSearchCard({
   function handleCancel() {
     if (pollRef.current) clearTimeout(pollRef.current)
     pollRef.current = null
+    if (typeof window !== 'undefined') sessionStorage.removeItem(`proxim-search-${candidateId}`)
     setMode('idle')
   }
 

@@ -353,7 +353,7 @@ async def _dispatch_job(pool, job: dict) -> None:
 
             await queue_pipeline_job(pool, cand_id, 'score_jobs', payload={'job_ids': job_ids})
             await _log("import_jobs",
-                       f"Score jobs queued — jobs will appear in the Pipeline review queue once scored.",
+                       f"Score jobs queued — jobs will appear in the Scorecard review queue once scored.",
                        {"queued": True})
 
             await update_pipeline_job_status(pool, pj_id, 'completed')

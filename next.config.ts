@@ -31,6 +31,26 @@ const config: NextConfig = {
       }
     }
 
+    // This is a two-runtime repo: the Python agent (agent/) shares the project
+    // root with the Next.js app. The agent writes to the local SQLite DB every
+    // few seconds (WAL/SHM files), plus PDF output and logs. Left unignored, the
+    // dev file-watcher rebuilds the frontend on every such write — a continuous
+    // Fast Refresh loop that intermittently corrupts chunk loads and interrupts
+    // client-side navigation. Exclude the agent dir, DB files, and test artifacts.
+    webpackConfig.watchOptions = {
+      ...(webpackConfig.watchOptions as object),
+      ignored: [
+        '**/node_modules/**',
+        '**/.git/**',
+        '**/.next/**',
+        '**/agent/**',
+        '**/.playwright-mcp/**',
+        '**/*.db',
+        '**/*.db-wal',
+        '**/*.db-shm',
+      ],
+    }
+
     return webpackConfig
   },
 }

@@ -1,8 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useParams } from 'next/navigation'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { PlusCircle, ExternalLink, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet'
@@ -18,6 +17,7 @@ interface Props {
 type Status = 'idle' | 'loading' | 'success' | 'error'
 
 export function ImportJobsSheet({ candidateId, onImported, label = '+ Add Jobs' }: Props) {
+  const router              = useRouter()
   const [open, setOpen]     = useState(false)
   const [urls, setUrls]     = useState('')
   const [status, setStatus] = useState<Status>('idle')
@@ -77,10 +77,10 @@ export function ImportJobsSheet({ candidateId, onImported, label = '+ Add Jobs' 
       <Sheet open={open} onOpenChange={handleClose}>
         <SheetContent className="w-full sm:max-w-lg bg-background border-border text-foreground">
           <SheetHeader className="mb-4">
-            <SheetTitle className="text-foreground">Import Jobs</SheetTitle>
+            <SheetTitle className="text-foreground">Add Jobs</SheetTitle>
             <SheetDescription className="text-muted-foreground text-xs">
               Paste one job URL per line. Supports LinkedIn and Naukri.
-              Each job will be scraped, scored, and added to your pipeline.
+              Each job will be scraped, scored, and added to your Scorecard.
             </SheetDescription>
           </SheetHeader>
 
@@ -135,7 +135,7 @@ export function ImportJobsSheet({ candidateId, onImported, label = '+ Add Jobs' 
                   </p>
                   {(result?.skipped ?? 0) > 0 && (
                     <p className="text-xs text-muted-foreground mt-1">
-                      {result?.skipped} URL{(result?.skipped ?? 0) > 1 ? 's' : ''} already in your pipeline — skipped
+                      {result?.skipped} URL{(result?.skipped ?? 0) > 1 ? 's' : ''} already in your Scorecard — skipped
                     </p>
                   )}
                   {(result?.imported ?? 0) > 0 && (
@@ -155,7 +155,7 @@ export function ImportJobsSheet({ candidateId, onImported, label = '+ Add Jobs' 
                         </div>
                         <div className="flex items-center gap-1.5">
                           <span className="w-4 h-4 rounded-full bg-border flex items-center justify-center text-[9px] text-muted-foreground">3</span>
-                          Jobs appear in Pipeline for your review
+                          Jobs appear in your Scorecard for review
                         </div>
                       </div>
                     </>
@@ -179,13 +179,13 @@ export function ImportJobsSheet({ candidateId, onImported, label = '+ Add Jobs' 
                   <Button
                     size="sm"
                     className="text-[11px] bg-blue-600 hover:bg-blue-700 text-white gap-1.5"
-                    asChild
-                    onClick={handleClose}
+                    onClick={() => {
+                      handleClose()
+                      router.push(`/candidates/${candidateId}/pipeline`)
+                    }}
                   >
-                    <Link href={`/candidates/${candidateId}/pipeline`}>
-                      Go to Scorecard
-                      <ArrowRight className="w-3 h-3" />
-                    </Link>
+                    Go to Scorecard
+                    <ArrowRight className="w-3 h-3" />
                   </Button>
                 </div>
               </div>
@@ -203,7 +203,7 @@ export function ImportJobsSheet({ candidateId, onImported, label = '+ Add Jobs' 
                 </li>
                 <li className="flex items-start gap-1.5">
                   <ExternalLink className="w-3 h-3 shrink-0 mt-0.5 text-muted-foreground" />
-                  Duplicate URLs (already in your pipeline) are skipped
+                  Duplicate URLs (already in your Scorecard) are skipped
                 </li>
                 <li className="flex items-start gap-1.5">
                   <ExternalLink className="w-3 h-3 shrink-0 mt-0.5 text-muted-foreground" />

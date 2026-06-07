@@ -78,7 +78,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         imported: 0,
         skipped: parsed.length,
-        message: 'All URLs already exist in your pipeline',
+        message: 'All URLs already exist in your Scorecard',
       })
     }
 
