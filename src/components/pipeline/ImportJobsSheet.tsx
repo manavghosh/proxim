@@ -16,6 +16,20 @@ interface Props {
 
 type Status = 'idle' | 'loading' | 'success' | 'error'
 
+// api.ts `request()` throws `"<status>: <body>"`. Surface the server's clean
+// message (e.g. "Maximum 50 URLs per import") instead of the raw status+JSON.
+function extractErrorMessage(e: unknown): string {
+  if (!(e instanceof Error)) return 'Import failed'
+  const m = e.message.match(/^\d+:\s*(\{[\s\S]*\})$/)
+  if (m) {
+    try {
+      const parsed = JSON.parse(m[1]) as { error?: string }
+      if (parsed.error) return parsed.error
+    } catch { /* not JSON — fall through */ }
+  }
+  return e.message
+}
+
 export function ImportJobsSheet({ candidateId, onImported, label = '+ Add Jobs' }: Props) {
   const router              = useRouter()
   const [open, setOpen]     = useState(false)
@@ -47,7 +61,7 @@ export function ImportJobsSheet({ candidateId, onImported, label = '+ Add Jobs' 
         }
       }
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Import failed')
+      setError(extractErrorMessage(e))
       setStatus('error')
     }
   }
