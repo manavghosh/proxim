@@ -1,8 +1,18 @@
 """Proxim agent polling daemon — polls DB every 3s for queued pipeline jobs."""
+import sys
 import warnings
 # langchain_core uses pydantic.v1 compat layer which emits a UserWarning on Python 3.14+.
 # The daemon functions correctly — suppress the noise.
 warnings.filterwarnings("ignore", message="Core Pydantic V1 functionality", category=UserWarning)
+
+# Windows consoles default to cp1252; job titles/JDs contain non-ASCII characters
+# that otherwise crash structlog's stdout writer ('charmap' codec can't encode).
+# Force UTF-8 so logging never fails on a unicode title. No-op on UTF-8 platforms.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
+    except (AttributeError, ValueError):
+        pass
 
 import asyncio
 import signal

@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
-import { getJobs, markSubmitted, rejectJob, getResumeVersions, triggerResumeGeneration, getPreferences, startJobStream, markInterview, retryPipelineStage } from '@/lib/api'
+import { getJobs, markSubmitted, rejectJob, archiveJob, getResumeVersions, triggerResumeGeneration, getPreferences, startJobStream, markInterview, retryPipelineStage } from '@/lib/api'
 import type { ScoredJob, ResumeVersion } from '@/lib/api'
+import { ArchiveAgedControl } from '@/components/jobs/ArchiveAgedControl'
 import type { EmailOutreachMode, OutreachStatus, EmailCadenceStatus } from '@/types/candidate'
 import { Topbar } from '@/components/layout/Topbar'
 import { CandidateSwitcher } from '@/components/layout/CandidateSwitcher'
@@ -153,6 +154,19 @@ export default function ApplicationsPage() {
     }
   }
 
+  const handleArchive = async (jobId: string) => {
+    setPendingId(jobId)
+    setError(null)
+    try {
+      await archiveJob(jobId, candidateId)
+      setJobs((prev) => prev.filter((j) => j.id !== jobId))
+    } catch {
+      setError('Failed to archive job. Please try again.')
+    } finally {
+      setPendingId(null)
+    }
+  }
+
   const handleGenerateResume = async (jobId: string) => {
     setPendingId(jobId)
     setError(null)
@@ -282,7 +296,14 @@ export default function ApplicationsPage() {
               </TabsTrigger>
             </TabsList>
             {activeTab === 'jobs' && (
-              <GradeFilterDropdown selected={selectedGrades} onChange={setSelectedGrades} counts={counts} />
+              <div className="flex items-center gap-3">
+                <GradeFilterDropdown selected={selectedGrades} onChange={setSelectedGrades} counts={counts} />
+                <ArchiveAgedControl
+                  candidateId={candidateId}
+                  onArchived={() => loadJobs(selectedGrades)}
+                  onError={(msg) => setError(msg)}
+                />
+              </div>
             )}
           </div>
 
@@ -323,6 +344,7 @@ export default function ApplicationsPage() {
                         emailResumeAttachment={emailResumeAttachment}
                         onMarkSubmitted={handleMarkSubmitted}
                         onMoveToRejected={handleMoveToRejected}
+                        onArchive={handleArchive}
                         onGenerateResume={handleGenerateResume}
                         onRetryResume={handleRetryResume}
                         onBuildComplete={handleBuildComplete}
@@ -349,6 +371,7 @@ export default function ApplicationsPage() {
                     emailResumeAttachment={emailResumeAttachment}
                     onMarkSubmitted={handleMarkSubmitted}
                     onMoveToRejected={handleMoveToRejected}
+                    onArchive={handleArchive}
                     onGenerateResume={handleGenerateResume}
                     onRetryResume={handleRetryResume}
                     onBuildComplete={handleBuildComplete}

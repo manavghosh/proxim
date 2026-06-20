@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { AlertTriangle, ChevronDown, ChevronUp, ExternalLink, RotateCcw } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronUp, ExternalLink, RotateCcw, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { resetFailedJobs, retryScoring, triggerPipeline } from '@/lib/api'
 import type { HitlJob } from '@/lib/api'
@@ -10,13 +10,23 @@ interface Props {
   jobs: HitlJob[]
   candidateId: string
   onRetried: (pipelineJobId: string) => void
+  onDismiss: (jobId: string) => Promise<void> | void
 }
 
-export function ScoreFailedSection({ jobs, candidateId, onRetried }: Props) {
+// An "unreadable" job (wall/login/expired page → empty JD) can't be rescored, so
+// it gets a Dismiss action instead of Retry. Identified by its error message.
+function isUnreadable(job: HitlJob): boolean {
+  return (job.errorMessage ?? '').startsWith("Couldn't read this posting")
+}
+
+export function ScoreFailedSection({ jobs, candidateId, onRetried, onDismiss }: Props) {
   const [open, setOpen]               = useState(false)
   const [retryingAll, setRetryingAll] = useState(false)
   const [retryingId, setRetryingId]   = useState<string | null>(null)
+  const [dismissingId, setDismissingId] = useState<string | null>(null)
   const [error, setError]             = useState<string | null>(null)
+
+  const retryableCount = jobs.filter(j => !isUnreadable(j)).length
 
   const count = jobs.length
 
@@ -47,6 +57,18 @@ export function ScoreFailedSection({ jobs, candidateId, onRetried }: Props) {
     }
   }
 
+  async function handleDismiss(jobId: string) {
+    setDismissingId(jobId)
+    setError(null)
+    try {
+      await onDismiss(jobId)
+    } catch {
+      setError('Failed to dismiss — please try again')
+    } finally {
+      setDismissingId(null)
+    }
+  }
+
   return (
     <div className="max-w-3xl mt-4 border border-amber-800/40 rounded-xl overflow-hidden bg-muted">
       {/* Header */}
@@ -67,18 +89,20 @@ export function ScoreFailedSection({ jobs, candidateId, onRetried }: Props) {
           }
         </Button>
 
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-6 text-[10px] border-amber-700/50 text-amber-400 hover:bg-amber-950/40 gap-1"
-          onClick={handleRetryAll}
-          disabled={retryingAll}
-          isLoading={retryingAll}
-          aria-label="Retry All"
-        >
-          <RotateCcw className="w-3 h-3" />
-          Retry All
-        </Button>
+        {retryableCount > 0 && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 text-[10px] border-amber-700/50 text-amber-400 hover:bg-amber-950/40 gap-1"
+            onClick={handleRetryAll}
+            disabled={retryingAll}
+            isLoading={retryingAll}
+            aria-label="Retry All"
+          >
+            <RotateCcw className="w-3 h-3" />
+            Retry All
+          </Button>
+        )}
       </div>
 
       {/* Body */}
@@ -109,18 +133,33 @@ export function ScoreFailedSection({ jobs, candidateId, onRetried }: Props) {
                 )}
               </div>
 
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-6 text-[10px] border-border-strong text-primary hover:bg-card gap-1 shrink-0"
-                onClick={() => handleRetryOne(job.id)}
-                disabled={retryingId === job.id}
-                isLoading={retryingId === job.id}
-                aria-label="Retry"
-              >
-                <RotateCcw className="w-3 h-3" />
-                Retry
-              </Button>
+              {isUnreadable(job) ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 text-[10px] border-border-strong text-muted-foreground hover:bg-card gap-1 shrink-0"
+                  onClick={() => handleDismiss(job.id)}
+                  disabled={dismissingId === job.id}
+                  isLoading={dismissingId === job.id}
+                  aria-label="Dismiss"
+                >
+                  <X className="w-3 h-3" />
+                  Dismiss
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 text-[10px] border-border-strong text-primary hover:bg-card gap-1 shrink-0"
+                  onClick={() => handleRetryOne(job.id)}
+                  disabled={retryingId === job.id}
+                  isLoading={retryingId === job.id}
+                  aria-label="Retry"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  Retry
+                </Button>
+              )}
             </div>
           ))}
         </div>

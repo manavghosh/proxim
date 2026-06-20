@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { eq, sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@/db'
 import { jobs } from '@/db/schema'
 import { getOrCreateCandidate, getCandidateById } from '@/lib/cv-service'
@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     const rows = await db
       .select({ status: jobs.status, count: sql<string>`count(*)` })
       .from(jobs)
-      .where(cId ? eq(jobs.candidateId, cId) : undefined)
+      .where(cId ? and(eq(jobs.candidateId, cId), eq(jobs.archived, false)) : eq(jobs.archived, false))
       .groupBy(jobs.status)
 
     const counts: Record<string, number> = {}

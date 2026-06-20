@@ -19,6 +19,7 @@ import {
   rejectJob,
   snoozeJob,
   unsnoozeJob,
+  archiveJob,
   startJobStream,
   updatePreferences,
   getPreferences,
@@ -26,6 +27,7 @@ import {
   getPipelineStatus,
   type HitlJob,
 } from '@/lib/api'
+import { ArchiveAgedControl } from '@/components/jobs/ArchiveAgedControl'
 import { Workflow, CheckCircle2 } from 'lucide-react'
 import type { OutreachStatus, EmailCadenceStatus } from '@/types/candidate'
 
@@ -397,6 +399,19 @@ export default function PipelinePage() {
     }
   }
 
+  const handleArchive = async (jobId: string) => {
+    setPending(jobId, true)
+    try {
+      await archiveJob(jobId, candidateId)
+      setJobs(prev => prev.filter(j => j.id !== jobId))
+      showToast('Job archived', 'info')
+    } catch {
+      showToast('Failed to archive job', 'error')
+    } finally {
+      setPending(jobId, false)
+    }
+  }
+
   const handleUnsnooze = async (jobId: string) => {
     setPending(jobId, true)
     try {
@@ -469,6 +484,17 @@ export default function PipelinePage() {
             counts={counts}
           />
           <PipelineSortControl value={sort} onChange={handleSortChange} />
+          <ArchiveAgedControl
+            candidateId={candidateId}
+            onArchived={(count) => {
+              showToast(
+                count > 0 ? `Archived ${count} aged job${count === 1 ? '' : 's'}` : 'No aged jobs to archive',
+                count > 0 ? 'success' : 'info'
+              )
+              loadJobs(selectedGrades, sort)
+            }}
+            onError={(msg) => showToast(msg, 'error')}
+          />
         </div>
       </div>
 
@@ -560,6 +586,7 @@ export default function PipelinePage() {
                 onSnooze={handleSnooze}
                 onUnsnooze={handleUnsnooze}
                 onGenerateResume={handleGenerateResume}
+                onArchive={handleArchive}
                 isPending={pendingJobIds.has(job.id)}
                 isPendingOutreach={pendingOutreachIds.has(job.id)}
                 onUpdate={() => loadJobs(selectedGrades, sort)}
@@ -575,6 +602,11 @@ export default function PipelinePage() {
             onRetried={(pjId) => {
               setRetryJobIds(prev => [...prev, pjId])
               loadJobs(selectedGrades, sort)
+            }}
+            onDismiss={async (jobId) => {
+              await rejectJob(jobId, candidateId)
+              setJobs(prev => prev.filter(j => j.id !== jobId))
+              showToast('Job dismissed', 'info')
             }}
           />
         )}

@@ -391,6 +391,57 @@ export async function unsnoozeJob(
   })
 }
 
+// ── Archival ────────────────────────────────────────────────────────────────
+
+export type ArchivedJob = {
+  id: string
+  title: string
+  company: string
+  location: string | null
+  sourceUrl: string
+  status: string
+  grade: string | null
+  postedAt: string | null
+  archivedAt: string | null
+  createdAt: string | null
+}
+
+export async function archiveJob(
+  jobId: string,
+  candidateId: string
+): Promise<{ jobId: string; archived: boolean }> {
+  return request(`/api/jobs/${jobId}/archive?candidateId=${encodeURIComponent(candidateId)}`, {
+    method: 'POST',
+  })
+}
+
+export async function unarchiveJob(
+  jobId: string,
+  candidateId: string
+): Promise<{ jobId: string; archived: boolean; status: string }> {
+  return request(`/api/jobs/${jobId}/unarchive?candidateId=${encodeURIComponent(candidateId)}`, {
+    method: 'POST',
+  })
+}
+
+export async function archiveAgedJobs(
+  candidateId: string,
+  days: 30 | 60 | 90,
+  dryRun = false
+): Promise<{ count: number; days: number; dryRun: boolean }> {
+  return request(`/api/jobs/archive-aged?candidateId=${encodeURIComponent(candidateId)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ days, dryRun }),
+  })
+}
+
+export async function getArchivedJobs(
+  candidateId: string
+): Promise<{ jobs: ArchivedJob[]; total: number }> {
+  return request(`/api/candidates/${candidateId}/archived`)
+}
+
 export function startJobStream(
   candidateId: string,
   onJobsArrived: (jobIds: string[]) => void,

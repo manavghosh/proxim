@@ -117,6 +117,7 @@ export async function GET(
       .where(
         and(
           eq(jobs.candidateId, candidateId),
+          eq(jobs.archived, false),
           or(
             eq(jobs.status, 'score_failed'),
             notInArray(jobs.status, EXCLUDED_STATUSES)

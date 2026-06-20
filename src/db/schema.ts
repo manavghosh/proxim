@@ -165,9 +165,14 @@ export const jobs = pgTable('jobs', {
   updatedAt: timestamp({ withTimezone: true }).defaultNow().notNull().$onUpdateFn(() => new Date()),
   // F7 interview callback tracking (self-reported)
   interviewCallbackAt: timestamp({ withTimezone: true }),
+  // Archival: organizational flag, independent of `status`. Archived jobs are
+  // hidden from Scorecard/Applications but retained and restorable.
+  archived:   boolean().default(false).notNull(),
+  archivedAt: timestamp({ withTimezone: true }),
 }, (table) => [
   index('jobs_candidate_status_idx').on(table.candidateId, table.status),
   index('jobs_candidate_source_url_idx').on(table.candidateId, table.sourceUrl),
+  index('jobs_candidate_archived_idx').on(table.candidateId, table.archived),
 ])
 
 export const scanHistory = pgTable('scan_history', {

@@ -141,9 +141,14 @@ export const jobs = sqliteTable('jobs', {
   createdAt:      text().$defaultFn(now).notNull(),
   updatedAt:      text().$defaultFn(now).$onUpdateFn(now).notNull(),
   interviewCallbackAt: text(),
+  // Archival: organizational flag, independent of `status`. Archived jobs are
+  // hidden from Scorecard/Applications but retained and restorable.
+  archived:   integer({ mode: 'boolean' }).default(false).notNull(),
+  archivedAt: text(),
 }, (table) => [
   index('jobs_candidate_status_idx').on(table.candidateId, table.status),
   index('jobs_candidate_source_url_idx').on(table.candidateId, table.sourceUrl),
+  index('jobs_candidate_archived_idx').on(table.candidateId, table.archived),
 ])
 
 export const scanHistory = sqliteTable('scan_history', {

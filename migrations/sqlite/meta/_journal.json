@@ -64,6 +64,20 @@
       "when": 1779547714405,
       "tag": "0008_glossy_bastion",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1781931859677,
+      "tag": "0009_fat_ben_grimm",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1781931882635,
+      "tag": "0010_spotty_jamie_braddock",
+      "breakpoints": true
     }
   ]
 }

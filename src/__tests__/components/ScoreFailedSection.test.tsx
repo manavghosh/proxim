@@ -29,6 +29,7 @@ const baseProps = {
   ],
   candidateId: 'cand1',
   onRetried: vi.fn(),
+  onDismiss: vi.fn(),
 }
 
 describe('ScoreFailedSection', () => {
@@ -75,5 +76,19 @@ describe('ScoreFailedSection', () => {
     await waitFor(() => expect(resetFailedJobs).toHaveBeenCalledWith('cand1'))
     expect(triggerPipeline).toHaveBeenCalledWith('score_jobs', 'cand1')
     expect(baseProps.onRetried).toHaveBeenCalledWith('pj2')
+  })
+
+  it('unreadable jobs show Dismiss (not Retry) and call onDismiss', async () => {
+    const onDismiss = vi.fn()
+    const jobs = [makeJob({
+      id: 'j3', title: 'Wall Page',
+      errorMessage: "Couldn't read this posting — the link returned a search, login, or expired page, not a job. Re-add the direct job URL (…/jobs/view/…).",
+    })]
+    render(<ScoreFailedSection {...baseProps} jobs={jobs} onDismiss={onDismiss} />)
+    fireEvent.click(screen.getByRole('button', { name: /job.*could not be scored/i }))
+    expect(screen.queryByRole('button', { name: /^retry$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /retry all/i })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /dismiss/i }))
+    await waitFor(() => expect(onDismiss).toHaveBeenCalledWith('j3'))
   })
 })

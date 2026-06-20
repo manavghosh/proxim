@@ -3,7 +3,7 @@
 import type { LucideIcon } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Workflow, Send, Settings, ChevronLeft } from 'lucide-react'
+import { LayoutDashboard, Workflow, Send, Archive, Settings, ChevronLeft } from 'lucide-react'
 import { CandidateAvatar } from '@/components/shared/CandidateAvatar'
 
 function NavItem({
@@ -51,6 +51,7 @@ export function CandidateSidebar({
     { href: `${base}/dashboard`,    label: 'Dashboard',    icon: LayoutDashboard },
     { href: `${base}/pipeline`,     label: 'Scorecard',    icon: Workflow },
     { href: `${base}/applications`, label: 'Applications', icon: Send },
+    { href: `${base}/archived`,     label: 'Archived',     icon: Archive },
   ]
   const NAV_ACCOUNT = [
     { href: `${base}/settings`, label: 'Settings', icon: Settings },

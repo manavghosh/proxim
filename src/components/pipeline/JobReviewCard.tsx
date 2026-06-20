@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { CheckCircle, XCircle, Bell, BellOff, MapPin, Building2, ExternalLink, Calendar, AlertTriangle, FileTextIcon, PlusCircle } from 'lucide-react'
+import { CheckCircle, XCircle, Bell, BellOff, MapPin, Building2, ExternalLink, Calendar, AlertTriangle, FileTextIcon, PlusCircle, Archive } from 'lucide-react'
 import { StrengthRiskChips } from './StrengthRiskChips'
 import { ScoreReportPane } from './ScoreReportPane'
 import type { HitlJob } from '@/lib/api'
@@ -53,6 +53,7 @@ interface JobReviewCardProps {
   onSnooze: (jobId: string) => void
   onUnsnooze: (jobId: string) => void
   onGenerateResume: (jobId: string) => void
+  onArchive: (jobId: string) => void
   isPending: boolean
   outreachTarget?: OutreachTargetSummary | null
   emailCadence?: EmailCadenceSummary | null
@@ -68,6 +69,7 @@ export function JobReviewCard({
   onSnooze,
   onUnsnooze,
   onGenerateResume,
+  onArchive,
   isPending,
   outreachTarget,
   emailCadence,
@@ -191,16 +193,30 @@ export function JobReviewCard({
             />
           </div>
 
-          {/* Source link */}
-          <a
-            href={job.sourceUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-shrink-0 text-muted-foreground hover:text-primary transition-colors"
-            title={job.sourceUrl}
-          >
-            <ExternalLink className="w-4 h-4" />
-          </a>
+          {/* Source link + archive */}
+          <div className="flex-shrink-0 flex items-center gap-1">
+            <a
+              href={job.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-muted-foreground hover:text-primary transition-colors"
+              title={job.sourceUrl}
+            >
+              <ExternalLink className="w-4 h-4" />
+            </a>
+            <Button
+              size="icon-xs"
+              variant="ghost"
+              className="text-muted-foreground hover:text-foreground"
+              onClick={() => onArchive(job.id)}
+              disabled={isPending}
+              title="Archive job"
+              aria-label="Archive job"
+              data-testid="archive-btn"
+            >
+              <Archive className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
 
         {/* Action buttons — hidden for F (gate fail): read-only, report only */}

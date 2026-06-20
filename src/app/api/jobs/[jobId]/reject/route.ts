@@ -21,7 +21,7 @@ export async function POST(
     const updated = await db
       .update(jobs)
       .set({ status: 'rejected' })
-      .where(and(eq(jobs.id, jobId), inArray(jobs.status, ['scored', 'awaiting', 'snoozed'] as JobStatus[])))
+      .where(and(eq(jobs.id, jobId), inArray(jobs.status, ['scored', 'awaiting', 'snoozed', 'score_failed', 'resume_failed'] as JobStatus[])))
       .returning({ id: jobs.id, status: jobs.status })
 
     if (updated.length === 0) {

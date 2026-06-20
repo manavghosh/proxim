@@ -32,6 +32,7 @@ function defaultProps() {
     candidateId: 'cand-1',
     onMarkSubmitted: vi.fn(),
     onMoveToRejected: vi.fn(),
+    onArchive: vi.fn(),
     onGenerateResume: vi.fn(),
     onRetryResume: vi.fn(),
     onViewResume: vi.fn(),
@@ -91,12 +92,14 @@ describe('JobCard', () => {
     expect(screen.getByRole('button', { name: /more actions/i })).toBeInTheDocument()
   })
 
-  it('hides the "More actions" overflow when the job is already rejected', () => {
+  it('still exposes "More actions" for rejected jobs (Archive is available there)', () => {
+    // Rejected jobs no longer hide the overflow menu — they keep it so the job
+    // can be archived (the "Move to Rejected" item is the only one suppressed).
     const props = defaultProps()
     props.job = { ...baseJob, status: 'rejected' }
     render(<JobCard {...props} />)
     act(() => { fireEvent.click(screen.getByRole('button', { name: /Expand job card/i })) })
-    expect(screen.queryByRole('button', { name: /more actions/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /more actions/i })).toBeInTheDocument()
   })
 
   it('disables Mark Submitted when isPending is true', () => {

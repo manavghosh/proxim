@@ -1,0 +1,1 @@
+ALTER TABLE "email_cadences" ADD COLUMN "send_retry_count" integer DEFAULT 0 NOT NULL;

@@ -5,11 +5,14 @@ import { jobs, pipelineJobs, pipelineLogs } from '@/db/schema'
 
 export async function POST() {
   try {
-    // 1. Find all score_failed jobs
+    // 1. Find score_failed jobs that actually have a JD — i.e. transient scoring
+    // failures worth retrying. "Unreadable" jobs (empty JD from a wall/login/
+    // expired page) can't be rescored; resetting them would drop them into
+    // 'discovered' limbo where they neither score nor stay surfaced (G1 retry).
     const failedJobs = await db
       .select({ id: jobs.id, title: jobs.title, company: jobs.company })
       .from(jobs)
-      .where(eq(jobs.status, 'score_failed'))
+      .where(and(eq(jobs.status, 'score_failed'), sql`coalesce(${jobs.jdRaw}, '') <> ''`))
 
     if (failedJobs.length === 0) {
       return NextResponse.json({ reset: 0 })

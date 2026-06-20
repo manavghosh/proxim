@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 import { db } from '@/db'
 import { candidates, jobs } from '@/db/schema'
 
@@ -20,12 +20,12 @@ export async function GET() {
       const [matchedRow] = await db
         .select({ count: sql<number>`count(*)` })
         .from(jobs)
-        .where(eq(jobs.candidateId, c.id))
+        .where(and(eq(jobs.candidateId, c.id), eq(jobs.archived, false)))
 
       const [approvedRow] = await db
         .select({ count: sql<number>`count(*)` })
         .from(jobs)
-        .where(eq(jobs.candidateId, c.id))
+        .where(and(eq(jobs.candidateId, c.id), eq(jobs.archived, false)))
 
       return {
         ...c,

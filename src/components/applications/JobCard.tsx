@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ExternalLink, FileTextIcon, MoreHorizontal, XCircle, CheckCheck, RotateCcw, Link2, MailIcon, ChevronDown, Sparkles, Star } from 'lucide-react'
+import { ExternalLink, FileTextIcon, MoreHorizontal, XCircle, CheckCheck, RotateCcw, Link2, MailIcon, ChevronDown, Sparkles, Star, Archive } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert } from '@/components/ui/alert'
@@ -41,6 +41,7 @@ interface Props {
   job: ScoredJob
   onMarkSubmitted: (jobId: string) => void
   onMoveToRejected: (jobId: string) => void
+  onArchive: (jobId: string) => void
   onGenerateResume: (jobId: string) => void
   onRetryResume: (jobId: string) => void
   onBuildComplete?: (jobId: string) => void
@@ -88,6 +89,7 @@ export function JobCard({
   job,
   onMarkSubmitted,
   onMoveToRejected,
+  onArchive,
   onGenerateResume,
   onRetryResume,
   onBuildComplete,
@@ -407,25 +409,31 @@ export function JobCard({
               )}
 
               <div className="ml-auto flex gap-2 items-center">
-                {!isRejected && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button size="sm" variant="ghost"
-                        className="h-7 w-7 p-0 text-muted-foreground hover:text-muted-foreground"
-                        aria-label="More actions">
-                        <MoreHorizontal className="w-3 h-3" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="ghost"
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-muted-foreground"
+                      aria-label="More actions">
+                      <MoreHorizontal className="w-3 h-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-44">
+                    {!isRejected && (
                       <DropdownMenuItem
                         onClick={() => onMoveToRejected(job.id)}
                         className="text-red-400 focus:text-red-300">
                         <XCircle className="w-3 h-3 mr-2" />
                         Move to Rejected
                       </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
+                    )}
+                    <DropdownMenuItem
+                      onClick={() => onArchive(job.id)}
+                      data-testid="archive-menu-item">
+                      <Archive className="w-3 h-3 mr-2" />
+                      Archive
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
 

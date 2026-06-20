@@ -78,7 +78,7 @@ export async function GET(request: Request) {
       .from(jobs)
       .leftJoin(emailCadences, eq(emailCadences.jobId, jobs.id))
       .leftJoin(outreachTargets, eq(outreachTargets.jobId, jobs.id))
-      .where(eq(jobs.candidateId, candidate.id))
+      .where(and(eq(jobs.candidateId, candidate.id), eq(jobs.archived, false)))
       .orderBy(jobs.createdAt)
 
     const filtered = allJobs.filter((j) => {
